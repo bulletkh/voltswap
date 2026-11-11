@@ -258,25 +258,6 @@ export default function App() {
     initTelegramWebApp();
   }, []);
 
-  // Synchronize Telegram BackButton with active modals
-  useEffect(() => {
-    if (tokenModalTarget) {
-      showTelegramBackButton(() => {
-        setTokenModalTarget(null);
-        setTokenSearchQuery('');
-      });
-    } else if (showSettings) {
-      showTelegramBackButton(() => {
-        setShowSettings(false);
-      });
-    } else if (notificationModal) {
-      showTelegramBackButton(() => {
-        setNotificationModal(null);
-      });
-    } else {
-      hideTelegramBackButton();
-    }
-  }, [tokenModalTarget, showSettings, notificationModal]);
 
   // Open Orders & DCA automations list
   const [openOrders, setOpenOrders] = useState<Array<{
@@ -371,6 +352,34 @@ export default function App() {
   // Viral PnL Share Card Modal
   const [pnlModalData, setPnlModalData] = useState<PnlTradeData | null>(null);
   const [isPnlModalOpen, setIsPnlModalOpen] = useState<boolean>(false);
+
+  // Synchronize Telegram BackButton with active modals (closed gracefully on hardware/TMA back button)
+  useEffect(() => {
+    if (tokenModalTarget) {
+      showTelegramBackButton(() => {
+        setTokenModalTarget(null);
+        setTokenSearchQuery('');
+      });
+    } else if (showSettings) {
+      showTelegramBackButton(() => {
+        setShowSettings(false);
+      });
+    } else if (notificationModal) {
+      showTelegramBackButton(() => {
+        setNotificationModal(null);
+      });
+    } else if (selectedOrderToManage) {
+      showTelegramBackButton(() => {
+        setSelectedOrderToManage(null);
+      });
+    } else if (isPnlModalOpen) {
+      showTelegramBackButton(() => {
+        setIsPnlModalOpen(false);
+      });
+    } else {
+      hideTelegramBackButton();
+    }
+  }, [tokenModalTarget, showSettings, notificationModal, selectedOrderToManage, isPnlModalOpen]);
 
   // Active Bluefin Perps Positions
   const [perpsPositions, setPerpsPositions] = useState<BluefinPosition[]>(() => {
