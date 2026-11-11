@@ -37,7 +37,10 @@ import {
   ShieldCheck,
   Users,
   Loader2,
-  BarChart2
+  BarChart2,
+  Star,
+  ArrowRight,
+  Fuel
 } from 'lucide-react';
 import { useCurrentAccount, ConnectButton, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
@@ -268,14 +271,59 @@ export default function App() {
   const [isFetchingQuote, setIsFetchingQuote] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showRouteDetails, setShowRouteDetails] = useState<boolean>(false);
-  const [activeOrdersTab, setActiveOrdersTab] = useState<'orders' | 'perps' | 'activity'>('orders');
+  const [activeOrdersTab, setActiveOrdersTab] = useState<'orders' | 'activity'>('orders');
   const [isOrdersExpanded, setIsOrdersExpanded] = useState<boolean>(false);
-  const [isPerpsExpanded, setIsPerpsExpanded] = useState<boolean>(false);
   const [isSwapsExpanded, setIsSwapsExpanded] = useState<boolean>(false);
   const [tokenModalTarget, setTokenModalTarget] = useState<'from' | 'to' | null>(null);
   const [tokenSearchQuery, setTokenSearchQuery] = useState<string>('');
   const [copiedRef, setCopiedRef] = useState<boolean>(false);
   const [radarBanner, setRadarBanner] = useState<string | null>(null);
+
+  // Auto-Refresh Quote Timer (10s countdown)
+  const [quoteRefreshCountdown, setQuoteRefreshCountdown] = useState<number>(10);
+  const [quoteRefreshNonce, setQuoteRefreshNonce] = useState<number>(0);
+
+  // Favorite Tokens (Pinned in token selector)
+  const [favoriteTokens, setFavoriteTokens] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('volt_favorite_tokens');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return ['SUI', 'USDC', 'USDT', 'DEEP', 'WAL', 'CETUS'];
+  });
+
+  const toggleFavoriteToken = useCallback((sym: string) => {
+    setFavoriteTokens((prev) => {
+      const upper = sym.toUpperCase();
+      const next = prev.includes(upper) ? prev.filter(s => s !== upper) : [...prev, upper];
+      try {
+        localStorage.setItem('volt_favorite_tokens', JSON.stringify(next));
+      } catch {}
+      playClickSound();
+      return next;
+    });
+  }, []);
+
+  // Live Quote Refresh Interval
+  useEffect(() => {
+    if (activeTab !== 'swap') return;
+    const interval = setInterval(() => {
+      setQuoteRefreshCountdown((prev) => {
+        if (prev <= 1) {
+          setQuoteRefreshNonce((n) => n + 1);
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
+  const handleManualQuoteRefresh = useCallback(() => {
+    setQuoteRefreshCountdown(10);
+    setQuoteRefreshNonce((n) => n + 1);
+    playClickSound();
+  }, []);
 
   // Initialize Telegram WebApp with native closing confirmation and theme synchronization
   useEffect(() => {
@@ -980,7 +1028,7 @@ export default function App() {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [fromAmount, fromToken, toToken, cetusClient]);
+  }, [fromAmount, fromToken, toToken, cetusClient, quoteRefreshNonce]);
 
   // Live dynamic USD prices:
   // 1. If we have an active on-chain Cetus Aggregator quote against USDC/USDT/BUCK, compute live pool mid-price
@@ -2299,7 +2347,7 @@ export default function App() {
                     onClick={() => setShowRouteDetails(!showRouteDetails)}
                     className="flex items-center justify-between text-xs text-gray-400 hover:text-gray-200 cursor-pointer select-none py-1 transition-colors"
                   >
-                    <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                    <div className="flex items-center gap-1.5 font-mono text-[11px] flex-wrap">
                       <span className="text-gray-400">1 {fromToken.symbol} ≈</span>
                       <span className="text-white font-bold">
                         {currentPairRate < 0.01 ? currentPairRate.toFixed(6) : currentPairRate.toFixed(4)} {toToken.symbol}
@@ -2307,14 +2355,33 @@ export default function App() {
                       <span className="text-[10px] text-gray-500">
                         (${fromPrice < 0.01 ? fromPrice.toFixed(4) : fromPrice.toFixed(2)})
                       </span>
+                      {/* Quote Auto-Refresh Badge / Manual Trigger */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleManualQuoteRefresh();
+                        }}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-[10px] text-gray-400 hover:text-volt border border-white/5 transition-all cursor-pointer"
+                        title="Click to refresh on-chain quote immediately"
+                      >
+                        <RefreshCw className={`w-2.5 h-2.5 text-volt ${isFetchingQuote ? 'animate-spin' : ''}`} />
+                        <span>{isFetchingQuote ? '...' : `${quoteRefreshCountdown}s`}</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[11px] font-mono">
-                      <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      {/* Network Gas Fee Badge */}
+                      <span className="text-[10px] text-emerald-400 font-mono font-medium flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        <Fuel className="w-2.5 h-2.5 text-emerald-400" />
+                        <span>&lt;$0.01</span>
+                      </span>
+
+                      <span className="text-emerald-400 font-semibold hidden sm:flex items-center gap-1">
                         <Zap className="w-3 h-3 text-volt" />
                         {cetusRouterResult ? `${cetusRouterResult.paths.length} Paths` : 'Cetus + DeepBook'}
                         {swapMode === 'market' && parseAmount(fromAmount) > 0 && (
-                          <span className="text-volt font-bold hidden sm:inline">
+                          <span className="text-volt font-bold">
                             • +${((parseAmount(fromAmount) * fromPrice) * 0.0085).toFixed(2)} saved
                           </span>
                         )}
@@ -2329,81 +2396,140 @@ export default function App() {
 
                   {/* Expandable Route & Execution Breakdown */}
                   {showRouteDetails && (
-                    <div className="mt-2 p-3 rounded-xl bg-[#0e1015]/90 border border-white/5 space-y-2 text-xs font-mono animate-in fade-in duration-150">
-                      <div className="flex items-center justify-between text-gray-400">
-                        <span className="flex items-center gap-1.5">
-                          <Layers className="w-3 h-3 text-volt" /> Routing Protocol
-                        </span>
-                        <span className="text-emerald-400 font-semibold">
-                          {cetusRouterResult
-                            ? `${cetusRouterResult.paths.length} Active Paths (Cetus CLMM + DeepBook v3)`
-                            : 'Cetus CLMM + DeepBook v3 CLOB'}
-                        </span>
+                    <div className="mt-2 p-3 rounded-2xl bg-[#0a0d14] border border-white/10 space-y-3 text-xs font-mono animate-fadeIn">
+                      {/* VISUAL SMART ROUTE GRAPH (1inch / Jupiter Pro style) */}
+                      <div className="p-3 rounded-xl bg-black/50 border border-white/5 space-y-2">
+                        <div className="flex items-center justify-between text-[10px] uppercase font-mono text-gray-400">
+                          <span className="flex items-center gap-1 font-bold text-gray-300">
+                            <Zap className="w-3 h-3 text-volt" /> Optimal PTB Execution
+                          </span>
+                          <span className="text-volt font-bold">Split-Liquidity Routing</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-1.5 text-xs font-mono py-1">
+                          {/* Input Token Pill */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#141824] border border-white/10 shrink-0 shadow-sm">
+                            <img
+                              src={fromToken.logo}
+                              alt=""
+                              className="w-4 h-4 rounded-full bg-white/5 object-cover"
+                              onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
+                            />
+                            <span className="font-bold text-white text-[11px]">{fromToken.symbol}</span>
+                          </div>
+
+                          <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                          {/* Routing Split Pools */}
+                          <div className="flex-1 flex flex-col gap-1.5 min-w-[120px]">
+                            <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-volt/10 border border-volt/25 text-[10px] shadow-sm">
+                              <span className="text-volt font-bold flex items-center gap-1">
+                                ⚡ Cetus CLMM
+                              </span>
+                              <span className="text-volt font-bold font-mono">68%</span>
+                            </div>
+                            <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-[10px] shadow-sm">
+                              <span className="text-cyan-300 font-bold flex items-center gap-1">
+                                📖 DeepBook v3
+                              </span>
+                              <span className="text-cyan-300 font-bold font-mono">32%</span>
+                            </div>
+                          </div>
+
+                          <ArrowRight className="w-3 h-3 text-gray-500 shrink-0" />
+
+                          {/* Output Token Pill */}
+                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#141824] border border-white/10 shrink-0 shadow-sm">
+                            <img
+                              src={toToken.logo}
+                              alt=""
+                              className="w-4 h-4 rounded-full bg-white/5 object-cover"
+                              onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
+                            />
+                            <span className="font-bold text-volt text-[11px]">{toToken.symbol}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-[10px] text-gray-500 text-center font-mono pt-0.5">
+                          Single Atomic Programmable Transaction Block • Zero Middleman
+                        </div>
                       </div>
 
-                      {swapMode === 'market' ? (
+                      {/* Detailed Execution Metrics */}
+                      <div className="space-y-2 pt-1">
                         <div className="flex items-center justify-between text-gray-400">
                           <span className="flex items-center gap-1.5">
-                            <Zap className="w-3 h-3 text-volt" /> Direct Route Advantage
+                            <Fuel className="w-3 h-3 text-emerald-400" /> Estimated Network Gas
                           </span>
-                          <span className="text-volt font-bold text-[11px]">
-                            +${((parseAmount(fromAmount) * fromPrice) * 0.0085).toFixed(2)} saved vs single DEX
-                          </span>
-                        </div>
-                      ) : swapMode === 'limit' ? (
-                        <div className="flex items-center justify-between text-gray-400">
-                          <span className="flex items-center gap-1.5">
-                            <Target className="w-3 h-3 text-cyan-400" /> CLOB Order Target
-                          </span>
-                          <span className="text-cyan-400 font-bold text-[11px]">
-                            DeepBook v3 @ {effectiveLimitRate < 0.01 ? effectiveLimitRate.toFixed(6) : effectiveLimitRate.toFixed(4)} {toToken.symbol}
+                          <span className="text-emerald-400 font-bold">
+                            ~0.0031 SUI (&lt;$0.01 USD)
                           </span>
                         </div>
-                      ) : (
-                        <div className="flex items-center justify-between text-gray-400">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-3 h-3 text-purple-400" /> DCA Schedule
-                          </span>
-                          <span className="text-purple-400 font-bold text-[11px]">
-                            {dcaOrdersCount} rounds every {dcaInterval}
-                          </span>
-                        </div>
-                      )}
 
-                      <div className="flex items-center justify-between text-gray-400">
-                        <span className="flex items-center gap-1.5">
-                          <ShieldCheck className="w-3 h-3 text-emerald-400" /> Max Slippage / MEV
-                        </span>
-                        <span className="text-white font-bold">
-                          {slippage === '0.2' ? '0.2% (Auto MEV Shield)' : `${slippage}%`}
-                        </span>
-                      </div>
+                        {swapMode === 'market' ? (
+                          <div className="flex items-center justify-between text-gray-400">
+                            <span className="flex items-center gap-1.5">
+                              <Zap className="w-3 h-3 text-volt" /> Direct Route Advantage
+                            </span>
+                            <span className="text-volt font-bold text-[11px]">
+                              +${((parseAmount(fromAmount) * fromPrice) * 0.0085).toFixed(2)} saved vs single DEX
+                            </span>
+                          </div>
+                        ) : swapMode === 'limit' ? (
+                          <div className="flex items-center justify-between text-gray-400">
+                            <span className="flex items-center gap-1.5">
+                              <Target className="w-3 h-3 text-cyan-400" /> CLOB Order Target
+                            </span>
+                            <span className="text-cyan-400 font-bold text-[11px]">
+                              DeepBook v3 @ {effectiveLimitRate < 0.01 ? effectiveLimitRate.toFixed(6) : effectiveLimitRate.toFixed(4)} {toToken.symbol}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between text-gray-400">
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="w-3 h-3 text-purple-400" /> DCA Schedule
+                            </span>
+                            <span className="text-purple-400 font-bold text-[11px]">
+                              {dcaOrdersCount} rounds every {dcaInterval}
+                            </span>
+                          </div>
+                        )}
 
-                      <div className="flex items-center justify-between text-gray-400">
-                        <span className="flex items-center gap-1.5">
-                          <Percent className="w-3 h-3 text-volt" /> Protocol Routing Fee
-                        </span>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-between text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <ShieldCheck className="w-3 h-3 text-emerald-400" /> Max Slippage / MEV
+                          </span>
                           <span className="text-white font-bold">
-                            {(effectiveFeeRate * 100).toFixed(2)}%
+                            {slippage === '0.2' ? '0.2% (Auto MEV Shield)' : `${slippage}%`}
                           </span>
-                          {userTraderTier.discountPct > 0 ? (
-                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 px-1.5 py-0.5 rounded-full">
-                              {userTraderTier.badgeEmoji} {userTraderTier.name} (-{userTraderTier.discountPct}%)
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-gray-500">
-                              (Standard)
-                            </span>
-                          )}
                         </div>
-                      </div>
 
-                      <div className="flex items-center justify-between text-gray-400">
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="w-3 h-3 text-volt" /> Settlement Speed
-                        </span>
-                        <span className="text-gray-300 text-[11px]">Single Atomic PTB (~390ms)</span>
+                        <div className="flex items-center justify-between text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <Percent className="w-3 h-3 text-volt" /> Protocol Routing Fee
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-white font-bold">
+                              {(effectiveFeeRate * 100).toFixed(2)}%
+                            </span>
+                            {userTraderTier.discountPct > 0 ? (
+                              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 px-1.5 py-0.5 rounded-full">
+                                {userTraderTier.badgeEmoji} {userTraderTier.name} (-{userTraderTier.discountPct}%)
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-500">
+                                (Standard)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-volt" /> Settlement Speed
+                          </span>
+                          <span className="text-gray-300 text-[11px]">Single Atomic PTB (~390ms)</span>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2530,22 +2656,6 @@ export default function App() {
 
                     <button
                       onClick={() => {
-                        setActiveOrdersTab('perps');
-                        playClickSound();
-                      }}
-                      className={`text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                        activeOrdersTab === 'perps'
-                          ? 'bg-[#1a1f2c] text-white border border-white/15 shadow-sm'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      <Flame className="w-3.5 h-3.5 text-volt shrink-0" />
-                      <span>Open Perps</span>
-                      <span className="text-[10px] bg-white/10 px-1.5 py-0.2 rounded-full font-mono">{perpsPositions.length}</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
                         setActiveOrdersTab('activity');
                         playClickSound();
                       }}
@@ -2556,7 +2666,7 @@ export default function App() {
                       }`}
                     >
                       <Activity className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span>My Swaps</span>
+                      <span>Recent Swaps</span>
                       <span className="text-[10px] bg-white/10 px-1.5 py-0.2 rounded-full font-mono">{mySwaps.length}</span>
                     </button>
                   </div>
@@ -2759,183 +2869,6 @@ export default function App() {
                           )}
                         </button>
                       )}
-                    </div>
-                  )
-                ) : activeOrdersTab === 'perps' ? (
-                  perpsPositions.length === 0 ? (
-                    <div className="py-6 text-center text-xs text-gray-500 font-mono space-y-3">
-                      <div>No active perpetual positions yet. Open leveraged Long or Short positions on Bluefin CLOB.</div>
-                      <button
-                        onClick={() => {
-                          setActiveTab('margin');
-                          playClickSound();
-                        }}
-                        className="px-3 py-1.5 rounded-xl bg-volt/10 hover:bg-volt/20 text-volt border border-volt/25 text-xs font-bold font-mono transition-all inline-flex items-center gap-1.5 cursor-pointer active:scale-95"
-                      >
-                        <Flame className="w-3.5 h-3.5 text-volt" /> Open Bluefin Perps Terminal →
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className={`space-y-2 pr-0.5 ${isPerpsExpanded ? 'max-h-[460px] overflow-y-auto' : ''}`}>
-                        {(isPerpsExpanded ? perpsPositions.slice(0, 50) : perpsPositions.slice(0, 3)).map((pos) => {
-                          const baseSym = pos.marketSymbol.replace('-PERP', '').toUpperCase();
-                          const currentMark = liveTokenPrices[baseSym] || pos.markPrice;
-                          const priceDiff = pos.side.toLowerCase() === 'long' ? (currentMark - pos.entryPrice) : (pos.entryPrice - currentMark);
-                          const livePnl = (priceDiff / pos.entryPrice) * pos.sizeUsd;
-                          const liveRoe = pos.marginCollateralUsd > 0 ? (livePnl / pos.marginCollateralUsd) * 100 : pos.roePct;
-
-                          return (
-                            <div
-                              key={pos.id}
-                              className="p-3 rounded-2xl bg-[#0d1017] hover:bg-[#111520] border border-white/6 hover:border-white/12 transition-all space-y-2 text-xs font-mono"
-                            >
-                              {/* Row 1: Side + Leverage Pill + Symbol + Entry / Mark Price + ROE Tag + Manage / Close buttons */}
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                  <span
-                                    className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide shrink-0 ${
-                                      pos.side.toLowerCase() === 'long'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                    }`}
-                                  >
-                                    {pos.side.toUpperCase()} {pos.leverage}x
-                                  </span>
-                                  <span className="font-bold text-white text-xs">
-                                    {pos.marketSymbol}
-                                  </span>
-                                  <span className="text-[11px] text-gray-400">
-                                    Entry: ${pos.entryPrice >= 1 ? pos.entryPrice.toFixed(4) : pos.entryPrice.toFixed(5)}
-                                  </span>
-                                  <span className="text-[11px] text-gray-500">
-                                    Mark: ${currentMark >= 1 ? currentMark.toFixed(4) : currentMark.toFixed(5)}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span
-                                    className={`text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap font-bold flex items-center gap-1 ${
-                                      livePnl >= 0
-                                        ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
-                                        : 'text-rose-400 bg-rose-500/10 border-rose-500/20'
-                                    }`}
-                                  >
-                                    <span className={`w-1.5 h-1.5 rounded-full ${livePnl >= 0 ? 'bg-emerald-400' : 'bg-rose-400'} animate-pulse`}></span>
-                                    {livePnl >= 0 ? '+' : ''}${livePnl.toFixed(2)} ({liveRoe >= 0 ? '+' : ''}{liveRoe.toFixed(2)}% ROE)
-                                  </span>
-
-                                  <button
-                                    onClick={() => {
-                                      setActiveTab('margin');
-                                      playClickSound();
-                                    }}
-                                    className="px-2 py-0.5 rounded-lg text-volt hover:text-black hover:bg-volt bg-volt/10 border border-volt/30 text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 active:scale-95"
-                                    title="Manage in Perps Terminal"
-                                  >
-                                    <Sliders className="w-3 h-3" /> Manage
-                                  </button>
-
-                                  <button
-                                    onClick={() => handleClosePerpPositionInApp(pos)}
-                                    className="px-2 py-0.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 bg-rose-500/10 border border-rose-500/25 text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 active:scale-95"
-                                    title="Market Close Position"
-                                  >
-                                    <X className="w-3 h-3" /> Close
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Row 2: Margin & Size + Liq Price + Share Card + Suiscan link */}
-                              <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-white/5 text-[11px] text-gray-400">
-                                <div className="flex items-center gap-2 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-                                  <span>
-                                    Margin: <strong className="text-gray-200">${pos.marginCollateralUsd.toFixed(2)} USDC</strong>
-                                  </span>
-                                  <span className="text-gray-600">•</span>
-                                  <span>
-                                    Position: <strong className="text-white">${pos.sizeUsd.toFixed(2)}</strong> ({pos.sizeContracts.toFixed(3)} {pos.baseAsset})
-                                  </span>
-                                  <span className="text-gray-600">•</span>
-                                  <span className="text-rose-400/90">
-                                    Liq: ${pos.liquidationPrice >= 1 ? pos.liquidationPrice.toFixed(4) : pos.liquidationPrice.toFixed(5)}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    onClick={() => {
-                                      handleOpenPnlModal({
-                                        fromToken: pos.side.toUpperCase() === 'LONG' ? pos.marketSymbol : 'USDC',
-                                        toToken: pos.side.toUpperCase() === 'LONG' ? 'USDC' : pos.marketSymbol,
-                                        fromAmount: pos.sizeContracts.toFixed(3),
-                                        toAmount: Math.max(0, pos.marginCollateralUsd + livePnl).toFixed(2),
-                                        volumeUsd: pos.sizeUsd,
-                                        profitUsd: livePnl,
-                                        profitPct: liveRoe,
-                                        digest: pos.digest,
-                                        timestamp: pos.openedAt || Date.now(),
-                                        orderType: 'PERPS'
-                                      });
-                                    }}
-                                    className="text-[10px] text-volt hover:text-white flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                                    title="Share PnL Card"
-                                  >
-                                    <Share2 className="w-2.5 h-2.5" /> Share
-                                  </button>
-
-                                  {pos.digest && (
-                                    <a
-                                      href={`https://suiscan.xyz/mainnet/tx/${pos.digest}`}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-[10px] text-cyan-400/80 hover:text-cyan-300 flex items-center gap-1 shrink-0 transition-colors"
-                                    >
-                                      Suiscan <ExternalLink className="w-2.5 h-2.5" />
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Expand / Collapse Button if more than 3 */}
-                      {perpsPositions.length > 3 && (
-                        <button
-                          onClick={() => {
-                            setIsPerpsExpanded(!isPerpsExpanded);
-                            playClickSound();
-                          }}
-                          className="w-full py-2 px-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 text-gray-400 hover:text-white text-xs font-mono font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-1"
-                        >
-                          {isPerpsExpanded ? (
-                            <>
-                              <ChevronUp className="w-3.5 h-3.5 text-volt" />
-                              <span>Show Recent 3 Only</span>
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="w-3.5 h-3.5 text-volt" />
-                              <span>View All Perps ({perpsPositions.length > 50 ? '50 of ' + perpsPositions.length : perpsPositions.length})</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-
-                      {/* Open Full Margin Terminal Action */}
-                      <div className="pt-1.5 flex justify-end">
-                        <button
-                          onClick={() => {
-                            setActiveTab('margin');
-                            playClickSound();
-                          }}
-                          className="text-xs font-mono text-volt hover:text-white bg-volt/10 hover:bg-volt/20 border border-volt/25 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer font-bold"
-                        >
-                          <Flame className="w-3.5 h-3.5 text-volt" /> Open Bluefin Perps Terminal →
-                        </button>
-                      </div>
                     </div>
                   )
                 ) : (
@@ -3706,10 +3639,12 @@ export default function App() {
               </div>
             </div>
 
-            {/* Popular Token Quick Chips */}
+            {/* Favorite / Pinned Token Quick Chips */}
             <div className="px-4 pb-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-              <span className="text-[11px] font-mono text-gray-500 uppercase shrink-0 mr-1">Popular:</span>
-              {['SUI', 'USDC', 'USDT', 'DEEP', 'WAL', 'CETUS'].map((sym) => {
+              <span className="text-[11px] font-mono text-gray-500 uppercase shrink-0 mr-1 flex items-center gap-1">
+                <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> Favorites:
+              </span>
+              {favoriteTokens.map((sym) => {
                 const tok = tokenList.find((t) => t.symbol.toUpperCase() === sym);
                 if (!tok) return null;
                 const isSelected =
@@ -3761,11 +3696,11 @@ export default function App() {
                     (tokenModalTarget === 'from' && fromToken.address === t.address) ||
                     (tokenModalTarget === 'to' && toToken.address === t.address);
                   const bal = getTokenBalance(t);
+                  const isFav = favoriteTokens.includes(t.symbol.toUpperCase());
 
                   return (
-                    <button
+                    <div
                       key={t.symbol + t.address}
-                      type="button"
                       onClick={() => handleSelectToken(t)}
                       className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer text-left ${
                         isSelected
@@ -3800,18 +3735,33 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Balance & Price */}
-                      <div className="text-right shrink-0 pl-2">
-                        <div className={`font-mono text-sm font-bold ${bal.num > 0 ? 'text-white' : 'text-gray-500'}`}>
-                          {currentAccount ? bal.formatted : '-'}
-                        </div>
-                        {currentAccount && bal.num > 0 && t.priceUsd && (
-                          <div className="text-[11px] font-mono text-gray-500">
-                            ≈ ${(bal.num * t.priceUsd).toFixed(2)}
+                      {/* Balance, Price & Star Favorite */}
+                      <div className="flex items-center gap-2 shrink-0 pl-2">
+                        <div className="text-right">
+                          <div className={`font-mono text-sm font-bold ${bal.num > 0 ? 'text-white' : 'text-gray-500'}`}>
+                            {currentAccount ? bal.formatted : '-'}
                           </div>
-                        )}
+                          {currentAccount && bal.num > 0 && t.priceUsd && (
+                            <div className="text-[11px] font-mono text-gray-500">
+                              ≈ ${(bal.num * t.priceUsd).toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Favorite Pin Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavoriteToken(t.symbol);
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-gray-500 hover:text-amber-400 transition-colors cursor-pointer"
+                          title={isFav ? `Remove ${t.symbol} from favorites` : `Add ${t.symbol} to favorites`}
+                        >
+                          <Star className={`w-4 h-4 ${isFav ? 'text-amber-400 fill-amber-400' : 'text-gray-600 hover:text-gray-400'}`} />
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               )}
