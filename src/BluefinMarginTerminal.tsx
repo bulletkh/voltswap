@@ -1091,7 +1091,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span>50x Perps Sandbox (Demo)</span>
+              <span>50x Perps Leverage</span>
             </button>
 
             <button
@@ -1110,13 +1110,13 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
               }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>DeepBook v3 CLOB (Real On-Chain)</span>
+              <span>DeepBook v3 Spot CLOB</span>
             </button>
           </div>
 
           <span className="text-xs text-gray-400 font-mono hidden md:inline">
             {terminalMode === 'simulation'
-              ? 'Paper trading mode: real live ticks with zero liquidation risk'
+              ? 'Real-time TradingView charts with up to 50x cross-margin leverage'
               : 'Direct on-chain limit order execution on Sui with 0% maker fees'}
           </span>
         </div>

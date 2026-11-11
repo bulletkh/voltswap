@@ -1652,7 +1652,7 @@ export default function App() {
             {[
               { id: 'swap', label: 'Trade', icon: Zap },
               { id: 'radar', label: 'Whale Radar', icon: Activity },
-              { id: 'margin', label: 'Perps (Demo)', icon: TrendingUp },
+              { id: 'margin', label: 'Perps', icon: TrendingUp },
               { id: 'earn', label: 'Pools (Demo)', icon: Coins },
               ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
               { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },
@@ -1728,7 +1728,7 @@ export default function App() {
         {[
           { id: 'swap', label: 'Swap', icon: Zap },
           { id: 'radar', label: 'Radar', icon: Activity },
-          { id: 'margin', label: 'Perps (Demo)', icon: TrendingUp },
+          { id: 'margin', label: 'Perps', icon: TrendingUp },
           { id: 'earn', label: 'Pools (Demo)', icon: Coins },
           ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
           { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },
