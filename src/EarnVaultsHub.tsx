@@ -657,29 +657,42 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   return (
     <div className="w-full max-w-[1400px] space-y-6 pb-16 animate-fadeIn font-mono">
       {/* 1. TOP HEADER BANNER (VOLT SMART VAULTS & POINTS) */}
+      {/* DEMO NOTICE BANNER */}
+      <div className="p-3.5 px-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold font-mono text-[11px] border border-amber-500/30">
+            DEMO SANDBOX
+          </span>
+          <span className="text-gray-300">
+            Volt Vaults & Liquidity Pools are currently running in <strong>Interactive Demo Sandbox</strong> mode. Smart contracts and multi-strategy routers are preparing for mainnet audit.
+          </span>
+        </div>
+        <span className="text-[11px] font-mono text-amber-400/80">Preview Mode</span>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full bg-volt/20 text-volt text-[11px] font-bold border border-volt/30 flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 fill-volt" /> Volt Smart Vaults Hub
+              <Sparkles className="w-3 h-3 fill-volt" /> Volt Pools & Vaults (Demo)
             </span>
             <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[11px] font-bold border border-cyan-500/20">
               Receipt Tokens (vTokens)
             </span>
-            <span className="text-xs text-gray-400">Zero Debt • On-Chain Yield Protection</span>
+            <span className="text-xs text-gray-400">Zero Debt • On-Chain Yield Simulation</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Institutional Yield & Vaults Terminal
+            Institutional Yield & Pools (Demo)
           </h1>
           <p className="text-xs text-gray-400 mt-1 max-w-2xl leading-relaxed">
-            Deposit into auto-compounding Volt Vaults powered by NAVI, Scallop, Haedal, Cetus, Walrus, and DeepBook. Earn yield, claim receipt tokens, and accrue Volt Airdrop Points.
+            Test deposit routing into auto-compounding strategies powered by NAVI, Scallop, Haedal, Cetus, Walrus, and DeepBook in an interactive sandbox.
           </p>
         </div>
 
-        {/* Global TVL & User Position Summary & Volt Points */}
+        {/* Global TVL & User Position Summary */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="px-4 py-2.5 rounded-2xl bg-[#0b0e17] border border-white/10">
-            <span className="text-[11px] text-gray-400 block">Total Vaults TVL</span>
+            <span className="text-[11px] text-gray-400 block">Total Simulated TVL</span>
             <span className="text-base font-black text-white">${(totalProtocolTvl / 1000000).toFixed(1)}M USD</span>
           </div>
           <div className="px-4 py-2.5 rounded-2xl bg-[#0b0e17] border border-cyan-500/30">
@@ -687,8 +700,8 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
             <span className="text-base font-black text-cyan-400">${totalUserStakedUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
           </div>
           <div className="px-4 py-2.5 rounded-2xl bg-[#0b0e17] border border-volt/30">
-            <span className="text-[11px] text-gray-400 block">Volt Airdrop Points</span>
-            <span className="text-base font-black text-volt animate-pulse">⚡ {userVoltPoints.toLocaleString()} PTS</span>
+            <span className="text-[11px] text-gray-400 block">Community XP</span>
+            <span className="text-base font-black text-volt animate-pulse">⚡ {userVoltPoints.toLocaleString()} XP</span>
           </div>
         </div>
       </div>
@@ -778,7 +791,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                   <ArrowUpDown className="w-3 h-3 text-gray-500" />
                 </div>
               </th>
-              <th className="py-3.5 px-4 font-bold hidden md:table-cell">Airdrop Points</th>
+              <th className="py-3.5 px-4 font-bold hidden md:table-cell">XP Boost</th>
               <th
                 onClick={() => { setSortKey('apy'); setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc'); }}
                 className="py-3.5 px-4 font-bold cursor-pointer text-right hover:text-white transition-colors"
@@ -896,11 +909,11 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                       </span>
                     </td>
 
-                    {/* 5. Airdrop Points Multiplier */}
+                    {/* 5. XP Multiplier */}
                     <td className="py-4 px-4 hidden md:table-cell">
                       <span className="px-2 py-0.5 rounded bg-volt/10 text-volt border border-volt/20 text-[11px] font-bold inline-flex items-center gap-1">
                         <Zap className="w-3 h-3 fill-volt" />
-                        <span>{vault.pointsMultiplier}x Points/day</span>
+                        <span>{vault.pointsMultiplier}x XP Boost</span>
                       </span>
                     </td>
 

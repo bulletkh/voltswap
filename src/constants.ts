@@ -1,3 +1,5 @@
+export const VOLT_TREASURY_ADDRESS = '0x7211d7a33c32b8a848fd5d87dc0630b7d40d3d324856a748aff454c2955cab12';
+
 export interface Chain {
   id: string;
   name: string;

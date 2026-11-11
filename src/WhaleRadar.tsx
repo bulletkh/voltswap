@@ -117,6 +117,7 @@ interface WhaleRadarProps {
     priceUsd?: number;
     targetPriceUsd?: number;
     expectedProfitPct?: number;
+    defaultInAmount?: string;
   }) => void;
   onOpenFullRadar?: () => void;
   compact?: boolean;
@@ -1184,13 +1185,72 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span style={{ fontSize: '0.98rem', fontWeight: 900, color: '#38bdf8' }}>
                       ${swap.usdVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </span>
                     <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                       {formatTimeAgo(swap.timestampMs)}
                     </span>
+                    
+                    {/* Quick Preset Chips for SUI buyers */}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <button
+                        title="Quick Buy with 10 SUI"
+                        onClick={() =>
+                          onCopyTrade({
+                            inSym: 'SUI',
+                            inCt: '0x2::sui::SUI',
+                            inDec: 9,
+                            outSym: swap.outSym,
+                            outCt: swap.outCt,
+                            outDec: swap.outDec,
+                            priceUsd: swap.priceUsd,
+                            defaultInAmount: '10',
+                          })
+                        }
+                        style={{
+                          background: 'rgba(215, 246, 38, 0.1)',
+                          color: '#d7f626',
+                          border: '1px solid rgba(215, 246, 38, 0.25)',
+                          borderRadius: '6px',
+                          padding: '4px 6px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        10 SUI
+                      </button>
+                      <button
+                        title="Quick Buy with 50 SUI"
+                        onClick={() =>
+                          onCopyTrade({
+                            inSym: 'SUI',
+                            inCt: '0x2::sui::SUI',
+                            inDec: 9,
+                            outSym: swap.outSym,
+                            outCt: swap.outCt,
+                            outDec: swap.outDec,
+                            priceUsd: swap.priceUsd,
+                            defaultInAmount: '50',
+                          })
+                        }
+                        style={{
+                          background: 'rgba(215, 246, 38, 0.1)',
+                          color: '#d7f626',
+                          border: '1px solid rgba(215, 246, 38, 0.25)',
+                          borderRadius: '6px',
+                          padding: '4px 6px',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        50 SUI
+                      </button>
+                    </div>
+
                     <button
                       onClick={() =>
                         onCopyTrade({
@@ -1212,9 +1272,12 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
                         fontSize: '0.73rem',
                         fontWeight: 800,
                         cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
                       }}
                     >
-                      ⚡ Copy
+                      ⚡ Quick Buy
                     </button>
                   </div>
                 </div>

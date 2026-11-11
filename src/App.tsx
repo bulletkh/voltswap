@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import {
   Zap,
   ArrowDownUp,
@@ -31,24 +31,38 @@ import {
   Twitter,
   Send,
   Sliders,
-  Flame
+  Flame,
+  Volume2,
+  VolumeX,
+  ShieldCheck,
+  Users,
+  Loader2
 } from 'lucide-react';
 import { useCurrentAccount, ConnectButton, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
 import BN from 'bn.js';
-import { POPULAR_TOKENS, Token, TRADER_TIERS, TraderTierConfig } from './constants';
+import { POPULAR_TOKENS, Token, TRADER_TIERS, TraderTierConfig, VOLT_TREASURY_ADDRESS } from './constants';
 import { executeTransactionViaGraphQL } from './graphqlExecutor';
 import { getOwnedCoinObjects } from './coinHelper';
-import { WhaleRadar } from './WhaleRadar';
-import { AffiliatesHub } from './AffiliatesHub';
 import { SpotTradingTerminal } from './SpotTradingTerminal';
 import { PnlShareModal, PnlTradeData } from './PnlShareModal';
-import { EarnVaultsHub, VOLT_TREASURY_ADDRESS } from './EarnVaultsHub';
-import { BluefinMarginTerminal, BluefinPosition } from './BluefinMarginTerminal';
-import { TreasuryDashboard } from './TreasuryDashboard';
+import type { BluefinPosition } from './BluefinMarginTerminal';
 import { playClickSound, playCashProfitSound, playOrderSubmittedSound, getSoundMuted, setSoundMuted } from './audioFx';
-import { Volume2, VolumeX, ShieldCheck } from 'lucide-react';
+
+// Lazy-loaded heavy modules for sub-second initial page load & code-splitting
+const WhaleRadar = lazy(() => import('./WhaleRadar').then(m => ({ default: m.WhaleRadar })));
+const AffiliatesHub = lazy(() => import('./AffiliatesHub').then(m => ({ default: m.AffiliatesHub })));
+const EarnVaultsHub = lazy(() => import('./EarnVaultsHub').then(m => ({ default: m.EarnVaultsHub })));
+const BluefinMarginTerminal = lazy(() => import('./BluefinMarginTerminal').then(m => ({ default: m.BluefinMarginTerminal })));
+const TreasuryDashboard = lazy(() => import('./TreasuryDashboard').then(m => ({ default: m.TreasuryDashboard })));
+
+const ModuleLoadingFallback = () => (
+  <div className="w-full flex flex-col items-center justify-center p-20 text-volt font-mono text-xs gap-3">
+    <Loader2 className="w-6 h-6 animate-spin text-volt" />
+    <span className="text-gray-400">Loading Volt Module...</span>
+  </div>
+);
 
 const parseAmount = (val: string | number): number => {
   if (!val) return 0;
@@ -873,7 +887,8 @@ export default function App() {
     outDec,
     priceUsd,
     targetPriceUsd,
-    expectedProfitPct
+    expectedProfitPct,
+    defaultInAmount
   }: {
     inSym: string;
     inCt: string;
@@ -884,6 +899,7 @@ export default function App() {
     priceUsd?: number;
     targetPriceUsd?: number;
     expectedProfitPct?: number;
+    defaultInAmount?: string;
   }) => {
     const resolveOrAddToken = (sym: string, ct: string, dec: number, p?: number): Token => {
       const cleanCt = sym === 'SUI' ? '0x2::sui::SUI' : ct;
@@ -909,7 +925,9 @@ export default function App() {
 
     setFromToken(tIn);
     setToToken(tOut);
-    if (tIn.symbol === 'USDC' && parseAmount(fromAmount) < 20) {
+    if (defaultInAmount) {
+      setFromAmount(defaultInAmount);
+    } else if (tIn.symbol === 'USDC' && parseAmount(fromAmount) < 20) {
       setFromAmount('100');
     }
     if (expectedProfitPct && targetPriceUsd && priceUsd) {
@@ -1515,11 +1533,11 @@ export default function App() {
             {[
               { id: 'swap', label: 'Trade', icon: Zap },
               { id: 'radar', label: 'Whale Radar', icon: Activity },
-              { id: 'margin', label: 'Perps', icon: TrendingUp },
-              { id: 'earn', label: 'Earn', icon: Coins },
+              { id: 'margin', label: 'Perps (Demo)', icon: TrendingUp },
+              { id: 'earn', label: 'Pools (Demo)', icon: Coins },
               ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
               { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },
-              { id: 'portfolio', label: 'Rewards', icon: Trophy },
+              { id: 'portfolio', label: 'Community', icon: Users },
               { id: 'docs', label: 'Docs', icon: BookOpen }
             ].map((tab) => {
               const Icon = tab.icon;
@@ -1591,11 +1609,11 @@ export default function App() {
         {[
           { id: 'swap', label: 'Swap', icon: Zap },
           { id: 'radar', label: 'Radar', icon: Activity },
-          { id: 'margin', label: 'Perps', icon: TrendingUp },
-          { id: 'earn', label: 'Earn (14%+)', icon: Coins },
+          { id: 'margin', label: 'Perps (Demo)', icon: TrendingUp },
+          { id: 'earn', label: 'Pools (Demo)', icon: Coins },
           ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
           { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },
-          { id: 'portfolio', label: 'Affiliates', icon: Trophy },
+          { id: 'portfolio', label: 'Community', icon: Users },
           { id: 'docs', label: 'Docs', icon: BookOpen }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -2887,44 +2905,50 @@ export default function App() {
         {/* TAB 2: FULL-SCREEN WHALE RADAR */}
         {activeTab === 'radar' && (
           <div className="w-full max-w-6xl">
-            <WhaleRadar onCopyTrade={handleCopyTradeFromRadar} compact={false} />
+            <Suspense fallback={<ModuleLoadingFallback />}>
+              <WhaleRadar onCopyTrade={handleCopyTradeFromRadar} compact={false} />
+            </Suspense>
           </div>
         )}
 
         {/* TAB: HIGH-YIELD DEFI VAULTS */}
         {activeTab === 'earn' && (
-          <EarnVaultsHub
-            currentAccount={currentAccount}
-            suiClient={suiClient}
-            signAndExecute={signAndExecute}
-            currentAccountAddress={currentAccount?.address}
-            userBalances={userBalances}
-            onNavigateToSwap={(from, to) => {
-              if (from) {
-                const f = POPULAR_TOKENS.find(t => t.symbol === from);
-                if (f) setFromToken(f);
-              }
-              if (to) {
-                const t = POPULAR_TOKENS.find(tok => tok.symbol === to);
-                if (t) setToToken(t);
-              }
-              setActiveTab('swap');
-            }}
-            showNotification={showNotification}
-          />
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <EarnVaultsHub
+              currentAccount={currentAccount}
+              suiClient={suiClient}
+              signAndExecute={signAndExecute}
+              currentAccountAddress={currentAccount?.address}
+              userBalances={userBalances}
+              onNavigateToSwap={(from, to) => {
+                if (from) {
+                  const f = POPULAR_TOKENS.find(t => t.symbol === from);
+                  if (f) setFromToken(f);
+                }
+                if (to) {
+                  const t = POPULAR_TOKENS.find(tok => tok.symbol === to);
+                  if (t) setToToken(t);
+                }
+                setActiveTab('swap');
+              }}
+              showNotification={showNotification}
+            />
+          </Suspense>
         )}
 
         {/* TAB: BLUEFIN MARGIN & PERPETUAL TRADING TERMINAL */}
         {activeTab === 'margin' && (
-          <BluefinMarginTerminal
-            currentAccount={currentAccount}
-            suiClient={suiClient}
-            signAndExecute={signAndExecute}
-            currentAccountAddress={currentAccount?.address}
-            userBalances={userBalances}
-            showNotification={showNotification}
-            onOpenPnlShareModal={handleOpenPnlModal}
-          />
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <BluefinMarginTerminal
+              currentAccount={currentAccount}
+              suiClient={suiClient}
+              signAndExecute={signAndExecute}
+              currentAccountAddress={currentAccount?.address}
+              userBalances={userBalances}
+              showNotification={showNotification}
+              onOpenPnlShareModal={handleOpenPnlModal}
+            />
+          </Suspense>
         )}
 
         {/* TAB 3: BRIDGE (Cross-Chain Native In-App Engine) */}
@@ -2981,16 +3005,20 @@ export default function App() {
 
         {/* TAB: ON-CHAIN PROTOCOL TREASURY & REVENUE DASHBOARD */}
         {activeTab === 'treasury' && (
-          <TreasuryDashboard
-            suiClient={suiClient}
-            currentAccount={currentAccount}
-            showNotification={showNotification}
-          />
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <TreasuryDashboard
+              suiClient={suiClient}
+              currentAccount={currentAccount}
+              showNotification={showNotification}
+            />
+          </Suspense>
         )}
 
         {/* TAB 4: PORTFOLIO, AFFILIATES & REVENUE RANKS */}
         {activeTab === 'portfolio' && (
-          <AffiliatesHub onBackToSwap={() => setActiveTab('swap')} />
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <AffiliatesHub onBackToSwap={() => setActiveTab('swap')} />
+          </Suspense>
         )}
 
         {/* TAB 5: ARCHITECTURE & DOCS */}

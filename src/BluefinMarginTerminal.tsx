@@ -1070,6 +1070,19 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-6 space-y-4 animate-fade-in text-white font-sans">
+      {/* DEMO NOTICE BANNER */}
+      <div className="p-3 px-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-200 text-xs flex items-center justify-between gap-3 flex-wrap font-mono">
+        <div className="flex items-center gap-2.5">
+          <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/30">
+            DEMO SIMULATOR
+          </span>
+          <span className="text-gray-300">
+            Perpetual Futures Sandbox: Test leverage, limit orders, and fast trading in interactive demo simulation.
+          </span>
+        </div>
+        <span className="text-[11px] text-cyan-400/80">Paper Trading Mode</span>
+      </div>
+
       {/* Bluefin Pro Running Ticker Ribbon with Smooth Scroll Controls */}
       <div className="relative flex items-center bg-[#0d111a] border border-white/8 rounded-2xl shadow-md p-1.5 overflow-hidden">
         {/* Left Badge */}
