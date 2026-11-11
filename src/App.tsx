@@ -49,6 +49,8 @@ import { SpotTradingTerminal } from './SpotTradingTerminal';
 import { PnlShareModal, PnlTradeData } from './PnlShareModal';
 import type { BluefinPosition } from './BluefinMarginTerminal';
 import { playClickSound, playCashProfitSound, playOrderSubmittedSound, getSoundMuted, setSoundMuted } from './audioFx';
+import { initTelegramWebApp, showTelegramBackButton, hideTelegramBackButton, triggerHaptic } from './telegram';
+import { PwaInstallPrompt } from './PwaInstallPrompt';
 
 // Lazy-loaded heavy modules for sub-second initial page load & code-splitting
 const WhaleRadar = lazy(() => import('./WhaleRadar').then(m => ({ default: m.WhaleRadar })));
@@ -251,15 +253,30 @@ export default function App() {
   const [copiedRef, setCopiedRef] = useState<boolean>(false);
   const [radarBanner, setRadarBanner] = useState<string | null>(null);
 
-  // Initialize Telegram WebApp when opened inside Telegram
+  // Initialize Telegram WebApp with native closing confirmation and theme synchronization
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
-      try {
-        (window as any).Telegram.WebApp.ready();
-        (window as any).Telegram.WebApp.expand();
-      } catch (_) {}
-    }
+    initTelegramWebApp();
   }, []);
+
+  // Synchronize Telegram BackButton with active modals
+  useEffect(() => {
+    if (tokenModalTarget) {
+      showTelegramBackButton(() => {
+        setTokenModalTarget(null);
+        setTokenSearchQuery('');
+      });
+    } else if (showSettings) {
+      showTelegramBackButton(() => {
+        setShowSettings(false);
+      });
+    } else if (notificationModal) {
+      showTelegramBackButton(() => {
+        setNotificationModal(null);
+      });
+    } else {
+      hideTelegramBackButton();
+    }
+  }, [tokenModalTarget, showSettings, notificationModal]);
 
   // Open Orders & DCA automations list
   const [openOrders, setOpenOrders] = useState<Array<{
@@ -3003,6 +3020,17 @@ export default function App() {
               userBalances={userBalances}
               showNotification={showNotification}
               onOpenPnlShareModal={handleOpenPnlModal}
+              onSwitchToSpotLimit={(baseAsset) => {
+                const found = tokenList.find(
+                  (t) => t.symbol.toUpperCase() === baseAsset.toUpperCase()
+                );
+                if (found) {
+                  setFromToken(found);
+                }
+                setSwapMode('limit');
+                setActiveTab('swap');
+                playClickSound();
+              }}
             />
           </Suspense>
         )}
@@ -3726,8 +3754,11 @@ export default function App() {
         </div>
       )}
 
+      {/* PWA 1-Tap Home Screen Install Banner */}
+      <PwaInstallPrompt />
+
       {/* Footer */}
-      <footer className="border-t border-white/5 py-6 px-4 text-center text-xs text-gray-500 font-mono">
+      <footer className="border-t border-white/5 py-6 px-4 text-center text-xs text-gray-500 font-mono safe-pb">
         <div className="flex items-center justify-center gap-6 mb-2">
           <a href="https://x.com/voltswap" target="_blank" rel="noreferrer" className="hover:text-volt transition-colors">
             X (@voltswap)

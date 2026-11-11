@@ -1,6 +1,8 @@
 // Web Audio API Synthesizer for High-Frequency DEX & Perps Audio FX
 // Zero external assets, 100% client-side, zero latency
 
+import { triggerHaptic } from './telegram';
+
 let audioCtx: AudioContext | null = null;
 let isAudioMuted = false;
 
@@ -33,6 +35,7 @@ export const setSoundMuted = (muted: boolean) => {
 
 // 1. Subtle UI mechanical click (leverage slider, tab switches)
 export const playClickSound = () => {
+  triggerHaptic('light');
   if (getSoundMuted()) return;
   
   // Asynchronous non-blocking dispatch to prevent touch stutter on mobile devices
@@ -61,6 +64,7 @@ export const playClickSound = () => {
 
 // 2. Order Submitted / Execution whoosh chime
 export const playOrderSubmittedSound = () => {
+  triggerHaptic('medium');
   if (getSoundMuted()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -87,6 +91,7 @@ export const playOrderSubmittedSound = () => {
 
 // 3. Rewarding "Cha-Ching!" Harmonic Cash Sound (Closing in profit / Harvest)
 export const playCashProfitSound = () => {
+  triggerHaptic('success');
   if (getSoundMuted()) return;
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -117,6 +122,7 @@ export const playCashProfitSound = () => {
 
 // 4. Alert / Warning Sound
 export const playAlertSound = () => {
+  triggerHaptic('warning');
   if (getSoundMuted()) return;
   const ctx = getAudioContext();
   if (!ctx) return;

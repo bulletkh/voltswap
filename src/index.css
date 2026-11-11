@@ -187,3 +187,13 @@ div[data-dapp-kit-modal-overlay] {
   animation: slideUpSheet 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Telegram WebApp & iOS Home Bar Safe Area Insets */
+.safe-pb {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+}
+
+.safe-mb {
+  margin-bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+}
+
+

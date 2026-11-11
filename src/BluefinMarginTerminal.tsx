@@ -335,6 +335,7 @@ interface BluefinMarginTerminalProps {
   userBalances?: Record<string, string>;
   showNotification: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string, actionLabel?: string, actionUrl?: string, tradeData?: any) => void;
   onOpenPnlShareModal?: (tradeData: any) => void;
+  onSwitchToSpotLimit?: (baseAsset: string) => void;
 }
 
 export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
@@ -344,8 +345,10 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
   currentAccountAddress,
   userBalances = {},
   showNotification,
-  onOpenPnlShareModal
+  onOpenPnlShareModal,
+  onSwitchToSpotLimit
 }) => {
+  const [terminalMode, setTerminalMode] = useState<'simulation' | 'deepbook'>('simulation');
   const [selectedMarket, setSelectedMarket] = useState<BluefinMarket>(BLUEFIN_MARKETS[0]);
   const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
   const tickerScrollRef = useRef<HTMLDivElement>(null);
@@ -1070,17 +1073,66 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-6 space-y-4 animate-fade-in text-white font-sans">
-      {/* DEMO NOTICE BANNER */}
-      <div className="p-3 px-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-200 text-xs flex items-center justify-between gap-3 flex-wrap font-mono">
-        <div className="flex items-center gap-2.5">
-          <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-bold text-[11px] border border-cyan-500/30">
-            DEMO SIMULATOR
-          </span>
-          <span className="text-gray-300">
-            Perpetual Futures Sandbox: Test leverage, limit orders, and fast trading in interactive demo simulation.
+      {/* TERMINAL MODE SWITCHER & REAL ON-CHAIN / SANDBOX SELECTOR */}
+      <div className="p-3 px-4 rounded-2xl bg-[#0f1420] border border-white/10 shadow-lg flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Mode Switcher */}
+          <div className="flex items-center bg-[#090b12] p-1 rounded-xl border border-white/10">
+            <button
+              type="button"
+              onClick={() => {
+                setTerminalMode('simulation');
+                playClickSound();
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
+                terminalMode === 'simulation'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>50x Perps Sandbox (Demo)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setTerminalMode('deepbook');
+                playClickSound();
+                if (onSwitchToSpotLimit) {
+                  onSwitchToSpotLimit(selectedMarket.baseAsset);
+                }
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5 cursor-pointer ${
+                terminalMode === 'deepbook'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>DeepBook v3 CLOB (Real On-Chain)</span>
+            </button>
+          </div>
+
+          <span className="text-xs text-gray-400 font-mono hidden md:inline">
+            {terminalMode === 'simulation'
+              ? 'Paper trading mode: real live ticks with zero liquidation risk'
+              : 'Direct on-chain limit order execution on Sui with 0% maker fees'}
           </span>
         </div>
-        <span className="text-[11px] text-cyan-400/80">Paper Trading Mode</span>
+
+        {/* Official Bluefin DEX Mainnet Link */}
+        <a
+          href={`https://trade.bluefin.io/trade/${selectedMarket.symbol}?ref=volt`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer font-mono shadow-sm"
+          title="Trade with cross-margined 50x leverage on Bluefin Exchange"
+        >
+          <Zap className="w-3.5 h-3.5 text-blue-400" />
+          <span>Trade on Bluefin Mainnet</span>
+          <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+        </a>
       </div>
 
       {/* Bluefin Pro Running Ticker Ribbon with Smooth Scroll Controls */}
