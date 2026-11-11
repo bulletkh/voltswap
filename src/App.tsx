@@ -871,6 +871,12 @@ export default function App() {
       localStorage.setItem('volt_active_ref', ref);
       setActiveRefCode(ref);
     }
+    const tabParam = params.get('tab');
+    if (tabParam === 'earn' || tabParam === 'pools') {
+      setActiveTab('earn');
+    } else if (tabParam && ['swap', 'radar', 'margin', 'earn', 'bridge', 'portfolio', 'docs', 'treasury'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
   }, []);
 
   useEffect(() => {
