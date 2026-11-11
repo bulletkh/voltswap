@@ -383,8 +383,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         await depositCoin(tx, naviPool.Sui, tx.gas, amountMist);
       } else if (activeStrategy.supplyToken === 'USDC') {
         const amountUnits = BigInt(Math.floor(collateralNum * 1e6));
-        const coinInput = tx.coin({ type: naviPool.nUSDC.type, balance: amountUnits });
-        await depositCoin(tx, naviPool.nUSDC, coinInput, amountUnits);
+        const [splitCoin] = tx.splitCoins(tx.gas, [amountUnits]);
+        await depositCoin(tx, naviPool.nUSDC, splitCoin, amountUnits);
       } else {
         // haSUI / USDY: deposit or staking request Move call
         const amountMist = BigInt(Math.floor(collateralNum * 1e9));

@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
+import { MarginMultiplyHub } from './MarginMultiplyHub';
 
 export type ProtocolFilter = 'all' | 'navi' | 'cetus' | 'haedal' | 'scallop' | 'walrus' | 'deepbook';
 
@@ -345,11 +346,11 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
     symbol: 'WAL-SUI',
     receiptToken: 'vLP-WAL',
     protocol: 'Walrus',
-    protocolLogo: '/tokens/walrus.png',
+    protocolLogo: '/tokens/wal.svg',
     protocolBadge: 'Walrus Mysten',
     protocolColor: 'from-blue-500/20 to-cyan-500/20 text-cyan-300 border-cyan-500/30',
     protocolUrl: 'https://walrus.xyz',
-    tokenLogos: ['/tokens/walrus.png', '/tokens/sui.svg'],
+    tokenLogos: ['/tokens/wal.svg', '/tokens/sui.svg'],
     coinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
     category: 'Ecosystem Farm',
     categoryBadgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
@@ -386,6 +387,9 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   onNavigateToSwap,
   showNotification
 }) => {
+  // View Mode: 7 Blue-Chip Vaults vs 1-Click Multiply Looping
+  const [viewMode, setViewMode] = useState<'vaults' | 'multiply'>('vaults');
+
   // Protocol Filter
   const [selectedProtocol, setSelectedProtocol] = useState<ProtocolFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -534,12 +538,12 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           await depositCoin(tx, naviPool.Sui, tx.gas, amountMist);
         } else if (activeVault.symbol === 'USDC') {
           const amountUnits = BigInt(Math.floor(amt * 1e6));
-          const coinInput = tx.coin({ type: naviPool.nUSDC.type, balance: amountUnits });
-          await depositCoin(tx, naviPool.nUSDC, coinInput, amountUnits);
+          const [splitCoin] = tx.splitCoins(tx.gas, [amountUnits]);
+          await depositCoin(tx, naviPool.nUSDC, splitCoin, amountUnits);
         } else if (activeVault.symbol === 'USDT') {
           const amountUnits = BigInt(Math.floor(amt * 1e6));
-          const coinInput = tx.coin({ type: naviPool.USDT.type, balance: amountUnits });
-          await depositCoin(tx, naviPool.USDT, coinInput, amountUnits);
+          const [splitCoin] = tx.splitCoins(tx.gas, [amountUnits]);
+          await depositCoin(tx, naviPool.USDT, splitCoin, amountUnits);
         }
       } else if (activeVault.protocol === 'Scallop') {
         const amountMist = BigInt(Math.floor(amt * 1e9));
@@ -706,8 +710,56 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         </div>
       </div>
 
-      {/* 2. PROTOCOL FILTER PILLS */}
-      <div className="space-y-3">
+      {/* 2. MODE SELECTOR: 7 BLUE-CHIP VAULTS vs 1-CLICK MULTIPLY LOOPING */}
+      <div className="flex items-center p-1.5 bg-[#0b0e17] border border-white/10 rounded-2xl w-full sm:w-auto self-start gap-1">
+        <button
+          onClick={() => setViewMode('vaults')}
+          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            viewMode === 'vaults'
+              ? 'bg-volt text-black shadow-volt-glow'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Coins className="w-4 h-4" />
+          <span>7 Blue-Chip Pools & Vaults</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+            viewMode === 'vaults' ? 'bg-black/30 text-black' : 'bg-white/10 text-gray-300'
+          }`}>
+            SUI • USDC • WAL • DEEP
+          </span>
+        </button>
+
+        <button
+          onClick={() => setViewMode('multiply')}
+          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+            viewMode === 'multiply'
+              ? 'bg-gradient-to-r from-amber-400 to-volt text-black shadow-volt-glow'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          <Zap className="w-4 h-4 fill-current" />
+          <span>1-Click Multiply Looping</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+            viewMode === 'multiply' ? 'bg-black/30 text-black' : 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+          }`}>
+            Up to 9.8x (24.8% APY)
+          </span>
+        </button>
+      </div>
+
+      {viewMode === 'multiply' ? (
+        <MarginMultiplyHub
+          currentAccount={currentAccount}
+          suiClient={suiClient}
+          signAndExecute={signAndExecute}
+          currentAccountAddress={currentAccountAddress}
+          onNavigateToSwap={onNavigateToSwap}
+          showNotification={showNotification}
+        />
+      ) : (
+        <>
+          {/* 3. PROTOCOL FILTER PILLS */}
+          <div className="space-y-3">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           {/* Protocol Pills */}
           <div className="flex items-center gap-1.5 p-1 bg-[#0b0e17] border border-white/10 rounded-2xl overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -964,6 +1016,8 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           </tbody>
         </table>
       </div>
+    </>
+  )}
 
       {/* 4. MODAL: VOLT SMART VAULT DEPOSIT & REDEEM (100% ENGLISH) */}
       {activeVault && (
