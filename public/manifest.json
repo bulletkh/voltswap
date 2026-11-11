@@ -1,0 +1,29 @@
+{
+  "name": "Volt Protocol - Sui Smart Money Terminal & PTB DEX Aggregator",
+  "short_name": "Volt Terminal",
+  "description": "Live On-Chain Whale Flow Radar & Atomic PTB Swap Aggregator on Sui Network.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d13",
+  "theme_color": "#d7f626",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/volt-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/volt-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
