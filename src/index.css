@@ -3,8 +3,35 @@
 @tailwind utilities;
 
 @layer base {
-  body {
+  *, *::before, *::after {
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  html, body {
     @apply bg-[#0a0b0d] text-white font-sans antialiased selection:bg-volt selection:text-black;
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+    -webkit-text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
+  button, a, input, select, textarea {
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: manipulation;
+  }
+}
+
+/* Eliminate button hover stickiness and tap flickering on mobile touchscreens */
+@media (hover: none) and (pointer: coarse) {
+  button:hover, a:hover {
+    transform: none !important;
+    filter: none !important;
+  }
+  button:active, a:active {
+    opacity: 0.8 !important;
+    transform: scale(0.97) !important;
+    transition: transform 0.05s ease, opacity 0.05s ease !important;
   }
 }
 

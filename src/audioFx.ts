@@ -34,25 +34,29 @@ export const setSoundMuted = (muted: boolean) => {
 // 1. Subtle UI mechanical click (leverage slider, tab switches)
 export const playClickSound = () => {
   if (getSoundMuted()) return;
-  const ctx = getAudioContext();
-  if (!ctx) return;
+  
+  // Asynchronous non-blocking dispatch to prevent touch stutter on mobile devices
+  setTimeout(() => {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx || ctx.state === 'suspended') return;
 
-  try {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(800, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.03);
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.03);
 
-    gain.gain.setValueAtTime(0.08, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.03);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
 
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.03);
-  } catch (_) {}
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.03);
+    } catch (_) {}
+  }, 0);
 };
 
 // 2. Order Submitted / Execution whoosh chime
