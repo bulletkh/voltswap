@@ -36,7 +36,8 @@ import {
   VolumeX,
   ShieldCheck,
   Users,
-  Loader2
+  Loader2,
+  BarChart2
 } from 'lucide-react';
 import { useCurrentAccount, ConnectButton, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
@@ -82,6 +83,29 @@ export default function App() {
   const suiClient = useSuiClient();
 
   const [activeTab, setActiveTab] = useState<'swap' | 'radar' | 'margin' | 'earn' | 'bridge' | 'portfolio' | 'docs' | 'treasury'>('swap');
+  
+  // Pro Chart & Orderbook Visibility (Jupiter-style toggle, default false on mobile to prevent scroll trap)
+  const [showChart, setShowChart] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('volt_show_chart');
+      if (saved !== null) return saved === 'true';
+      return typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleChart = useCallback(() => {
+    setShowChart((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('volt_show_chart', String(next));
+      } catch {}
+      playClickSound();
+      return next;
+    });
+  }, []);
+
   const [isSoundMuted, setIsSoundMuted] = useState<boolean>(() => getSoundMuted());
 
   const toggleSound = () => {
@@ -1775,33 +1799,40 @@ export default function App() {
       <main className="flex-1 flex flex-col items-center px-2 py-3 sm:p-6 lg:p-8 max-w-[1540px] w-full mx-auto my-1 overflow-x-hidden">
         {/* TAB 1: SPLIT TERMINAL (PRO CHART TERMINAL + SWAP) */}
         {activeTab === 'swap' && (
-          <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div className={`w-full transition-all duration-300 ${
+            showChart
+              ? 'grid grid-cols-1 lg:grid-cols-12 gap-5 items-start'
+              : 'max-w-[490px] mx-auto space-y-4'
+          }`}>
             {/* LEFT COLUMN: INSTITUTIONAL SPOT TRADING TERMINAL & DEEPBOOK (7 COLS) */}
-            <div className="lg:col-span-7 w-full order-2 lg:order-1">
-              <SpotTradingTerminal
-                fromToken={fromToken}
-                toToken={toToken}
-                fromPrice={fromPrice}
-                toPrice={toPrice}
-                onOpenRadar={() => {
-                  setActiveTab('radar');
-                  playClickSound();
-                }}
-                onSelectLimitPrice={(price) => {
-                  setSwapMode('limit');
-                  setLimitPrice(price);
-                  playClickSound();
-                  showNotification(
-                    'info',
-                    'Limit Price Selected',
-                    `Set DeepBook v3 Limit Order target to $${price} ${toToken.symbol} directly from Orderbook.`
-                  );
-                }}
-              />
-            </div>
+            {showChart && (
+              <div className="lg:col-span-7 w-full order-2 lg:order-1 animate-fadeIn">
+                <SpotTradingTerminal
+                  fromToken={fromToken}
+                  toToken={toToken}
+                  fromPrice={fromPrice}
+                  toPrice={toPrice}
+                  onOpenRadar={() => {
+                    setActiveTab('radar');
+                    playClickSound();
+                  }}
+                  onSelectLimitPrice={(price) => {
+                    setSwapMode('limit');
+                    setLimitPrice(price);
+                    playClickSound();
+                    showNotification(
+                      'info',
+                      'Limit Price Selected',
+                      `Set DeepBook v3 Limit Order target to $${price} ${toToken.symbol} directly from Orderbook.`
+                    );
+                  }}
+                  onClose={toggleChart}
+                />
+              </div>
+            )}
 
-            {/* RIGHT COLUMN: OPTIMAL PTB SWAP & OPEN ORDERS (5 COLS) */}
-            <div className="lg:col-span-5 w-full order-1 lg:order-2 space-y-4">
+            {/* RIGHT COLUMN: OPTIMAL PTB SWAP & OPEN ORDERS (5 COLS or CENTERED) */}
+            <div className={`${showChart ? 'lg:col-span-5' : 'w-full'} w-full order-1 lg:order-2 space-y-4`}>
               {radarBanner && (
                 <div className="p-2.5 rounded-2xl bg-volt/10 border border-volt/25 text-volt text-xs font-mono font-bold flex items-center justify-between">
                   <span>{radarBanner}</span>
@@ -1859,6 +1890,20 @@ export default function App() {
                     </span>
                   </span>
                   <div className="flex items-center gap-1.5">
+                    {/* Jupiter-style Chart & Orderbook Toggle */}
+                    <button
+                      onClick={toggleChart}
+                      className={`px-2.5 py-1.5 rounded-xl border transition-all text-xs flex items-center gap-1.5 font-mono cursor-pointer ${
+                        showChart
+                          ? 'bg-volt/15 text-volt border-volt/30 shadow-volt-glow'
+                          : 'bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border-white/[0.06]'
+                      }`}
+                      title={showChart ? 'Hide Real-Time Chart & Orderbook' : 'Show Real-Time Chart & Orderbook'}
+                    >
+                      <BarChart2 className="w-3.5 h-3.5 text-volt" />
+                      <span className="font-semibold text-[11px] hidden sm:inline">{showChart ? 'Hide Chart' : 'Chart'}</span>
+                    </button>
+
                     {userTraderTier.discountPct > 0 && (
                       <button
                         onClick={() => setActiveTab('portfolio')}
@@ -2450,6 +2495,18 @@ export default function App() {
                   </button>
                 )}
               </div>
+
+              {/* Optional Quick Chart Launcher when Chart is Hidden */}
+              {!showChart && (
+                <button
+                  onClick={toggleChart}
+                  className="w-full py-3 px-4 rounded-2xl bg-[#0f121a] hover:bg-[#151924] border border-white/[0.08] hover:border-volt/30 text-gray-400 hover:text-white text-xs font-mono font-medium flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg group"
+                >
+                  <BarChart2 className="w-4 h-4 text-volt group-hover:scale-110 transition-transform" />
+                  <span>Show Live Price Chart & DeepBook v3 Orderbook</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                </button>
+              )}
 
               {/* OPEN ORDERS & PERSONAL ACTIVITY TABS */}
               <div className="bg-[#0f121a] border border-white/[0.08] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">

@@ -23,6 +23,7 @@ interface SpotTradingTerminalProps {
   toPrice: number;
   onOpenRadar: () => void;
   onSelectLimitPrice?: (price: string) => void;
+  onClose?: () => void;
 }
 
 interface OrderLevel {
@@ -39,7 +40,8 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
   fromPrice,
   toPrice,
   onOpenRadar,
-  onSelectLimitPrice
+  onSelectLimitPrice,
+  onClose
 }) => {
   const [chartMode, setChartMode] = useState<SpotChartMode>('chart');
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -417,6 +419,16 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
             <Flame className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Whale Radar →</span>
           </button>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 border border-white/[0.06] hover:border-rose-500/30 transition-colors duration-150 cursor-pointer"
+              title="Hide Chart & Orderbook"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
