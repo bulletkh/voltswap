@@ -82,3 +82,108 @@
   box-shadow: 0 0 20px rgba(227, 250, 92, 0.15);
 }
 
+/* ==========================================================================
+   Volt Protocol Theme Overrides for @mysten/dapp-kit ConnectButton & Modals
+   ========================================================================== */
+[data-dapp-kit] button,
+button[data-dapp-kit],
+.Button_buttonVariants__x1s81q0 {
+  background: linear-gradient(135deg, rgba(227, 250, 92, 0.14) 0%, rgba(18, 22, 33, 0.95) 100%) !important;
+  color: #e3fa5c !important;
+  border: 1px solid rgba(227, 250, 92, 0.4) !important;
+  border-radius: 9999px !important;
+  font-weight: 700 !important;
+  font-family: inherit !important;
+  box-shadow: 0 0 16px rgba(227, 250, 92, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  letter-spacing: 0.02em !important;
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+}
+
+@media (max-width: 640px) {
+  [data-dapp-kit] button,
+  button[data-dapp-kit],
+  .Button_buttonVariants__x1s81q0 {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    border-radius: 9999px !important;
+  }
+}
+
+[data-dapp-kit] button:hover,
+button[data-dapp-kit]:hover,
+.Button_buttonVariants__x1s81q0:hover {
+  background: linear-gradient(135deg, rgba(227, 250, 92, 0.28) 0%, rgba(26, 32, 48, 0.95) 100%) !important;
+  border-color: rgba(227, 250, 92, 0.8) !important;
+  box-shadow: 0 0 24px rgba(227, 250, 92, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+}
+
+[data-dapp-kit] button:active,
+button[data-dapp-kit]:active,
+.Button_buttonVariants__x1s81q0:active {
+  transform: scale(0.96) !important;
+  opacity: 0.9 !important;
+}
+
+/* Modal Dialog & Overlay Overrides */
+[data-dapp-kit] [role="dialog"],
+div[data-dapp-kit] div[role="dialog"] {
+  background: #0d1017 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 40px rgba(227, 250, 92, 0.1) !important;
+  color: #ffffff !important;
+}
+
+[data-dapp-kit] [data-radix-portal] > div,
+div[data-dapp-kit-modal-overlay] {
+  backdrop-filter: blur(12px) !important;
+  background-color: rgba(5, 7, 11, 0.82) !important;
+}
+
+[data-dapp-kit] button[role="menuitem"],
+[data-dapp-kit] .WalletListItem_walletItem__1t9wz8r0 {
+  background: #121622 !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 14px !important;
+  color: #ffffff !important;
+  transition: all 0.15s ease !important;
+}
+
+[data-dapp-kit] button[role="menuitem"]:hover,
+[data-dapp-kit] .WalletListItem_walletItem__1t9wz8r0:hover {
+  background: rgba(227, 250, 92, 0.1) !important;
+  border-color: rgba(227, 250, 92, 0.4) !important;
+  color: #e3fa5c !important;
+}
+
+[data-dapp-kit] .AccountDropdownMenu_menuContent__div2ql2 {
+  background: #0f131d !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Smooth bottom-sheet slide up animation for mobile */
+@keyframes slideUpSheet {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUpSheet 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

@@ -246,8 +246,8 @@ export default function App() {
   const [isOrdersExpanded, setIsOrdersExpanded] = useState<boolean>(false);
   const [isPerpsExpanded, setIsPerpsExpanded] = useState<boolean>(false);
   const [isSwapsExpanded, setIsSwapsExpanded] = useState<boolean>(false);
-  const [showFromSelect, setShowFromSelect] = useState<boolean>(false);
-  const [showToSelect, setShowToSelect] = useState<boolean>(false);
+  const [tokenModalTarget, setTokenModalTarget] = useState<'from' | 'to' | null>(null);
+  const [tokenSearchQuery, setTokenSearchQuery] = useState<string>('');
   const [copiedRef, setCopiedRef] = useState<boolean>(false);
   const [radarBanner, setRadarBanner] = useState<string | null>(null);
 
@@ -679,33 +679,144 @@ export default function App() {
     };
   }, [currentAccount?.address]);
 
+  // Helper to compute raw and formatted balance for any token
+  const getTokenBalance = useCallback(
+    (tok: Token | undefined | null) => {
+      if (!currentAccount || !tok) return { raw: '0', formatted: '0.00', num: 0 };
+      let foundRaw = '0';
+      for (const [coinType, bal] of Object.entries(userBalances)) {
+        if (
+          coinType === tok.address ||
+          (tok.symbol === 'SUI' && coinType.endsWith('::sui::SUI')) ||
+          coinType.toLowerCase().endsWith(`::${tok.symbol.toLowerCase()}`)
+        ) {
+          foundRaw = bal;
+          break;
+        }
+      }
+      const rawBig = BigInt(foundRaw || '0');
+      if (rawBig <= 0n) return { raw: '0', formatted: '0.00', num: 0 };
+      const dec = tok.decimals;
+      const num = Number(rawBig) / Math.pow(10, dec);
+      const precision = num > 0 && num < 0.01 ? Math.min(dec, 6) : 4;
+      const factor = Math.pow(10, precision);
+      const floored = Math.floor(num * factor) / factor;
+      return {
+        raw: foundRaw,
+        formatted: floored.toFixed(precision).replace(/\.?0+$/, '') || '0.00',
+        num
+      };
+    },
+    [currentAccount, userBalances]
+  );
+
   // Compute formatted balance for selected fromToken
   const currentTokenBalanceRaw = useMemo(() => {
-    if (!currentAccount || !fromToken) return '0';
-    for (const [coinType, bal] of Object.entries(userBalances)) {
-      if (
-        coinType === fromToken.address ||
-        (fromToken.symbol === 'SUI' && coinType.endsWith('::sui::SUI')) ||
-        coinType.toLowerCase().endsWith(`::${fromToken.symbol.toLowerCase()}`)
-      ) {
-        return bal;
-      }
-    }
-    return '0';
-  }, [userBalances, fromToken, currentAccount]);
+    return getTokenBalance(fromToken).raw;
+  }, [getTokenBalance, fromToken]);
 
   const formattedBalance = useMemo(() => {
-    if (!currentAccount || !fromToken) return '0.00';
-    const raw = BigInt(currentTokenBalanceRaw || '0');
-    if (raw <= 0n) return '0.00';
-    const dec = fromToken.decimals;
-    const num = Number(raw) / Math.pow(10, dec);
-    // Always floor to avoid rounding up beyond the actual spendable coin balance
-    const precision = num > 0 && num < 0.01 ? Math.min(dec, 6) : 4;
-    const factor = Math.pow(10, precision);
-    const floored = Math.floor(num * factor) / factor;
-    return floored.toFixed(precision).replace(/\.?0+$/, '') || '0.00';
-  }, [currentTokenBalanceRaw, fromToken, currentAccount]);
+    return getTokenBalance(fromToken).formatted;
+  }, [getTokenBalance, fromToken]);
+
+  // Set quick percentages (25%, 50%, 75%, MAX)
+  const handleSetPercentage = useCallback(
+    (pct: number) => {
+      if (!currentAccount) return;
+      const bal = getTokenBalance(fromToken);
+      if (bal.num <= 0) return;
+
+      let targetAmount = (bal.num * pct) / 100;
+      // If SUI and 100%, leave 0.05 SUI for gas fees so transaction succeeds reliably
+      if (fromToken.symbol === 'SUI' && pct === 100) {
+        targetAmount = Math.max(0, bal.num - 0.05);
+      }
+
+      if (targetAmount <= 0) {
+        setFromAmount('0');
+        return;
+      }
+
+      const precision = targetAmount > 0 && targetAmount < 0.01 ? Math.min(fromToken.decimals, 6) : 4;
+      const factor = Math.pow(10, precision);
+      const floored = Math.floor(targetAmount * factor) / factor;
+      setFromAmount(floored.toFixed(precision).replace(/\.?0+$/, ''));
+      playClickSound();
+    },
+    [currentAccount, fromToken, getTokenBalance]
+  );
+
+  // Token Modal Handlers
+  const handleSelectToken = useCallback(
+    (selected: Token) => {
+      playClickSound();
+      if (tokenModalTarget === 'from') {
+        if (selected.address === toToken.address) {
+          setToToken(fromToken);
+        }
+        setFromToken(selected);
+      } else if (tokenModalTarget === 'to') {
+        if (selected.address === fromToken.address) {
+          setFromToken(toToken);
+        }
+        setToToken(selected);
+      }
+      setTokenModalTarget(null);
+      setTokenSearchQuery('');
+    },
+    [tokenModalTarget, fromToken, toToken]
+  );
+
+  const handleAddCustomToken = useCallback(
+    (addr: string) => {
+      const cleanAddr = addr.trim();
+      const parts = cleanAddr.split('::');
+      const sym = parts.length > 2 ? parts[parts.length - 1].toUpperCase() : 'TOKEN';
+      const newTok: Token = {
+        symbol: sym,
+        name: `${sym} (Imported)`,
+        address: cleanAddr,
+        decimals: 9,
+        logo: '/tokens/sui.svg',
+        priceUsd: 0.01,
+        chain: 'sui'
+      };
+      setTokenList((prev) => [newTok, ...prev]);
+      handleSelectToken(newTok);
+    },
+    [handleSelectToken]
+  );
+
+  const filteredTokens = useMemo(() => {
+    const q = tokenSearchQuery.trim().toLowerCase();
+    if (!q) return tokenList;
+    return tokenList.filter(
+      (t) =>
+        t.symbol.toLowerCase().includes(q) ||
+        t.name.toLowerCase().includes(q) ||
+        t.address.toLowerCase().includes(q)
+    );
+  }, [tokenList, tokenSearchQuery]);
+
+  // Handle escape key and body scroll lock for token modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && tokenModalTarget) {
+        setTokenModalTarget(null);
+        setTokenSearchQuery('');
+      }
+    };
+    if (tokenModalTarget) {
+      document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleKeyDown);
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [tokenModalTarget]);
 
   // Check if requested amount strictly exceeds the user's total balance
   const isInsufficientBalance = useMemo(() => {
@@ -1769,24 +1880,14 @@ export default function App() {
                   </div>
                 )}
 
-                {/* From Token */}
+                {/* From Token (Pay) */}
                 <div className="bg-[#0e1015] border border-white/5 rounded-2xl p-4 transition-all focus-within:border-volt/40 relative">
                   <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
-                    <span>Pay</span>
+                    <span className="font-semibold text-gray-400">Pay</span>
                     <div
-                      onClick={() => {
-                        if (!currentAccount) return;
-                        const rawBal = BigInt(currentTokenBalanceRaw || '0');
-                        if (rawBal <= 0n) return;
-                        const dec = fromToken.decimals;
-                        const num = Number(rawBal) / Math.pow(10, dec);
-                        const precision = num > 0 && num < 0.01 ? Math.min(dec, 6) : 4;
-                        const factor = Math.pow(10, precision);
-                        const floored = Math.floor(num * factor) / factor;
-                        setFromAmount(floored.toFixed(precision).replace(/\.?0+$/, ''));
-                      }}
+                      onClick={() => handleSetPercentage(100)}
                       className="flex items-center gap-1.5 cursor-pointer group select-none hover:opacity-90 transition-opacity"
-                      title="Click balance to use Max"
+                      title="Click balance to use 100% Max"
                     >
                       <span>
                         Balance:{' '}
@@ -1802,6 +1903,7 @@ export default function App() {
                       )}
                     </div>
                   </div>
+
                   <div className="flex items-center justify-between gap-3">
                     <input
                       type="text"
@@ -1819,74 +1921,64 @@ export default function App() {
                       placeholder="0.0"
                       className="bg-transparent text-2xl font-mono font-bold text-white outline-none w-full placeholder:text-gray-600"
                     />
-                    <div
-                      onClick={() => setShowFromSelect(!showFromSelect)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1a1e27] border border-white/10 cursor-pointer hover:border-volt/50 transition-all shrink-0"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTokenModalTarget('from');
+                        setTokenSearchQuery('');
+                        playClickSound();
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2436] border border-white/10 hover:border-volt/50 cursor-pointer transition-all shrink-0 active:scale-95"
                     >
                       <img
                         src={fromToken.logo}
                         alt={fromToken.symbol}
-                        className="w-6 h-6 rounded-full bg-white/5"
+                        className="w-6 h-6 rounded-full bg-white/5 object-cover"
                         onError={(e) => {
                           (e.target as any).src = '/tokens/sui.svg';
                         }}
                       />
-                      <span className="font-bold text-sm">{fromToken.symbol}</span>
+                      <span className="font-bold text-sm text-white">{fromToken.symbol}</span>
                       <ChevronDown className="w-4 h-4 text-gray-400" />
-                    </div>
+                    </button>
                   </div>
 
-                  {/* From Token Dropdown */}
-                  {showFromSelect && (
-                    <div className="absolute top-full right-4 mt-2 z-50 w-60 max-h-64 overflow-y-auto bg-[#181d28] border border-white/10 rounded-2xl p-2 shadow-2xl">
-                      <span className="text-[10px] text-gray-400 uppercase font-mono px-2 block mb-1">Select Input Token</span>
-                      {tokenList.map((t) => (
-                        <button
-                          key={t.symbol + t.address}
-                          onClick={() => {
-                            setFromToken(t);
-                            setShowFromSelect(false);
-                          }}
-                          className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-white/5 text-xs font-semibold text-left transition-all cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <img
-                              src={t.logo}
-                              alt={t.symbol}
-                              className="w-6 h-6 rounded-full bg-white/5"
-                              onError={(e) => {
-                                (e.target as any).src = '/tokens/sui.svg';
-                              }}
-                            />
-                            <div>
-                              <span className="block text-white font-bold">{t.symbol}</span>
-                              <span className="text-[10px] text-gray-400 truncate max-w-[130px] block">{t.name}</span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* Quick Volume Percentage Chips: 25%, 50%, 75%, MAX */}
+                  <div className="flex items-center gap-1.5 mt-2.5">
+                    {[25, 50, 75, 100].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => handleSetPercentage(pct)}
+                        className="flex-1 py-1 rounded-lg bg-[#141824] hover:bg-[#1f2638] active:scale-95 border border-white/5 hover:border-volt/30 text-[11px] font-mono font-semibold text-gray-300 hover:text-volt transition-all text-center cursor-pointer"
+                        title={`Set ${pct}% of ${fromToken.symbol} balance`}
+                      >
+                        {pct === 100 ? 'MAX' : `${pct}%`}
+                      </button>
+                    ))}
+                  </div>
 
-                  <div className="text-xs text-gray-500 font-mono mt-1">
+                  <div className="text-xs text-gray-500 font-mono mt-1.5">
                     ≈ ${(parseAmount(fromAmount) * fromPrice).toFixed(2)} USD
                   </div>
                 </div>
 
-                {/* Switch */}
+                {/* Switch Button */}
                 <div className="flex justify-center -my-3 relative z-10">
                   <button
+                    type="button"
                     onClick={handleSwapTokens}
-                    className="w-10 h-10 rounded-2xl bg-[#1b202c] border border-white/10 flex items-center justify-center text-volt hover:scale-110 hover:border-volt/40 transition-all shadow-lg cursor-pointer"
+                    className="w-10 h-10 rounded-2xl bg-[#1b202c] border border-white/10 flex items-center justify-center text-volt hover:scale-110 hover:border-volt/40 active:scale-95 transition-all shadow-lg cursor-pointer"
+                    title="Swap pay and receive tokens"
                   >
                     <ArrowDownUp className="w-4 h-4" />
                   </button>
                 </div>
 
-                {/* To Token */}
+                {/* To Token (Receive) */}
                 <div className="bg-[#0e1015] border border-white/5 rounded-2xl p-4 mt-1 transition-all focus-within:border-volt/40 relative">
                   <div className="flex justify-between text-xs text-gray-400 mb-2">
-                    <span>Receive</span>
+                    <span className="font-semibold text-gray-400">Receive</span>
                     <span>{isFetchingQuote ? 'Scanning Cetus + DeepBook...' : 'Best On-Chain Output'}</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
@@ -1897,56 +1989,29 @@ export default function App() {
                       placeholder="0.0"
                       className="bg-transparent text-2xl font-mono font-bold text-volt outline-none w-full placeholder:text-gray-600"
                     />
-                    <div
-                      onClick={() => setShowToSelect(!showToSelect)}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#1a1e27] border border-white/10 cursor-pointer hover:border-volt/50 transition-all shrink-0"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTokenModalTarget('to');
+                        setTokenSearchQuery('');
+                        playClickSound();
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2436] border border-white/10 hover:border-volt/50 cursor-pointer transition-all shrink-0 active:scale-95"
                     >
                       <img
                         src={toToken.logo}
                         alt={toToken.symbol}
-                        className="w-6 h-6 rounded-full bg-white/5"
+                        className="w-6 h-6 rounded-full bg-white/5 object-cover"
                         onError={(e) => {
                           (e.target as any).src = '/tokens/sui.svg';
                         }}
                       />
-                      <span className="font-bold text-sm">{toToken.symbol}</span>
+                      <span className="font-bold text-sm text-white">{toToken.symbol}</span>
                       <ChevronDown className="w-4 h-4 text-gray-400" />
-                    </div>
+                    </button>
                   </div>
 
-                  {/* To Token Dropdown */}
-                  {showToSelect && (
-                    <div className="absolute top-full right-4 mt-2 z-50 w-60 max-h-64 overflow-y-auto bg-[#181d28] border border-white/10 rounded-2xl p-2 shadow-2xl">
-                      <span className="text-[10px] text-gray-400 uppercase font-mono px-2 block mb-1">Select Output Token</span>
-                      {tokenList.map((t) => (
-                        <button
-                          key={t.symbol + t.address}
-                          onClick={() => {
-                            setToToken(t);
-                            setShowToSelect(false);
-                          }}
-                          className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-white/5 text-xs font-semibold text-left transition-all cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <img
-                              src={t.logo}
-                              alt={t.symbol}
-                              className="w-6 h-6 rounded-full bg-white/5"
-                              onError={(e) => {
-                                (e.target as any).src = '/tokens/sui.svg';
-                              }}
-                            />
-                            <div>
-                              <span className="block text-white font-bold">{t.symbol}</span>
-                              <span className="text-[10px] text-gray-400 truncate max-w-[130px] block">{t.name}</span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="text-xs text-gray-500 font-mono mt-1">
+                  <div className="text-xs text-gray-500 font-mono mt-2">
                     ≈ ${(parseFloat(swapMode === 'limit' ? limitEstimatedOutput : (rawToAmount || '0')) * toPrice).toFixed(2)} USD
                   </div>
                 </div>
@@ -3469,6 +3534,193 @@ export default function App() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Responsive Token Selector Modal / Mobile Bottom Sheet */}
+      {tokenModalTarget && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200">
+          {/* Click backdrop to close */}
+          <div
+            className="absolute inset-0 cursor-pointer"
+            onClick={() => {
+              setTokenModalTarget(null);
+              setTokenSearchQuery('');
+            }}
+          />
+
+          {/* Modal / Bottom Sheet Box */}
+          <div className="relative w-full max-w-lg bg-[#0d1017] border-t sm:border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[82vh] overflow-hidden z-10 animate-slide-up">
+            {/* Mobile drag handle bar */}
+            <div className="sm:hidden w-12 h-1.5 bg-white/20 rounded-full mx-auto mt-3 mb-1 shrink-0" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/5 shrink-0">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>Select Token</span>
+                  <span className="text-xs font-mono font-normal text-volt bg-volt/10 px-2 py-0.5 rounded-full border border-volt/20 uppercase">
+                    {tokenModalTarget === 'from' ? 'Pay' : 'Receive'}
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Search by name, symbol, or paste Sui Move coin address
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setTokenModalTarget(null);
+                  setTokenSearchQuery('');
+                }}
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="p-4 pb-2 shrink-0">
+              <div className="relative flex items-center">
+                <Search className="absolute left-3.5 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={tokenSearchQuery}
+                  onChange={(e) => setTokenSearchQuery(e.target.value)}
+                  placeholder="Search name, symbol (e.g. SUI, USDC) or 0x..."
+                  className="w-full bg-[#131722] border border-white/10 focus:border-volt/50 rounded-xl pl-10 pr-9 py-2.5 text-sm text-white placeholder:text-gray-500 outline-none transition-all font-sans"
+                />
+                {tokenSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setTokenSearchQuery('')}
+                    className="absolute right-3 p-1 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Popular Token Quick Chips */}
+            <div className="px-4 pb-3 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+              <span className="text-[11px] font-mono text-gray-500 uppercase shrink-0 mr-1">Popular:</span>
+              {['SUI', 'USDC', 'USDT', 'DEEP', 'WAL', 'CETUS'].map((sym) => {
+                const tok = tokenList.find((t) => t.symbol.toUpperCase() === sym);
+                if (!tok) return null;
+                const isSelected =
+                  (tokenModalTarget === 'from' && fromToken.symbol === tok.symbol) ||
+                  (tokenModalTarget === 'to' && toToken.symbol === tok.symbol);
+                return (
+                  <button
+                    key={sym}
+                    type="button"
+                    onClick={() => handleSelectToken(tok)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border shrink-0 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-volt/15 border-volt text-volt shadow-volt-glow'
+                        : 'bg-[#141824] border-white/10 text-gray-300 hover:border-volt/40 hover:text-white hover:bg-[#1a2133]'
+                    }`}
+                  >
+                    <img
+                      src={tok.logo}
+                      alt={tok.symbol}
+                      className="w-4 h-4 rounded-full bg-white/5 object-cover"
+                      onError={(e) => {
+                        (e.target as any).src = '/tokens/sui.svg';
+                      }}
+                    />
+                    <span>{tok.symbol}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Token List */}
+            <div className="flex-1 overflow-y-auto px-3 py-1 space-y-1 divide-y divide-white/[0.03]">
+              {filteredTokens.length === 0 ? (
+                <div className="p-6 text-center space-y-3">
+                  <p className="text-sm text-gray-400">No token found matching "{tokenSearchQuery}"</p>
+                  {tokenSearchQuery.includes('::') && (
+                    <button
+                      type="button"
+                      onClick={() => handleAddCustomToken(tokenSearchQuery)}
+                      className="px-4 py-2 rounded-xl bg-volt text-black font-bold text-xs hover:opacity-90 transition-all cursor-pointer"
+                    >
+                      + Import Custom Token ({tokenSearchQuery.slice(0, 10)}...{tokenSearchQuery.slice(-6)})
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredTokens.map((t) => {
+                  const isSelected =
+                    (tokenModalTarget === 'from' && fromToken.address === t.address) ||
+                    (tokenModalTarget === 'to' && toToken.address === t.address);
+                  const bal = getTokenBalance(t);
+
+                  return (
+                    <button
+                      key={t.symbol + t.address}
+                      type="button"
+                      onClick={() => handleSelectToken(t)}
+                      className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer text-left ${
+                        isSelected
+                          ? 'bg-volt/10 border border-volt/30'
+                          : 'hover:bg-white/[0.04] border border-transparent hover:border-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative">
+                          <img
+                            src={t.logo}
+                            alt={t.symbol}
+                            className="w-9 h-9 rounded-full bg-white/5 object-cover"
+                            onError={(e) => {
+                              (e.target as any).src = '/tokens/sui.svg';
+                            }}
+                          />
+                          {isSelected && (
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-volt text-black flex items-center justify-center">
+                              <Check className="w-2.5 h-2.5 stroke-[3]" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-white truncate">{t.symbol}</span>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-volt shrink-0" />
+                          </div>
+                          <div className="text-xs text-gray-400 truncate max-w-[160px] sm:max-w-[220px]">
+                            {t.name}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Balance & Price */}
+                      <div className="text-right shrink-0 pl-2">
+                        <div className={`font-mono text-sm font-bold ${bal.num > 0 ? 'text-white' : 'text-gray-500'}`}>
+                          {currentAccount ? bal.formatted : '-'}
+                        </div>
+                        {currentAccount && bal.num > 0 && t.priceUsd && (
+                          <div className="text-[11px] font-mono text-gray-500">
+                            ≈ ${(bal.num * t.priceUsd).toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer info */}
+            <div className="p-3 bg-[#0a0d14] border-t border-white/5 text-[11px] text-gray-500 flex items-center justify-between px-4 shrink-0 font-mono">
+              <span>Verified Sui Mainnet Assets</span>
+              <span>{filteredTokens.length} Tokens</span>
             </div>
           </div>
         </div>
