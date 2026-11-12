@@ -24,7 +24,9 @@ import {
   Sparkles,
   ArrowDownUp,
   RefreshCw,
-  Coins
+  Coins,
+  Search,
+  Landmark
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
@@ -607,112 +609,171 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   const totalAccruedPnlUsd = activePositions.reduce((acc, p) => acc + p.pnlUsd, 0);
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
-      {/* Top Banner / Hero */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e1320] via-[#121829] to-[#0a0d16] border border-volt/25 p-6 lg:p-8 shadow-2xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-volt/10 via-amber-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+    <div className="w-full max-w-[1400px] space-y-5 pb-16 animate-fadeIn font-mono">
+      {/* 1. HERO HEADER (Harmonized with Pools & Vaults) */}
+      <div className="relative p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-[#121624] via-[#0d101a] to-[#07090e] border border-white/10 shadow-2xl overflow-hidden backdrop-blur-xl">
+        <div className="absolute -top-32 -right-32 w-80 h-80 bg-cyan-500/15 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-blue-500/15 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-volt/10 border border-volt/30 text-volt text-xs font-mono font-bold uppercase tracking-wider mb-3">
-              <Zap className="w-3.5 h-3.5 fill-volt" />
-              Volt Multiply & Margin Engine • Up to 10x Leverage
+            <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[11px] font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Sui Mainnet Audited Protocols
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 text-[11px] font-bold border border-cyan-500/30 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-cyan-400" /> Automated Compounding
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 text-[11px] font-bold border border-sky-500/30">
+                Up to 10x Leverage
+              </span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight flex items-center gap-3">
-              Multiply <span className="text-volt">Terminal</span>
+
+            <h1 className="text-xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
+              1-Click Multiply & Looping Engine
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                PRO
+              </span>
             </h1>
-            <p className="text-gray-400 text-sm max-w-2xl mt-2 leading-relaxed">
-              Effortlessly amplify yields and trade with automated compounding loops powered by NAVI, Scallop, and Haedal liquidity.
-              Earn up to <strong>28.4% Net APR</strong> with soft-pegged LSTs and delta-neutral stablecoin loops.
+
+            <p className="text-xs sm:text-sm text-gray-400 mt-1.5 max-w-2xl leading-relaxed">
+              Effortlessly amplify yields and trade with automated recursive compounding loops powered by NAVI, Scallop, and Haedal liquidity in 1 atomic PTB.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <div className="bg-[#161c2d] border border-white/10 rounded-2xl px-5 py-3.5 flex-1 sm:flex-initial">
-              <div className="text-[11px] font-mono uppercase text-gray-400">Total Multiply TVL</div>
-              <div className="text-xl font-mono font-black text-white mt-0.5">$391,340,000</div>
-            </div>
-            <div className="bg-[#161c2d] border border-white/10 rounded-2xl px-5 py-3.5 flex-1 sm:flex-initial">
-              <div className="text-[11px] font-mono uppercase text-gray-400">Max Leverage</div>
-              <div className="text-xl font-mono font-black text-amber-400 mt-0.5">9.8x Multiplier</div>
+          {/* Integrated Liquidity Partners Pill */}
+          <div className="flex items-center gap-2 p-2.5 bg-black/50 border border-white/10 rounded-2xl backdrop-blur-md self-start lg:self-center">
+            <span className="text-[10px] text-gray-400 uppercase tracking-widest font-mono shrink-0 mr-1">Liquidity:</span>
+            <div className="flex items-center gap-1.5">
+              <img src="/tokens/sui.svg" alt="Sui" title="Sui Network" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
+              <img src="/tokens/sca.svg" alt="Scallop" title="Scallop" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
+              <img src="/tokens/navx.svg" alt="NAVI" title="NAVI Protocol" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
+              <img src="/tokens/hasui.svg" alt="Haedal" title="Haedal LST" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
+              <img src="/tokens/deep.svg" alt="DeepBook" title="DeepBook v3" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
             </div>
           </div>
         </div>
 
-        {/* Top 3 Featured Cards (Matching Current Finance Layout) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          {/* Card 1: haSUI / SUI */}
-          <div
-            onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[0])}
-            className="group cursor-pointer bg-[#151b2a]/90 hover:bg-[#1a2236] border border-white/10 hover:border-volt/50 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <span className="text-2xl font-black text-emerald-400 font-mono">24.8%</span>
-                <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
-              </div>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                9.8x LST Loop
-              </span>
+        {/* 3 Balanced Metric Cards (Identical Layout & Metrics to Pools) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-5 pt-5 border-t border-white/10">
+          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-white/10 backdrop-blur-md">
+            <div className="flex items-center justify-between text-gray-400 text-xs mb-1">
+              <span>Total Multiply TVL</span>
+              <Landmark className="w-4 h-4 text-cyan-400" />
             </div>
-            <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
-              <span>haSUI / SUI • Pegged Staking</span>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-volt group-hover:translate-x-1 transition-all" />
-            </div>
+            <div className="text-lg sm:text-2xl font-black text-white font-mono">$391.3M USD</div>
+            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 mt-1">
+              <TrendingUp className="w-3.5 h-3.5" /> 6 Verified Looping Strategies
+            </span>
           </div>
 
-          {/* Card 2: Long SUI */}
-          <div
-            onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[2])}
-            className="group cursor-pointer bg-[#151b2a]/90 hover:bg-[#1a2236] border border-white/10 hover:border-volt/50 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-volt" />
-                <span className="text-2xl font-black text-volt font-mono">28.4%</span>
-                <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
-              </div>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-volt/10 text-volt border border-volt/30">
-                4.0x Long SUI
-              </span>
+          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-white/10 backdrop-blur-md">
+            <div className="flex items-center justify-between text-gray-400 text-xs mb-1">
+              <span>Highest Net APR</span>
+              <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400" />
             </div>
-            <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
-              <span>SUI / USDC • Leveraged Upside</span>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-volt group-hover:translate-x-1 transition-all" />
-            </div>
+            <div className="text-lg sm:text-2xl font-black text-cyan-300 font-mono">28.40% Net APR</div>
+            <span className="text-xs text-gray-400 font-mono mt-1 block truncate">
+              SUI / USDC Leveraged Upside (4.0x)
+            </span>
           </div>
 
-          {/* Card 3: Stable Loop */}
-          <div
-            onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[4])}
-            className="group cursor-pointer bg-[#151b2a]/90 hover:bg-[#1a2236] border border-white/10 hover:border-volt/50 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                <span className="text-2xl font-black text-cyan-400 font-mono">16.8%</span>
-                <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
-              </div>
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                4.8x RWA Loop
-              </span>
+          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-cyan-500/30 backdrop-blur-md">
+            <div className="flex items-center justify-between text-cyan-400 text-xs mb-1">
+              <span>Your Active Multiply Value</span>
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
             </div>
-            <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
-              <span>USDY / USDC • US Treasury Yield</span>
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-volt group-hover:translate-x-1 transition-all" />
+            <div className="text-lg sm:text-2xl font-black text-white font-mono">
+              ${totalPositionsValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
+            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 mt-1">
+              {totalPositionsValueUsd > 0 ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  +${totalAccruedPnlUsd.toFixed(2)} Real-Time Yield
+                </>
+              ) : (
+                <span className="text-gray-500 font-normal">● No open margin loops</span>
+              )}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Active User Positions Widget (Matching Current Finance "Your Positions") */}
+      {/* Top 3 Featured Quick Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        {/* Card 1: haSUI / SUI */}
+        <div
+          onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[0])}
+          className="group cursor-pointer bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span className="text-2xl font-black text-emerald-400 font-mono">24.8%</span>
+              <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
+            </div>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              9.8x LST Loop
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
+            <span>haSUI / SUI • Pegged Staking</span>
+            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+          </div>
+        </div>
+
+        {/* Card 2: Long SUI */}
+        <div
+          onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[2])}
+          className="group cursor-pointer bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-cyan-400" />
+              <span className="text-2xl font-black text-cyan-300 font-mono">28.4%</span>
+              <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
+            </div>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              4.0x Long SUI
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
+            <span>SUI / USDC • Leveraged Upside</span>
+            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+          </div>
+        </div>
+
+        {/* Card 3: Stable Loop */}
+        <div
+          onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[4])}
+          className="group cursor-pointer bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+              <span className="text-2xl font-black text-cyan-300 font-mono">16.8%</span>
+              <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
+            </div>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              4.8x RWA Loop
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
+            <span>USDY / USDC • US Treasury Yield</span>
+            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+          </div>
+        </div>
+      </div>
+
+      {/* Active User Positions Widget */}
       {activePositions.length > 0 && (
-        <div className="bg-[#121623] border border-white/10 rounded-3xl p-5 lg:p-6 shadow-xl space-y-4">
+        <div className="bg-[#0b0e17] border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-volt/10 border border-volt/30 flex items-center justify-center">
-                <Coins className="w-4 h-4 text-volt" />
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                <Coins className="w-4 h-4 text-cyan-400" />
               </div>
               <div>
                 <h3 className="text-base font-bold text-white">Your Active Multiply Positions</h3>
@@ -736,11 +797,11 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             {activePositions.map((pos) => (
               <div
                 key={pos.id}
-                className="bg-[#171d2d] border border-white/10 rounded-2xl p-4 space-y-3 relative overflow-hidden"
+                className="bg-[#121624] border border-white/10 rounded-2xl p-4 space-y-3 relative overflow-hidden"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-white">{pos.strategyName}</span>
-                  <span className="px-2 py-0.5 rounded-lg bg-amber-400/10 text-amber-400 border border-amber-400/30 text-xs font-mono font-bold">
+                  <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold">
                     {pos.multiplier}x Multiplier
                   </span>
                 </div>
@@ -756,7 +817,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   </div>
                   <div className="bg-black/30 p-2 rounded-xl">
                     <span className="text-gray-400 text-[10px] uppercase block">Net APY</span>
-                    <span className="text-volt font-bold">{pos.netApr.toFixed(2)}%</span>
+                    <span className="text-cyan-300 font-bold">{pos.netApr.toFixed(2)}%</span>
                   </div>
                   <div className="bg-black/30 p-2 rounded-xl">
                     <span className="text-gray-400 text-[10px] uppercase block">Accrued Yield</span>
@@ -784,25 +845,25 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         </div>
       )}
 
-      {/* Strategy Filters & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+      {/* 2. Strategy Filters & Search Bar (Harmonized with Pools) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-[#0b0e17] border border-white/10">
         {/* Strategy Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-[#121622] border border-white/10 rounded-2xl overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {[
-            { id: 'all', label: 'All Markets' },
-            { id: 'lst', label: 'LST Pegged' },
-            { id: 'long_sui', label: 'Long SUI' },
-            { id: 'short_sui', label: 'Short SUI' },
-            { id: 'stablecoin', label: 'Stablecoin' },
-            { id: 'rwa', label: 'RWA' }
+            { id: 'all', label: 'All Markets (6)' },
+            { id: 'lst', label: '💧 LST Pegged' },
+            { id: 'long_sui', label: '📈 Long SUI' },
+            { id: 'short_sui', label: '📉 Short SUI' },
+            { id: 'stablecoin', label: '💵 Stablecoin' },
+            { id: 'rwa', label: '🏛️ RWA' }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setSelectedFilter(tab.id as any)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                 selectedFilter === tab.id
-                  ? 'bg-volt text-black shadow-volt-glow font-bold'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black shadow-[0_0_15px_rgba(56,189,248,0.25)]'
+                  : 'text-gray-400 hover:text-white bg-transparent hover:bg-white/5'
               }`}
             >
               {tab.label}
@@ -811,23 +872,24 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         </div>
 
         {/* Search */}
-        <div className="relative min-w-[240px]">
+        <div className="relative flex-1 sm:w-56">
+          <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search strategy or token..."
+            placeholder="Search strategies or tokens..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#121622] border border-white/10 focus:border-volt/50 rounded-2xl px-4 py-2 text-xs text-white placeholder-gray-500 outline-none font-mono transition-all"
+            className="w-full pl-8 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder:text-gray-500 outline-none focus:border-cyan-500/50 font-mono"
           />
         </div>
       </div>
 
-      {/* Main Multiply Market Table (Current Finance Layout) */}
-      <div className="bg-[#121623] border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+      {/* 3. Main Multiply Market Table (Harmonized with Pools & Vaults) */}
+      <div className="bg-[#0b0e17] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/10 bg-[#0d101a] text-[11px] font-mono text-gray-400 uppercase tracking-wider">
+              <tr className="border-b border-white/5 bg-[#090d16] text-[11px] font-bold text-gray-400 uppercase tracking-wider">
                 <th className="py-4 px-5">Supply (Collateral)</th>
                 <th className="py-4 px-5">Borrow (Debt)</th>
                 <th className="py-4 px-4">Strategy</th>
@@ -842,17 +904,20 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
               {filteredStrategies.map((strat) => (
                 <tr
                   key={strat.id}
-                  className="hover:bg-white/[0.02] transition-colors group"
+                  className="hover:bg-white/[0.03] transition-colors group"
                 >
                   {/* Supply Asset */}
                   <td className="py-4 px-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center font-bold text-white text-[11px]">
-                        {strat.supplyToken.slice(0, 3)}
-                      </div>
+                      <img
+                        src={strat.supplyTokenLogo}
+                        alt=""
+                        className="w-8 h-8 rounded-full border border-white/10 bg-black p-0.5 shrink-0"
+                        onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
+                      />
                       <div>
                         <div className="font-bold text-white text-sm">{strat.supplyToken}</div>
-                        <div className="text-[10px] text-gray-400">${(strat.supplyTvlUsd / 1e6).toFixed(2)}M TVL</div>
+                        <div className="text-[10px] text-gray-400">${(strat.supplyTvlUsd / 1e6).toFixed(1)}M TVL</div>
                       </div>
                     </div>
                   </td>
@@ -860,12 +925,15 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   {/* Borrow Asset */}
                   <td className="py-4 px-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center font-bold text-white text-[11px]">
-                        {strat.borrowToken.slice(0, 3)}
-                      </div>
+                      <img
+                        src={strat.borrowTokenLogo}
+                        alt=""
+                        className="w-8 h-8 rounded-full border border-white/10 bg-black p-0.5 shrink-0"
+                        onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
+                      />
                       <div>
                         <div className="font-bold text-white text-sm">{strat.borrowToken}</div>
-                        <div className="text-[10px] text-gray-400">${(strat.borrowBorrowedUsd / 1e6).toFixed(2)}M Borrowed</div>
+                        <div className="text-[10px] text-gray-400">${(strat.borrowBorrowedUsd / 1e6).toFixed(1)}M Borrowed</div>
                       </div>
                     </div>
                   </td>
@@ -879,7 +947,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
                   {/* Max Net APR */}
                   <td className="py-4 px-4 text-right">
-                    <div className="font-bold text-base text-emerald-400 flex items-center justify-end gap-1">
+                    <div className="font-bold text-base text-emerald-400 flex items-center justify-end gap-1 font-mono">
                       <Zap className="w-3.5 h-3.5 fill-emerald-400" />
                       {strat.maxApr.toFixed(1)}%
                     </div>
@@ -887,18 +955,18 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
                   {/* Max Multiplier */}
                   <td className="py-4 px-4 text-right">
-                    <span className="font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-lg border border-amber-400/20">
+                    <span className="font-bold text-cyan-300 bg-cyan-500/15 px-2.5 py-0.5 rounded-lg border border-cyan-500/30">
                       {strat.maxMultiplier}x
                     </span>
                   </td>
 
                   {/* Supply APR */}
-                  <td className="py-4 px-4 text-right text-gray-300">
+                  <td className="py-4 px-4 text-right text-gray-300 font-mono">
                     {strat.supplyApr.toFixed(2)}%
                   </td>
 
                   {/* Borrow APR */}
-                  <td className="py-4 px-4 text-right text-rose-300 font-medium">
+                  <td className="py-4 px-4 text-right text-rose-300 font-medium font-mono">
                     {strat.borrowApr.toFixed(2)}%
                   </td>
 
@@ -906,9 +974,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   <td className="py-4 px-5 text-right">
                     <button
                       onClick={() => handleOpenMultiplyModal(strat)}
-                      className="px-4 py-2 rounded-xl bg-volt hover:bg-volt-light text-black font-extrabold text-xs shadow-volt-glow transition-all cursor-pointer"
+                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ml-auto"
                     >
-                      Multiply &gt;&gt;
+                      <span>Multiply</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </td>
                 </tr>
@@ -920,13 +989,13 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       {/* Interactive Multiply Modal */}
       {activeStrategy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="bg-[#121623] border border-white/15 rounded-3xl w-full max-w-lg p-6 space-y-5 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in font-mono">
+          <div className="bg-[#0e121d] border border-white/10 rounded-3xl w-full max-w-lg p-6 space-y-5 shadow-2xl relative">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-volt/10 border border-volt/30 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-volt" />
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-cyan-400" />
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-white">{activeStrategy.name}</h3>
@@ -980,10 +1049,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             </div>
 
             {/* Leverage / Multiplier Selector & Slider */}
-            <div className="space-y-2 bg-[#171d2e] p-4 rounded-2xl border border-white/5">
+            <div className="space-y-2 bg-[#080b12] p-4 rounded-2xl border border-white/10">
               <div className="flex items-center justify-between text-xs font-mono">
                 <span className="text-gray-300 font-bold">Select Multiplier / Leverage:</span>
-                <span className="text-amber-400 font-black text-sm">{multiplier.toFixed(1)}x</span>
+                <span className="text-cyan-300 font-black text-sm">{multiplier.toFixed(1)}x</span>
               </div>
 
               {/* Slider */}
@@ -994,7 +1063,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                 step="0.1"
                 value={multiplier}
                 onChange={(e) => setMultiplier(parseFloat(e.target.value))}
-                className="w-full accent-amber-400 cursor-pointer"
+                className="w-full accent-cyan-400 cursor-pointer"
               />
 
               {/* Quick Multiplier Buttons */}
@@ -1005,7 +1074,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                     onClick={() => setMultiplier(val)}
                     className={`py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                       multiplier === val
-                        ? 'bg-amber-400 text-black shadow-md'
+                        ? 'bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black shadow-md'
                         : 'bg-white/5 text-gray-400 hover:text-white'
                     }`}
                   >
@@ -1049,20 +1118,20 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             <button
               onClick={handleConfirmMultiply}
               disabled={isExecuting || collateralNum <= 0}
-              className={`w-full py-3.5 rounded-2xl font-extrabold text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
+              className={`w-full py-3.5 rounded-2xl font-black text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
                 isExecuting || collateralNum <= 0
                   ? 'bg-white/10 text-gray-500 cursor-not-allowed'
-                  : 'bg-volt hover:bg-volt-light text-black shadow-volt-glow'
+                  : 'bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black shadow-[0_0_20px_rgba(56,189,248,0.25)]'
               }`}
             >
               {isExecuting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                   Signing on Sui Mainnet...
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4 fill-black" />
+                  <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
                   Execute {multiplier.toFixed(1)}x Multiply Position
                 </>
               )}
@@ -1073,8 +1142,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       {/* Position Manage / De-leverage Modal */}
       {managingPosition && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="bg-[#121623] border border-white/15 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in font-mono">
+          <div className="bg-[#0e121d] border border-white/10 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl relative">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <h3 className="text-lg font-black text-white">Manage Position</h3>
               <button
@@ -1085,14 +1154,14 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
               </button>
             </div>
 
-            <div className="bg-[#0b0e17] p-4 rounded-2xl space-y-2 text-xs font-mono">
+            <div className="bg-[#0b0e17] p-4 rounded-2xl space-y-2 text-xs font-mono border border-white/5">
               <div className="flex justify-between">
                 <span className="text-gray-400">Strategy:</span>
                 <span className="text-white font-bold">{managingPosition.strategyName}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Multiplier:</span>
-                <span className="text-amber-400 font-bold">{managingPosition.multiplier}x</span>
+                <span className="text-cyan-300 font-bold">{managingPosition.multiplier}x</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Collateral:</span>

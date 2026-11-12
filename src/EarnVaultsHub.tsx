@@ -339,6 +339,7 @@ interface EarnVaultsHubProps {
   userTraderTier?: any;
   cetusClient?: any;
   onNavigateToSwap: (fromToken: string, toToken: string) => void;
+  onNavigateToMultiply?: () => void;
   showNotification: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string, actionLabel?: string, actionUrl?: string) => void;
 }
 
@@ -352,6 +353,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   userTraderTier,
   cetusClient,
   onNavigateToSwap,
+  onNavigateToMultiply,
   showNotification
 }) => {
   // View Mode: 7 Blue-Chip Vaults vs 1-Click Multiply Looping (Up to 9.8x)
@@ -925,11 +927,17 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         </button>
 
         <button
-          onClick={() => setViewMode('multiply')}
+          onClick={() => {
+            if (onNavigateToMultiply) {
+              onNavigateToMultiply();
+            } else {
+              setViewMode('multiply');
+            }
+          }}
           className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             viewMode === 'multiply'
               ? 'bg-gradient-to-r from-cyan-500/20 via-sky-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.2)]'
-              : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+              : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-cyan-500/20'
           }`}
         >
           <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400/20" />

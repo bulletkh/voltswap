@@ -60,6 +60,7 @@ import { PwaInstallPrompt } from './PwaInstallPrompt';
 const WhaleRadar = lazy(() => import('./WhaleRadar').then(m => ({ default: m.WhaleRadar })));
 const AffiliatesHub = lazy(() => import('./AffiliatesHub').then(m => ({ default: m.AffiliatesHub })));
 const EarnVaultsHub = lazy(() => import('./EarnVaultsHub').then(m => ({ default: m.EarnVaultsHub })));
+const MarginMultiplyHub = lazy(() => import('./MarginMultiplyHub').then(m => ({ default: m.MarginMultiplyHub })));
 const BluefinMarginTerminal = lazy(() => import('./BluefinMarginTerminal').then(m => ({ default: m.BluefinMarginTerminal })));
 const TreasuryDashboard = lazy(() => import('./TreasuryDashboard').then(m => ({ default: m.TreasuryDashboard })));
 
@@ -85,7 +86,7 @@ export default function App() {
   });
   const suiClient = useSuiClient();
 
-  const [activeTab, setActiveTab] = useState<'swap' | 'radar' | 'margin' | 'earn' | 'bridge' | 'portfolio' | 'docs' | 'treasury'>('swap');
+  const [activeTab, setActiveTab] = useState<'swap' | 'radar' | 'margin' | 'earn' | 'multiply' | 'bridge' | 'portfolio' | 'docs' | 'treasury'>('swap');
   
   // Pro Chart & Orderbook Visibility: Always open by default on Desktop (>= 1024px) for full terminal experience
   const [showChart, setShowChart] = useState<boolean>(() => {
@@ -1925,8 +1926,9 @@ export default function App() {
             {[
               { id: 'swap', label: 'Trade', icon: Zap },
               { id: 'radar', label: 'Whale Radar', icon: Activity },
-              { id: 'margin', label: 'Perps (Beta)', icon: TrendingUp },
               { id: 'earn', label: 'Pools', icon: Coins },
+              { id: 'multiply', label: 'Multiply', icon: Sparkles },
+              { id: 'margin', label: 'Perps (Beta)', icon: TrendingUp },
               ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
               { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },
               { id: 'portfolio', label: 'Community', icon: Users },
@@ -2005,8 +2007,9 @@ export default function App() {
         {[
           { id: 'swap', label: 'Swap', icon: Zap },
           { id: 'radar', label: 'Radar', icon: Activity },
-          { id: 'margin', label: 'Perps (Beta)', icon: TrendingUp },
           { id: 'earn', label: 'Pools', icon: Coins },
+          { id: 'multiply', label: 'Multiply', icon: Sparkles },
+          { id: 'margin', label: 'Perps (Beta)', icon: TrendingUp },
           ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
           { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },
           { id: 'portfolio', label: 'Community', icon: Users },
@@ -3326,6 +3329,34 @@ export default function App() {
               effectiveFeeRate={effectiveFeeRate}
               userTraderTier={userTraderTier}
               cetusClient={cetusClient}
+              onNavigateToSwap={(from, to) => {
+                if (from) {
+                  const f = POPULAR_TOKENS.find(t => t.symbol === from);
+                  if (f) setFromToken(f);
+                }
+                if (to) {
+                  const t = POPULAR_TOKENS.find(tok => tok.symbol === to);
+                  if (t) setToToken(t);
+                }
+                setActiveTab('swap');
+              }}
+              onNavigateToMultiply={() => setActiveTab('multiply')}
+              showNotification={showNotification}
+            />
+          </Suspense>
+        )}
+
+        {/* TAB: 1-CLICK MULTIPLY & MARGIN LOOPING */}
+        {activeTab === 'multiply' && (
+          <Suspense fallback={<ModuleLoadingFallback />}>
+            <MarginMultiplyHub
+              currentAccount={currentAccount}
+              suiClient={suiClient}
+              signAndExecute={signAndExecute}
+              currentAccountAddress={currentAccount?.address}
+              userBalances={userBalances}
+              effectiveFeeRate={effectiveFeeRate}
+              userTraderTier={userTraderTier}
               onNavigateToSwap={(from, to) => {
                 if (from) {
                   const f = POPULAR_TOKENS.find(t => t.symbol === from);
