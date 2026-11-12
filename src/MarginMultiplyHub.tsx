@@ -1119,6 +1119,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       // Dry-run Flash-Loan loop so wallet never shows "This transaction will fail"
       let finalTx: Transaction | null = null;
       let executedAtomicLoop = false;
+      let executedBorrowUnits = 0;
 
       if (multiplier > 1.0 && borrowUsd >= 0.5 && borrowTokenPriceUsd > 0) {
         const targetBorrowUnits = Math.floor(borrowAmount * Math.pow(10, borrowDecimals));
@@ -1134,6 +1135,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             if (dryRun?.effects?.status?.status === 'success') {
               finalTx = candidate.tx;
               executedAtomicLoop = true;
+              executedBorrowUnits = units;
               break;
             }
           } catch {
@@ -1155,6 +1157,16 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       recordMultiplyAffiliateFee(collateralUsd * feeRate);
       fetchOnChainPortfolio();
+      setTimeout(() => fetchOnChainPortfolio(), 2000);
+
+      const actualBorrowAmount = executedAtomicLoop ? executedBorrowUnits / Math.pow(10, borrowDecimals) : 0;
+      const actualBorrowUsd = actualBorrowAmount * borrowTokenPriceUsd;
+      const actualExposureUsd = collateralUsd + actualBorrowUsd;
+      const actualMultiplier = collateralUsd > 0 ? actualExposureUsd / collateralUsd : 1.0;
+      const actualNetApr = executedAtomicLoop
+        ? Math.max(0, activeStrategy.supplyApr * actualMultiplier - activeStrategy.borrowApr * (actualMultiplier - 1))
+        : activeStrategy.supplyApr;
+      const actualHealthFactor = executedAtomicLoop ? calculatedHealthFactor : 999.0;
 
       const newPosition: ActiveMarginPosition = {
         id: 'pos_' + Date.now(),
@@ -1164,12 +1176,12 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         borrowToken: activeStrategy.borrowToken,
         collateralAmount: collateralNum,
         collateralUsd: collateralUsd,
-        borrowAmount: borrowAmount,
-        borrowUsd: borrowUsd,
-        multiplier: multiplier,
-        totalExposureUsd: totalExposureUsd,
-        netApr: calculatedNetApr,
-        healthFactor: calculatedHealthFactor,
+        borrowAmount: actualBorrowAmount,
+        borrowUsd: actualBorrowUsd,
+        multiplier: parseFloat(actualMultiplier.toFixed(1)),
+        totalExposureUsd: actualExposureUsd,
+        netApr: actualNetApr,
+        healthFactor: actualHealthFactor,
         pnlUsd: 0,
         openedAt: Date.now(),
         digest: digest,
@@ -1180,8 +1192,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       showNotification(
         'success',
-        'Leveraged Multiply Position Opened',
-        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Deposited Asset: ${collateralNum.toFixed(4)} ${depositTokenSymbol} (~$${collateralUsd.toFixed(2)})\n• Atomic Borrow Loop: ${executedAtomicLoop ? 'Executed On-Chain (NAVI + Cetus)' : 'Single-Step Collateral Deposit (<$0.50 dust guard)'}\n• Protocol Tier Fee: ${(feeRate * 100).toFixed(2)}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        executedAtomicLoop ? 'Leveraged Multiply Position Opened' : 'Collateral Deposited On-Chain (1.0x)',
+        `Executed ${actualMultiplier.toFixed(1)}x ${activeStrategy.name}!\n• Deposited Asset: ${collateralNum.toFixed(4)} ${depositTokenSymbol} (~$${collateralUsd.toFixed(2)})\n• Borrowed On-Chain: ${actualBorrowAmount.toFixed(4)} ${activeStrategy.borrowToken} (~$${actualBorrowUsd.toFixed(2)})\n• Mode: ${executedAtomicLoop ? 'Atomic Flash-Loan Loop (NAVI)' : 'Single-Step Deposit (below protocol flash-loan minimum)'}\n• Protocol Tier Fee: ${(feeRate * 100).toFixed(2)}%\n• Total Exposure: ~$${actualExposureUsd.toFixed(2)}\n• Net APY: ${actualNetApr.toFixed(2)}%\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -1501,10 +1513,14 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           <div className="lg:col-span-7 space-y-5">
             {/* Card 1: Your Position Summary (Live On-Chain NAVI + Local Tracking) */}
             {(() => {
-              const liveSupply = onChainPortfolio[getNaviPortfolioKey(activeStrategy.supplyToken)]?.supplyBalance || 0;
+              const primarySupply = onChainPortfolio[getNaviPortfolioKey(activeStrategy.supplyToken)]?.supplyBalance || 0;
+              const suiFallbackSupply = activeStrategy.supplyToken !== 'SUI' ? (onChainPortfolio['Sui']?.supplyBalance || 0) : 0;
+              const liveSupply = primarySupply > 0.00001 ? primarySupply : suiFallbackSupply;
+              const liveSupplySymbol = primarySupply > 0.00001 ? activeStrategy.supplyToken : (suiFallbackSupply > 0.00001 ? 'SUI' : activeStrategy.supplyToken);
               const liveBorrow = onChainPortfolio[getNaviPortfolioKey(activeStrategy.borrowToken)]?.borrowBalance || 0;
               const hasLiveOnChain = liveSupply > 0.00001 || liveBorrow > 0.00001;
               const displaySupply = hasLiveOnChain ? liveSupply : (activeUserPositionForStrategy?.collateralAmount || 0);
+              const displaySupplySymbol = hasLiveOnChain ? liveSupplySymbol : (activeUserPositionForStrategy?.supplyToken || activeStrategy.supplyToken);
               const displayBorrow = hasLiveOnChain ? liveBorrow : (activeUserPositionForStrategy?.borrowAmount || 0);
               const hasAnyPos = hasLiveOnChain || Boolean(activeUserPositionForStrategy);
               const displayHf = onChainHealthFactor ?? activeUserPositionForStrategy?.healthFactor ?? null;
@@ -1535,7 +1551,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                     <div className="p-3 rounded-xl bg-black/40 border border-white/5">
                       <span className="text-gray-400 block text-[10px] uppercase">Your Supply</span>
                       <span className="text-white font-bold text-sm">
-                        {displaySupply > 0 ? `${displaySupply.toFixed(4)} ${activeStrategy.supplyToken}` : '—'}
+                        {displaySupply > 0 ? `${displaySupply.toFixed(4)} ${displaySupplySymbol}` : '—'}
                       </span>
                       <span className="text-gray-500 text-[10px] block">Supply APR: {activeStrategy.supplyApr}%</span>
                     </div>
