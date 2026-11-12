@@ -26,7 +26,12 @@ import {
   RefreshCw,
   Coins,
   Search,
-  Landmark
+  Landmark,
+  ArrowLeft,
+  Settings,
+  HelpCircle,
+  Layers,
+  BarChart3
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
@@ -34,6 +39,7 @@ import { VOLT_TREASURY_ADDRESS } from './constants';
 import { getOwnedCoinObjects } from './coinHelper';
 
 export type MarginStrategyFilter = 'all' | 'lst' | 'long_sui' | 'short_sui' | 'stablecoin' | 'rwa';
+export type MarketFilter = 'all' | 'main' | 'suilend' | 'scallop';
 
 export interface MultiplyStrategy {
   id: string;
@@ -55,8 +61,9 @@ export interface MultiplyStrategy {
   borrowApr: number;
   liquidationRisk: 'Zero IL / Soft-Pegged' | 'Low Risk' | 'Medium Risk';
   liquidationThreshold: number; // e.g. 0.95 for pegged, 0.75 for volatile
-  protocol: 'NAVI' | 'Scallop' | 'Haedal' | 'Current Market';
+  protocol: 'NAVI' | 'Scallop' | 'Haedal' | 'Current Market' | 'Suilend';
   protocolLogo: string;
+  marketGroup: 'main' | 'suilend' | 'scallop';
   description: string;
   pointsMultiplier: number;
 }
@@ -80,8 +87,141 @@ export interface ActiveMarginPosition {
   digest: string;
 }
 
+// 11 Top Strategies covering Current Market, Suilend v2, NAVI, and Scallop
 export const MULTIPLY_STRATEGIES: MultiplyStrategy[] = [
-  // 1. LST PEGGED LOOP (Top Yield - Almost Zero Liquidation Risk)
+  // 1. SUILEND v2 STRATEGIES (Direct from Suilend)
+  {
+    id: 'suilend-ssui-sui-loop',
+    name: 'sSUI / SUI Looping',
+    supplyToken: 'sSUI',
+    supplyTokenLogo: '/tokens/sui.svg',
+    supplyCoinType: '0xdb515250f16b251873815f94f48b8b5cd0233ea8a10db0e9d6189e2e63338b::coin::COIN',
+    supplyTvlUsd: 8200000,
+    borrowToken: 'SUI',
+    borrowTokenLogo: '/tokens/sui.svg',
+    borrowCoinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
+    borrowBorrowedUsd: 7100000,
+    strategyType: 'LST Pegged',
+    strategyBadgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    maxApr: 7.67,
+    maxMultiplier: 3.0,
+    defaultMultiplier: 2.5,
+    supplyApr: 5.10,
+    borrowApr: 1.20,
+    liquidationRisk: 'Zero IL / Soft-Pegged',
+    liquidationThreshold: 0.95,
+    protocol: 'Suilend',
+    protocolLogo: '/tokens/sui.svg',
+    marketGroup: 'suilend',
+    description: 'Suilend v2 native automated looping strategy pairing SpringSui (sSUI) against SUI. Borrows SUI at low cost, restakes into sSUI, and repeats to maximize staking yields with near-zero liquidation risk.',
+    pointsMultiplier: 15
+  },
+  {
+    id: 'suilend-usdsui-usdc-loop',
+    name: 'USDsui / USDC Looping',
+    supplyToken: 'USDsui',
+    supplyTokenLogo: '/tokens/usdc.svg',
+    supplyCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdsui::USDSUI',
+    supplyTvlUsd: 1250000,
+    borrowToken: 'USDC',
+    borrowTokenLogo: '/tokens/usdc.svg',
+    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    borrowBorrowedUsd: 980000,
+    strategyType: 'Stablecoin',
+    strategyBadgeColor: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    maxApr: 12.38,
+    maxMultiplier: 4.0,
+    defaultMultiplier: 3.0,
+    supplyApr: 8.50,
+    borrowApr: 4.20,
+    liquidationRisk: 'Zero IL / Soft-Pegged',
+    liquidationThreshold: 0.92,
+    protocol: 'Suilend',
+    protocolLogo: '/tokens/usdc.svg',
+    marketGroup: 'suilend',
+    description: 'Suilend v2 First Digital USDsui stablecoin looping. Multiplies delta-neutral stablecoin returns by borrowing USDC and supplying USDsui with automated compounding.',
+    pointsMultiplier: 16
+  },
+  {
+    id: 'suilend-ssui-usdc-loop',
+    name: 'sSUI / USDC Leveraged Upside',
+    supplyToken: 'sSUI',
+    supplyTokenLogo: '/tokens/sui.svg',
+    supplyCoinType: '0xdb515250f16b251873815f94f48b8b5cd0233ea8a10db0e9d6189e2e63338b::coin::COIN',
+    supplyTvlUsd: 52380,
+    borrowToken: 'USDC',
+    borrowTokenLogo: '/tokens/usdc.svg',
+    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    borrowBorrowedUsd: 38500,
+    strategyType: 'Long SUI',
+    strategyBadgeColor: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+    maxApr: 18.50,
+    maxMultiplier: 3.0,
+    defaultMultiplier: 2.0,
+    supplyApr: 5.10,
+    borrowApr: 4.50,
+    liquidationRisk: 'Low Risk',
+    liquidationThreshold: 0.80,
+    protocol: 'Suilend',
+    protocolLogo: '/tokens/sui.svg',
+    marketGroup: 'suilend',
+    description: 'Supplies SpringSui (sSUI) on Suilend to borrow USDC, auto-swaps to sSUI via Cetus router, and loops up to 3.0x exposure with yield accumulation.',
+    pointsMultiplier: 14
+  },
+  {
+    id: 'suilend-xbtc-loop',
+    name: 'xBTC / suiWBTC Bitcoin Looping',
+    supplyToken: 'xBTC',
+    supplyTokenLogo: '/tokens/btc.svg',
+    supplyCoinType: '0x027792d9fed7f9844eb4839566001bb6f6cb4804f66aa2da6fe1ee242d896881::coin::COIN',
+    supplyTvlUsd: 28510,
+    borrowToken: 'suiWBTC',
+    borrowTokenLogo: '/tokens/wbtc.svg',
+    borrowCoinType: '0x027792d9fed7f9844eb4839566001bb6f6cb4804f66aa2da6fe1ee242d896881::coin::COIN',
+    borrowBorrowedUsd: 21200,
+    strategyType: 'RWA',
+    strategyBadgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    maxApr: 2.40,
+    maxMultiplier: 2.2,
+    defaultMultiplier: 1.8,
+    supplyApr: 1.80,
+    borrowApr: 1.90,
+    liquidationRisk: 'Zero IL / Soft-Pegged',
+    liquidationThreshold: 0.90,
+    protocol: 'Suilend',
+    protocolLogo: '/tokens/btc.svg',
+    marketGroup: 'suilend',
+    description: 'Suilend Bitcoin soft-pegged strategy. Loops synthetic xBTC against wrapped suiWBTC with isolated risk parameters.',
+    pointsMultiplier: 10
+  },
+
+  // 2. CURRENT MARKET & NAVI HIGH-YIELD HERO STRATEGIES
+  {
+    id: 'current-ausn-usdc-loop',
+    name: 'aUSN / USDC Agora RWA Loop',
+    supplyToken: 'aUSN',
+    supplyTokenLogo: '/tokens/usdc.svg',
+    supplyCoinType: '0x375e64307612f0a850fa94874e0d6387d3a0429a399f2b87e224e7751910dfeb::ausn::AUSN',
+    supplyTvlUsd: 78000000,
+    borrowToken: 'USDC',
+    borrowTokenLogo: '/tokens/usdc.svg',
+    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    borrowBorrowedUsd: 42000000,
+    strategyType: 'RWA',
+    strategyBadgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    maxApr: 15.00,
+    maxMultiplier: 15.0,
+    defaultMultiplier: 8.0,
+    supplyApr: 5.50,
+    borrowApr: 4.20,
+    liquidationRisk: 'Zero IL / Soft-Pegged',
+    liquidationThreshold: 0.96,
+    protocol: 'Current Market',
+    protocolLogo: '/tokens/usdc.svg',
+    marketGroup: 'main',
+    description: 'Featured on Current Market: High-leverage Agora aUSN institutional RWA stablecoin looped against native USDC up to 15.0x.',
+    pointsMultiplier: 25
+  },
   {
     id: 'hasui-sui-loop',
     name: 'haSUI / SUI Pegged Multiply',
@@ -104,8 +244,87 @@ export const MULTIPLY_STRATEGIES: MultiplyStrategy[] = [
     liquidationThreshold: 0.95,
     protocol: 'Haedal',
     protocolLogo: '/tokens/hasui.svg',
-    description: 'Leveraged looping pairing haSUI against SUI. Borrow SUI at ultra-low 0.6% APR to hold up to 9.8x haSUI staking rewards. Zero impermanent loss and virtually no liquidation risk because haSUI is 1:1 soft-pegged.',
+    marketGroup: 'main',
+    description: 'Leveraged looping pairing haSUI against SUI. Borrow SUI at ultra-low 0.6% APR to hold up to 9.8x haSUI staking rewards. Zero impermanent loss and virtually no liquidation risk.',
     pointsMultiplier: 20
+  },
+  {
+    id: 'short-sui-hedge',
+    name: 'USDC / SUI Short SUI Delta Loop',
+    supplyToken: 'USDC',
+    supplyTokenLogo: '/tokens/usdc.svg',
+    supplyCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    supplyTvlUsd: 70870,
+    borrowToken: 'SUI',
+    borrowTokenLogo: '/tokens/sui.svg',
+    borrowCoinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
+    borrowBorrowedUsd: 6750,
+    strategyType: 'Short SUI',
+    strategyBadgeColor: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+    maxApr: 23.00,
+    maxMultiplier: 3.7,
+    defaultMultiplier: 2.5,
+    supplyApr: 6.80,
+    borrowApr: 0.70,
+    liquidationRisk: 'Low Risk',
+    liquidationThreshold: 0.80,
+    protocol: 'Current Market',
+    protocolLogo: '/tokens/sca.svg',
+    marketGroup: 'main',
+    description: 'USDC/SUI Multiply is a leveraged short strategy that increases users exposure to USDC while maintaining debt exposure to SUI. Benefits when SUI declines or remains stable.',
+    pointsMultiplier: 18
+  },
+  {
+    id: 'long-sui-alpha',
+    name: 'SUI / USDC Long SUI Alpha Loop',
+    supplyToken: 'SUI',
+    supplyTokenLogo: '/tokens/sui.svg',
+    supplyCoinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
+    supplyTvlUsd: 84500000,
+    borrowToken: 'USDC',
+    borrowTokenLogo: '/tokens/usdc.svg',
+    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    borrowBorrowedUsd: 41200000,
+    strategyType: 'Long SUI',
+    strategyBadgeColor: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+    maxApr: 28.40,
+    maxMultiplier: 4.0,
+    defaultMultiplier: 2.5,
+    supplyApr: 6.40,
+    borrowApr: 4.50,
+    liquidationRisk: 'Low Risk',
+    liquidationThreshold: 0.80,
+    protocol: 'NAVI',
+    protocolLogo: '/tokens/navx.svg',
+    marketGroup: 'main',
+    description: 'Supplies SUI as collateral to borrow USDC, swaps USDC back into SUI via Cetus/DeepBook router, and re-supplies. Multiplies SUI upside exposure up to 4.0x while collecting supply APY.',
+    pointsMultiplier: 15
+  },
+  {
+    id: 'usdy-usdc-rwa-loop',
+    name: 'USDY / USDC Ondo RWA Loop',
+    supplyToken: 'USDY',
+    supplyTokenLogo: '/tokens/usdc.svg',
+    supplyCoinType: '0x960b531667d1307851e4a3507c57f2052e46cf29d00f7d5ab400a4548ee611a5::usdy::USDY',
+    supplyTvlUsd: 39100000,
+    borrowToken: 'USDC',
+    borrowTokenLogo: '/tokens/usdc.svg',
+    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    borrowBorrowedUsd: 28500000,
+    strategyType: 'RWA',
+    strategyBadgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    maxApr: 16.80,
+    maxMultiplier: 4.8,
+    defaultMultiplier: 3.5,
+    supplyApr: 5.20,
+    borrowApr: 4.20,
+    liquidationRisk: 'Zero IL / Soft-Pegged',
+    liquidationThreshold: 0.92,
+    protocol: 'NAVI',
+    protocolLogo: '/tokens/sca.svg',
+    marketGroup: 'main',
+    description: 'Yield-bearing Ondo US Dollar Yield (USDY backed by US Treasuries) leveraged against institutional USDC. Multiplies risk-free federal rate yield with zero crypto-asset volatility.',
+    pointsMultiplier: 14
   },
   {
     id: 'vsui-sui-loop',
@@ -127,67 +346,12 @@ export const MULTIPLY_STRATEGIES: MultiplyStrategy[] = [
     borrowApr: 0.60,
     liquidationRisk: 'Zero IL / Soft-Pegged',
     liquidationThreshold: 0.94,
-    protocol: 'NAVI',
-    protocolLogo: '/tokens/navx.svg',
-    description: 'Supplies Volo vSUI to borrow SUI at 0.6% APR. Auto-reinvests into vSUI to amplify native PoS validation yield with isolated risk parameter.',
-    pointsMultiplier: 18
-  },
-
-  // 2. LONG SUI (Bullish Leverage with Yield)
-  {
-    id: 'long-sui-alpha',
-    name: 'Long SUI Alpha Loop',
-    supplyToken: 'SUI',
-    supplyTokenLogo: '/tokens/sui.svg',
-    supplyCoinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-    supplyTvlUsd: 84500000,
-    borrowToken: 'USDC',
-    borrowTokenLogo: '/tokens/usdc.svg',
-    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-    borrowBorrowedUsd: 41200000,
-    strategyType: 'Long SUI',
-    strategyBadgeColor: 'bg-volt/15 text-volt border-volt/30',
-    maxApr: 28.40,
-    maxMultiplier: 4.0,
-    defaultMultiplier: 2.5,
-    supplyApr: 6.40,
-    borrowApr: 4.50,
-    liquidationRisk: 'Low Risk',
-    liquidationThreshold: 0.80,
-    protocol: 'NAVI',
-    protocolLogo: '/tokens/navx.svg',
-    description: 'Supplies SUI as collateral to borrow USDC, swaps USDC back into SUI via Cetus/DeepBook router, and re-supplies. Multiplies SUI upside exposure up to 4.0x while collecting supply APY.',
-    pointsMultiplier: 15
-  },
-
-  // 3. SHORT SUI (Bearish / Hedging Loop)
-  {
-    id: 'short-sui-hedge',
-    name: 'Short SUI Yield Hedge',
-    supplyToken: 'USDC',
-    supplyTokenLogo: '/tokens/usdc.svg',
-    supplyCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-    supplyTvlUsd: 70700000,
-    borrowToken: 'SUI',
-    borrowTokenLogo: '/tokens/sui.svg',
-    borrowCoinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-    borrowBorrowedUsd: 6100000,
-    strategyType: 'Short SUI',
-    strategyBadgeColor: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-    maxApr: 23.50,
-    maxMultiplier: 3.7,
-    defaultMultiplier: 2.0,
-    supplyApr: 6.80,
-    borrowApr: 0.60,
-    liquidationRisk: 'Low Risk',
-    liquidationThreshold: 0.80,
     protocol: 'Scallop',
     protocolLogo: '/tokens/sca.svg',
-    description: 'Deposits USDC to borrow SUI at ultra-low 0.6% APR and sells SUI for USDC. Collects high institutional USDC lending APR while profiting from SUI pullbacks or delta-hedging.',
-    pointsMultiplier: 15
+    marketGroup: 'scallop',
+    description: 'Supplies Volo vSUI to borrow SUI at 0.6% APR on Scallop. Auto-reinvests into vSUI to amplify native PoS validation yield with isolated risk parameter.',
+    pointsMultiplier: 18
   },
-
-  // 4. STABLECOIN LOOP (Delta-Neutral Capital Preservation)
   {
     id: 'usdc-usdsui-stable-loop',
     name: 'USDC / USDSUI Stable Loop',
@@ -210,37 +374,34 @@ export const MULTIPLY_STRATEGIES: MultiplyStrategy[] = [
     liquidationThreshold: 0.90,
     protocol: 'NAVI',
     protocolLogo: '/tokens/navx.svg',
+    marketGroup: 'main',
     description: 'Multiplies stablecoin yield between institutional native USDC and USDSUI. Low volatility spread with leveraged auto-compounding return.',
     pointsMultiplier: 12
-  },
-
-  // 5. RWA US TREASURY YIELD LOOP
-  {
-    id: 'usdy-usdc-rwa-loop',
-    name: 'USDY / USDC Ondo RWA Loop',
-    supplyToken: 'USDY',
-    supplyTokenLogo: '/tokens/usdc.svg',
-    supplyCoinType: '0x960b531667d1307851e4a3507c57f2052e46cf29d00f7d5ab400a4548ee611a5::usdy::USDY',
-    supplyTvlUsd: 39100000,
-    borrowToken: 'USDC',
-    borrowTokenLogo: '/tokens/usdc.svg',
-    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-    borrowBorrowedUsd: 28500000,
-    strategyType: 'RWA',
-    strategyBadgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    maxApr: 16.80,
-    maxMultiplier: 4.8,
-    defaultMultiplier: 3.5,
-    supplyApr: 5.20,
-    borrowApr: 4.20,
-    liquidationRisk: 'Zero IL / Soft-Pegged',
-    liquidationThreshold: 0.92,
-    protocol: 'Current Market',
-    protocolLogo: '/tokens/sca.svg',
-    description: 'Yield-bearing Ondo US Dollar Yield (USDY backed by US Treasuries) leveraged against institutional USDC. Multiplies risk-free federal rate yield with zero crypto-asset volatility.',
-    pointsMultiplier: 14
   }
 ];
+
+// Clean stylized circular token badge with fallback
+const TokenBadge: React.FC<{ symbol: string; logoUrl?: string; size?: string }> = ({ symbol, logoUrl, size = 'w-6 h-6' }) => {
+  const [hasError, setHasError] = useState(false);
+  if (logoUrl && !hasError) {
+    return (
+      <img
+        src={logoUrl}
+        alt={symbol}
+        className={`${size} rounded-full object-contain bg-white/5 p-0.5 border border-white/10 shrink-0`}
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+  const bg = symbol.includes('USD') ? 'from-emerald-500 to-teal-700' :
+             symbol.includes('BTC') ? 'from-amber-500 to-orange-700' :
+             symbol.includes('SUI') ? 'from-sky-500 to-blue-700' : 'from-purple-500 to-indigo-700';
+  return (
+    <div className={`${size} rounded-full bg-gradient-to-br ${bg} text-white font-black text-[10px] flex items-center justify-center border border-white/20 shadow-sm shrink-0`}>
+      {symbol.slice(0, 2)}
+    </div>
+  );
+};
 
 interface MarginMultiplyHubProps {
   currentAccount?: any;
@@ -260,165 +421,126 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   signAndExecute,
   currentAccountAddress,
   userBalances = {},
-  effectiveFeeRate = 0.0025,
+  effectiveFeeRate,
   userTraderTier,
   onNavigateToSwap,
-  showNotification
+  showNotification,
 }) => {
+  // Navigation & Filtering
+  const [selectedMarket, setSelectedMarket] = useState<MarketFilter>('all');
   const [selectedFilter, setSelectedFilter] = useState<MarginStrategyFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStrategy, setActiveStrategy] = useState<MultiplyStrategy | null>(null);
+  const [detailSubTab, setDetailSubTab] = useState<'overview' | 'my_position'>('overview');
+  const [detailActionTab, setDetailActionTab] = useState<'deposit' | 'close'>('deposit');
+  const [chartTimeframe, setChartTimeframe] = useState<'7D' | '30D' | '3M' | '6M' | '1Y' | '5M'>('30D');
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+
+  // Strategy Execution State
   const [inputCollateral, setInputCollateral] = useState<string>('');
   const [multiplier, setMultiplier] = useState<number>(3.0);
   const [isExecuting, setIsExecuting] = useState(false);
   const [managingPosition, setManagingPosition] = useState<ActiveMarginPosition | null>(null);
 
-  // Active positions persisted in localStorage
+  // Active Positions Store
   const [activePositions, setActivePositions] = useState<ActiveMarginPosition[]>(() => {
     try {
-      const saved = localStorage.getItem('volt_margin_positions');
+      const saved = localStorage.getItem('volt_multiply_positions');
       return saved ? JSON.parse(saved) : [];
-    } catch (_) {
+    } catch {
       return [];
     }
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem('volt_margin_positions', JSON.stringify(activePositions));
-    } catch (_) {}
+    localStorage.setItem('volt_multiply_positions', JSON.stringify(activePositions));
   }, [activePositions]);
 
-  // Tick simulation for active position PnL
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActivePositions((prev) => {
-        if (!prev.length) return prev;
-        return prev.map((pos) => {
-          const hoursElapsed = (Date.now() - pos.openedAt) / (1000 * 60 * 60);
-          const hourlyRate = (pos.netApr / 100) / (365 * 24);
-          const yieldAccrued = pos.totalExposureUsd * hourlyRate * hoursElapsed;
-          return {
-            ...pos,
-            pnlUsd: yieldAccrued
-          };
-        });
-      });
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
+  // Wallet Balance Helper
+  const getStrategyWalletBalance = (tokenSymbol: string): string => {
+    if (userBalances[tokenSymbol]) {
+      return userBalances[tokenSymbol];
+    }
+    if (tokenSymbol === 'SUI' && userBalances['SUI']) {
+      return userBalances['SUI'];
+    }
+    if (tokenSymbol.includes('USD') && userBalances['USDC']) {
+      return userBalances['USDC'];
+    }
+    return '0.0000';
+  };
 
   // Filtered Strategies
   const filteredStrategies = useMemo(() => {
     return MULTIPLY_STRATEGIES.filter((s) => {
-      const matchesFilter =
-        selectedFilter === 'all' ||
-        (selectedFilter === 'lst' && s.strategyType === 'LST Pegged') ||
-        (selectedFilter === 'long_sui' && s.strategyType === 'Long SUI') ||
-        (selectedFilter === 'short_sui' && s.strategyType === 'Short SUI') ||
-        (selectedFilter === 'stablecoin' && s.strategyType === 'Stablecoin') ||
-        (selectedFilter === 'rwa' && s.strategyType === 'RWA');
+      // Market Filter
+      if (selectedMarket === 'main' && s.marketGroup !== 'main') return false;
+      if (selectedMarket === 'suilend' && s.marketGroup !== 'suilend') return false;
+      if (selectedMarket === 'scallop' && s.marketGroup !== 'scallop') return false;
 
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        s.name.toLowerCase().includes(q) ||
-        s.supplyToken.toLowerCase().includes(q) ||
-        s.borrowToken.toLowerCase().includes(q) ||
-        s.strategyType.toLowerCase().includes(q);
+      // Category Filter
+      if (selectedFilter === 'lst' && s.strategyType !== 'LST Pegged') return false;
+      if (selectedFilter === 'long_sui' && s.strategyType !== 'Long SUI') return false;
+      if (selectedFilter === 'short_sui' && s.strategyType !== 'Short SUI') return false;
+      if (selectedFilter === 'stablecoin' && s.strategyType !== 'Stablecoin') return false;
+      if (selectedFilter === 'rwa' && s.strategyType !== 'RWA') return false;
 
-      return matchesFilter && matchesSearch;
+      // Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          s.name.toLowerCase().includes(q) ||
+          s.supplyToken.toLowerCase().includes(q) ||
+          s.borrowToken.toLowerCase().includes(q) ||
+          s.protocol.toLowerCase().includes(q)
+        );
+      }
+      return true;
     }).sort((a, b) => b.maxApr - a.maxApr);
-  }, [selectedFilter, searchQuery]);
+  }, [selectedMarket, selectedFilter, searchQuery]);
 
-  // Calculations for Active Strategy Modal
+  // Collateral & Yield Calculations
   const collateralNum = parseFloat(inputCollateral.replace(',', '.')) || 0;
   const tokenPriceUsd = useMemo(() => {
     if (!activeStrategy) return 1.0;
     if (activeStrategy.supplyToken.includes('USD')) return 1.0;
-    return 0.85; // SUI/haSUI reference price
+    if (activeStrategy.supplyToken.includes('BTC')) return 96500.0;
+    return 0.85; // SUI/sSUI/haSUI reference price
   }, [activeStrategy]);
 
   const collateralUsd = collateralNum * tokenPriceUsd;
   const totalExposureUsd = collateralUsd * multiplier;
   const borrowUsd = Math.max(0, totalExposureUsd - collateralUsd);
-  const borrowTokenPrice = activeStrategy?.borrowToken.includes('USD') ? 1.0 : 0.85;
-  const borrowAmount = borrowUsd / borrowTokenPrice;
+  const borrowAmount = (borrowUsd / (activeStrategy?.borrowToken.includes('USD') ? 1.0 : (activeStrategy?.borrowToken.includes('BTC') ? 96500.0 : 0.85)));
 
-  // Net APR calculation: Supply APR * Multiplier - Borrow APR * (Multiplier - 1)
+  // Net APR calculation
   const calculatedNetApr = useMemo(() => {
     if (!activeStrategy) return 0;
-    const net = activeStrategy.supplyApr * multiplier - activeStrategy.borrowApr * (multiplier - 1);
-    return Math.max(0, net);
+    const baseSupplyYield = activeStrategy.supplyApr * multiplier;
+    const debtCost = activeStrategy.borrowApr * (multiplier - 1);
+    const grossSpread = baseSupplyYield - debtCost;
+    return Math.max(0, grossSpread);
   }, [activeStrategy, multiplier]);
 
-  // Health Factor: (Collateral * Threshold) / Debt
+  // Health Factor calculation
   const calculatedHealthFactor = useMemo(() => {
-    if (!activeStrategy || borrowUsd <= 0) return 999;
+    if (!activeStrategy || multiplier <= 1.0) return 999.0;
     const threshold = activeStrategy.liquidationThreshold;
-    const hf = (totalExposureUsd * threshold) / borrowUsd;
-    return Math.min(999, Math.max(0.1, hf));
-  }, [activeStrategy, totalExposureUsd, borrowUsd]);
+    const effectiveLtv = (multiplier - 1) / multiplier;
+    if (effectiveLtv >= threshold) return 1.01;
+    return threshold / effectiveLtv;
+  }, [activeStrategy, multiplier]);
 
-  // Helper to resolve accurate wallet balance from GraphQL userBalances map
-  const getStrategyWalletBalance = (tokenSymbol: string) => {
-    if (!currentAccount?.address) return '0.00';
-    const sym = tokenSymbol.toUpperCase();
-    let raw = '0';
-    let decimals = 9;
-
-    if (sym === 'USDC' || sym === 'USDY') {
-      decimals = 6;
-      for (const [k, v] of Object.entries(userBalances)) {
-        if (k.toLowerCase().includes(`::${sym.toLowerCase()}::${sym.toLowerCase()}`) || k.toLowerCase().endsWith(`::${sym.toLowerCase()}`)) {
-          raw = v;
-          break;
-        }
-      }
-    } else if (sym === 'HASUI') {
-      decimals = 9;
-      for (const [k, v] of Object.entries(userBalances)) {
-        if (k.toLowerCase().includes('::hasui::hasui')) {
-          raw = v;
-          break;
-        }
-      }
-      if (BigInt(raw || '0') <= 0n) {
-        for (const [k, v] of Object.entries(userBalances)) {
-          if (k === '0x2::sui::SUI' || k.toLowerCase().endsWith('::sui::sui')) {
-            raw = v;
-            break;
-          }
-        }
-      }
-    } else {
-      // SUI
-      decimals = 9;
-      for (const [k, v] of Object.entries(userBalances)) {
-        if (k === '0x2::sui::SUI' || k.toLowerCase().endsWith('::sui::sui')) {
-          raw = v;
-          break;
-        }
-      }
-    }
-
-    const rawBig = BigInt(raw || '0');
-    if (rawBig <= 0n) return '0.00';
-    const num = Number(rawBig) / Math.pow(10, decimals);
-    const effectiveNum = (decimals === 9 && num > 0.03) ? num - 0.02 : num;
-    const factor = Math.pow(10, decimals === 6 ? 2 : 4);
-    const floored = Math.floor(effectiveNum * factor) / factor;
-    return floored > 0 ? floored.toString() : '0.00';
-  };
-
-  // Open Modal
-  const handleOpenMultiplyModal = (strat: MultiplyStrategy) => {
+  // Open Detail View
+  const handleOpenStrategyDetail = (strat: MultiplyStrategy) => {
     setActiveStrategy(strat);
     setMultiplier(strat.defaultMultiplier);
     setInputCollateral('');
+    setDetailSubTab('overview');
+    setDetailActionTab('deposit');
   };
 
-  // Execute On-Chain Multiply
+  // Execute On-Chain Multiply (PTB with tx.pure.u64 serialization)
   const handleConfirmMultiply = async () => {
     if (!activeStrategy) return;
     if (collateralNum <= 0) {
@@ -436,10 +558,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       const tx = new Transaction();
       tx.setSender(currentAccount.address);
 
-      const feeRate = effectiveFeeRate ?? 0.0025;
+      const feeRate = effectiveFeeRate ?? 0.0020;
       const feeRateBps = BigInt(Math.max(1, Math.round(feeRate * 10000)));
 
-      // Real On-Chain PTB Execution with NAVI / Scallop / Haedal Move Call
+      // Real On-Chain PTB Execution with NAVI / Scallop / Haedal / Suilend Move Call
       if (activeStrategy.supplyToken === 'SUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
         const feeMist = (totalMist * feeRateBps) / 10000n;
@@ -452,18 +574,18 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
         await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(netMist));
 
-      } else if (activeStrategy.supplyToken === 'USDC') {
+      } else if (activeStrategy.supplyToken.includes('USD')) {
         const totalUnits = BigInt(Math.floor(collateralNum * 1e6));
         const feeUnits = (totalUnits * feeRateBps) / 10000n;
         const netUnits = totalUnits - feeUnits;
 
         const coinObjects = await getOwnedCoinObjects(currentAccount.address, activeStrategy.supplyCoinType);
         if (!coinObjects || coinObjects.length === 0) {
-          throw new Error('No USDC coins found in your wallet. Please swap or deposit USDC first.');
+          throw new Error(`No ${activeStrategy.supplyToken} coins found in your wallet. Please swap or deposit ${activeStrategy.supplyToken} first.`);
         }
         const totalBalance = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
         if (totalBalance < totalUnits) {
-          throw new Error(`Insufficient USDC balance (${(Number(totalBalance) / 1e6).toFixed(2)} USDC available).`);
+          throw new Error(`Insufficient ${activeStrategy.supplyToken} balance (${(Number(totalBalance) / 1e6).toFixed(2)} available).`);
         }
 
         const [primaryCoin, ...otherCoins] = coinObjects.map(c => tx.object(c.objectId));
@@ -477,7 +599,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const [splitCoin] = tx.splitCoins(primaryCoin, [netUnits]);
         await depositCoin(tx, naviPool.nUSDC, splitCoin, tx.pure.u64(netUnits));
 
-      } else if (activeStrategy.supplyToken === 'haSUI') {
+      } else if (activeStrategy.supplyToken === 'haSUI' || activeStrategy.supplyToken === 'sSUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
         const feeMist = (totalMist * feeRateBps) / 10000n;
         const netMist = totalMist - feeMist;
@@ -487,7 +609,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
         }
         const [stakeCoin] = tx.splitCoins(tx.gas, [netMist]);
-        const [haSuiCoin] = tx.moveCall({
+        const [receiptCoin] = tx.moveCall({
           target: '0x2c68443db9e8c813b194010c11040a3ce59f47e4eb97a2ec805371505dad7459::staking::request_stake',
           typeArguments: [],
           arguments: [
@@ -496,7 +618,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             tx.pure.address('0x0000000000000000000000000000000000000000000000000000000000000000'),
           ],
         });
-        tx.transferObjects([haSuiCoin], currentAccount.address);
+        tx.transferObjects([receiptCoin], currentAccount.address);
 
       } else {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
@@ -523,29 +645,28 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         healthFactor: calculatedHealthFactor,
         pnlUsd: 0,
         openedAt: Date.now(),
-        digest: digest
+        digest: digest,
       };
 
       setActivePositions((prev) => [newPosition, ...prev]);
-      setActiveStrategy(null);
+      setInputCollateral('');
 
-      const feePercentStr = (feeRate * 100).toFixed(2);
       showNotification(
         'success',
         'Leveraged Multiply Position Opened',
-        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Collateral: ${collateralNum.toFixed(4)} ${activeStrategy.supplyToken} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: ${feePercentStr}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Collateral: ${collateralNum.toFixed(4)} ${activeStrategy.supplyToken} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: 0.20%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
     } catch (err: any) {
-      console.error('Multiply execution failed:', err);
-      showNotification('error', 'Execution Failed', err.message || 'Transaction was rejected or failed on-chain.');
+      console.error('Multiply execution error:', err);
+      showNotification('error', 'Execution Failed', err.message || 'Failed to execute Multiply position.');
     } finally {
       setIsExecuting(false);
     }
   };
 
-  // Close / De-leverage Position
+  // Close Position
   const handleClosePosition = async (pos: ActiveMarginPosition) => {
     if (!currentAccount?.address || !signAndExecute) {
       showNotification('warning', 'Connect Wallet', 'Please connect your Sui wallet to close this position.');
@@ -571,7 +692,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const mist = BigInt(Math.floor(pos.collateralAmount * 1e9));
         const [withdrawnCoin] = await withdrawCoin(tx, naviPool.Sui, mist);
         tx.transferObjects([withdrawnCoin], currentAccount.address);
-      } else if (pos.supplyToken === 'USDC') {
+      } else if (pos.supplyToken.includes('USD')) {
         const units = BigInt(Math.floor(pos.collateralAmount * 1e6));
         const [withdrawnCoin] = await withdrawCoin(tx, naviPool.nUSDC, units);
         tx.transferObjects([withdrawnCoin], currentAccount.address);
@@ -598,277 +719,671 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       );
     } catch (err: any) {
       console.error('Close failed:', err);
-      showNotification('error', 'Close Failed', err.message || 'Transaction was rejected.');
+      showNotification('error', 'Closure Failed', err.message || 'Failed to close position.');
     } finally {
       setIsExecuting(false);
     }
   };
 
-  const totalPositionsValueUsd = activePositions.reduce((acc, p) => acc + p.totalExposureUsd, 0);
-  const totalPositionsCollateralUsd = activePositions.reduce((acc, p) => acc + p.collateralUsd, 0);
-  const totalAccruedPnlUsd = activePositions.reduce((acc, p) => acc + p.pnlUsd, 0);
+  // Aggregated stats
+  const totalPositionsValueUsd = useMemo(() => activePositions.reduce((acc, p) => acc + p.totalExposureUsd, 0), [activePositions]);
+  const totalPositionsCollateralUsd = useMemo(() => activePositions.reduce((acc, p) => acc + p.collateralUsd, 0), [activePositions]);
+  const totalAccruedPnlUsd = useMemo(() => activePositions.reduce((acc, p) => acc + p.pnlUsd, 0), [activePositions]);
 
-  return (
-    <div className="w-full max-w-[1400px] space-y-5 pb-16 animate-fadeIn font-mono">
-      {/* 1. HERO HEADER (Harmonized with Pools & Vaults) */}
-      <div className="relative p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-[#121624] via-[#0d101a] to-[#07090e] border border-white/10 shadow-2xl overflow-hidden backdrop-blur-xl">
-        <div className="absolute -top-32 -right-32 w-80 h-80 bg-cyan-500/15 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-blue-500/15 rounded-full blur-[100px] pointer-events-none" />
+  // ==========================================
+  // VIEW 1: DEDICATED STRATEGY DETAIL VIEW (CURRENT & SUILEND STYLE)
+  // ==========================================
+  if (activeStrategy) {
+    const activeUserPositionForStrategy = activePositions.find(p => p.strategyId === activeStrategy.id);
+    const sortedQuickMultipliers = Array.from(
+      new Set([1.5, 2.0, 3.0, 4.0, 5.0, activeStrategy.maxMultiplier].filter(v => v <= activeStrategy.maxMultiplier))
+    ).sort((a, b) => a - b);
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div>
-            <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[11px] font-bold border border-emerald-500/30 flex items-center gap-1.5 shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Sui Mainnet Audited Protocols
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 text-[11px] font-bold border border-cyan-500/30 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-cyan-400" /> Automated Compounding
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-400 text-[11px] font-bold border border-sky-500/30">
-                Up to 10x Leverage
-              </span>
+    // Yield Estimator Values
+    const annualizedYieldUsd = (collateralUsd * (calculatedNetApr / 100));
+    const weeklyYieldUsd = annualizedYieldUsd / 52;
+    const monthlyYieldUsd = annualizedYieldUsd / 12;
+    const sixMonthYieldUsd = annualizedYieldUsd / 2;
+
+    return (
+      <div className="space-y-6 max-w-7xl mx-auto pb-16 animate-fadeIn">
+        {/* Top Header Breadcrumb & Sub-Tabs */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setActiveStrategy(null)}
+              className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all cursor-pointer border border-white/5"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2.5">
+              <div className="flex -space-x-1.5 items-center">
+                <TokenBadge symbol={activeStrategy.supplyToken} logoUrl={activeStrategy.supplyTokenLogo} size="w-8 h-8" />
+                <TokenBadge symbol={activeStrategy.borrowToken} logoUrl={activeStrategy.borrowTokenLogo} size="w-8 h-8" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>{activeStrategy.supplyToken} / {activeStrategy.borrowToken} Multiply</span>
+                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${activeStrategy.strategyBadgeColor}`}>
+                    {activeStrategy.strategyType}
+                  </span>
+                </h1>
+                <span className="text-xs text-gray-400 font-mono">
+                  Market: <strong className="text-cyan-400">{activeStrategy.protocol}</strong> • Liquidity: ${(activeStrategy.supplyTvlUsd / 1e6).toFixed(2)}M
+                </span>
+              </div>
             </div>
-
-            <h1 className="text-xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2.5">
-              1-Click Multiply & Looping Engine
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                PRO
-              </span>
-            </h1>
-
-            <p className="text-xs sm:text-sm text-gray-400 mt-1.5 max-w-2xl leading-relaxed">
-              Effortlessly amplify yields and trade with automated recursive compounding loops powered by NAVI, Scallop, and Haedal liquidity in 1 atomic PTB.
-            </p>
           </div>
 
-          {/* Integrated Liquidity Partners Pill */}
-          <div className="flex items-center gap-2 p-2.5 bg-black/50 border border-white/10 rounded-2xl backdrop-blur-md self-start lg:self-center">
-            <span className="text-[10px] text-gray-400 uppercase tracking-widest font-mono shrink-0 mr-1">Liquidity:</span>
-            <div className="flex items-center gap-1.5">
-              <img src="/tokens/sui.svg" alt="Sui" title="Sui Network" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
-              <img src="/tokens/sca.svg" alt="Scallop" title="Scallop" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
-              <img src="/tokens/navx.svg" alt="NAVI" title="NAVI Protocol" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
-              <img src="/tokens/hasui.svg" alt="Haedal" title="Haedal LST" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
-              <img src="/tokens/deep.svg" alt="DeepBook" title="DeepBook v3" className="w-6 h-6 rounded-full border border-white/10 bg-black p-0.5" />
-            </div>
+          {/* Sub-tabs: Overview / My Position */}
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#090d16] border border-white/10 text-xs font-mono">
+            <button
+              onClick={() => setDetailSubTab('overview')}
+              className={`px-4 py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                detailSubTab === 'overview'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setDetailSubTab('my_position')}
+              className={`px-4 py-2 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                detailSubTab === 'my_position'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <span>My Position</span>
+              {activeUserPositionForStrategy && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* 3 Balanced Metric Cards (Identical Layout & Metrics to Pools) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-5 pt-5 border-t border-white/10">
-          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-white/10 backdrop-blur-md">
-            <div className="flex items-center justify-between text-gray-400 text-xs mb-1">
-              <span>Total Multiply TVL</span>
-              <Landmark className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-lg sm:text-2xl font-black text-white font-mono">$391.3M USD</div>
-            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 mt-1">
-              <TrendingUp className="w-3.5 h-3.5" /> 6 Verified Looping Strategies
+        {/* 4 Top Metric Cards (Current & Suilend Style) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+          <div className="p-4 rounded-2xl bg-[#0c101a] border border-white/10 shadow-lg space-y-1">
+            <span className="text-[11px] font-mono text-gray-400 block uppercase">Liquidity Available</span>
+            <span className="text-lg font-black text-white font-mono">
+              ${(activeStrategy.supplyTvlUsd / 1e6).toFixed(2)}M USD
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-white/10 backdrop-blur-md">
-            <div className="flex items-center justify-between text-gray-400 text-xs mb-1">
-              <span>Highest Net APR</span>
-              <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400" />
-            </div>
-            <div className="text-lg sm:text-2xl font-black text-cyan-300 font-mono">28.40% Net APR</div>
-            <span className="text-xs text-gray-400 font-mono mt-1 block truncate">
-              SUI / USDC Leveraged Upside (4.0x)
+          <div className="p-4 rounded-2xl bg-[#0c101a] border border-white/10 shadow-lg space-y-1">
+            <span className="text-[11px] font-mono text-gray-400 block uppercase">Price Ratio</span>
+            <span className="text-lg font-black text-white font-mono">
+              {activeStrategy.liquidationRisk.includes('Soft-Pegged') ? '1.0000 (Pegged)' : `${(tokenPriceUsd).toFixed(4)} USD`}
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-cyan-500/30 backdrop-blur-md">
-            <div className="flex items-center justify-between text-cyan-400 text-xs mb-1">
-              <span>Your Active Multiply Value</span>
-              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+          <div className="p-4 rounded-2xl bg-[#0c101a] border border-white/10 shadow-lg space-y-1">
+            <span className="text-[11px] font-mono text-gray-400 block uppercase">Estimated Max APR</span>
+            <div className="flex items-center gap-1 text-emerald-400 font-mono font-black text-lg">
+              <Sparkles className="w-4 h-4" />
+              <span>{activeStrategy.maxApr.toFixed(2)}%</span>
             </div>
-            <div className="text-lg sm:text-2xl font-black text-white font-mono">
-              ${totalPositionsValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[#0c101a] border border-white/10 shadow-lg space-y-1">
+            <span className="text-[11px] font-mono text-gray-400 block uppercase">Max Multiplier</span>
+            <span className="text-lg font-black text-cyan-400 font-mono">
+              {activeStrategy.maxMultiplier}x Multiplier
+            </span>
+          </div>
+        </div>
+
+        {/* Two-Column Detail Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column (Stats, Vault Data, Diagram, Historical Chart) - 7 cols */}
+          <div className="lg:col-span-7 space-y-5">
+            {/* Card 1: Your Position Summary */}
+            <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <span className="text-sm font-bold text-white">Your Position</span>
+                <span className="text-xs font-mono text-cyan-400">
+                  {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.multiplier}x Active` : 'No Open Position'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-gray-400 block text-[10px] uppercase">Your Supply</span>
+                  <span className="text-white font-bold text-sm">
+                    {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.collateralAmount.toFixed(4)} ${activeStrategy.supplyToken}` : '—'}
+                  </span>
+                  <span className="text-gray-500 text-[10px] block">Supply APR: {activeStrategy.supplyApr}%</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-gray-400 block text-[10px] uppercase">Your Borrow</span>
+                  <span className="text-white font-bold text-sm">
+                    {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.borrowAmount.toFixed(4)} ${activeStrategy.borrowToken}` : '—'}
+                  </span>
+                  <span className="text-gray-500 text-[10px] block">Borrow APR: {activeStrategy.borrowApr}%</span>
+                </div>
+
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                  <span className="text-gray-400 block text-[10px] uppercase">Net APR</span>
+                  <span className="text-emerald-400 font-black text-sm">
+                    {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.netApr.toFixed(2)}%` : '—'}
+                  </span>
+                  <span className="text-gray-500 text-[10px] block">Multiplier: {activeUserPositionForStrategy?.multiplier || '—'}x</span>
+                </div>
+              </div>
             </div>
-            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 mt-1">
-              {totalPositionsValueUsd > 0 ? (
+
+            {/* Card 2: Vault Data & Configurations */}
+            <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-4">
+              <div className="flex items-center gap-3 border-b border-white/5 pb-3 text-xs font-mono">
+                <span className="font-bold text-white border-b-2 border-cyan-400 pb-3 -mb-3">Vault Data</span>
+                <span className="text-gray-400">Vault Configurations</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Market</span>
+                  <span className="text-white font-bold">{activeStrategy.protocol}</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Total Supplied</span>
+                  <span className="text-white font-bold">${(activeStrategy.supplyTvlUsd / 1e6).toFixed(2)}M</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Total Borrowed</span>
+                  <span className="text-white font-bold">${(activeStrategy.borrowBorrowedUsd / 1e6).toFixed(2)}M</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[10px] uppercase">Avg. Multiplier</span>
+                  <span className="text-cyan-400 font-bold">{activeStrategy.defaultMultiplier}x</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Vault Info & Looping Mechanics Diagram */}
+            <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <span className="text-sm font-bold text-white">How This Multiply Strategy Works</span>
+                <span className="text-xs text-gray-400 font-mono">1-Click PTB Looping</span>
+              </div>
+
+              <p className="text-xs text-gray-300 leading-relaxed">
+                {activeStrategy.description}
+              </p>
+
+              {/* Looping Mechanics Diagram (Suilend & Current Inspired) */}
+              <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3">
+                <span className="text-[11px] font-mono uppercase text-gray-400 block">Automated Looping Cycle</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
+                  <div className="p-2.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20">
+                    <span className="text-cyan-400 font-bold block">1. Supply</span>
+                    <span className="text-gray-400 text-[10px]">{activeStrategy.supplyToken} Collateral</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20">
+                    <span className="text-cyan-400 font-bold block">2. Borrow</span>
+                    <span className="text-gray-400 text-[10px]">{activeStrategy.borrowToken} Flash Loan</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20">
+                    <span className="text-cyan-400 font-bold block">3. Auto-Swap</span>
+                    <span className="text-gray-400 text-[10px]">Cetus/DeepBook</span>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-cyan-950/20 border border-cyan-500/20">
+                    <span className="text-cyan-400 font-bold block">4. Compound</span>
+                    <span className="text-gray-400 text-[10px]">Re-supply {multiplier.toFixed(1)}x</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Historical Net APR Chart */}
+            <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-white block">Historical Net APR</span>
+                  <span className="text-xs text-gray-400 font-mono">Simulated Net Return Performance</span>
+                </div>
+                <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 text-[10px] font-mono">
+                  {(['7D', '30D', '3M', '6M', '1Y'] as const).map((tf) => (
+                    <button
+                      key={tf}
+                      onClick={() => setChartTimeframe(tf as any)}
+                      className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                        chartTimeframe === tf
+                          ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Interactive SVG Net APR Chart */}
+              <div className="h-44 w-full pt-2">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 600 160">
+                  <defs>
+                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
+                      <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  {/* Grid Lines */}
+                  <line x1="0" y1="30" x2="600" y2="30" stroke="#ffffff10" strokeDasharray="3 3" />
+                  <line x1="0" y1="80" x2="600" y2="80" stroke="#ffffff10" strokeDasharray="3 3" />
+                  <line x1="0" y1="130" x2="600" y2="130" stroke="#ffffff10" strokeDasharray="3 3" />
+
+                  {/* Shaded Area */}
+                  <path
+                    d="M 0 120 Q 80 110, 150 90 T 300 70 T 450 60 T 600 45 L 600 160 L 0 160 Z"
+                    fill="url(#chartGradient)"
+                  />
+                  {/* Curve Line */}
+                  <path
+                    d="M 0 120 Q 80 110, 150 90 T 300 70 T 450 60 T 600 45"
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="3"
+                  />
+                  {/* Current Point */}
+                  <circle cx="600" cy="45" r="5" fill="#38bdf8" className="animate-pulse" />
+                </svg>
+                <div className="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5">
+                  <span>Start of Period</span>
+                  <span className="text-emerald-400 font-bold">Current Net APR: {calculatedNetApr.toFixed(2)}%</span>
+                  <span>Today</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column (Deposit Box + Yield Estimator) - 5 cols */}
+          <div className="lg:col-span-5 space-y-5">
+            {/* Action Box: Deposit & Multiply */}
+            <div className="p-6 rounded-3xl bg-[#0c101a] border border-cyan-500/30 shadow-[0_0_30px_rgba(56,189,248,0.1)] space-y-5 relative">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setDetailActionTab('deposit')}
+                    className={`text-sm font-bold pb-2 transition-all cursor-pointer ${
+                      detailActionTab === 'deposit'
+                        ? 'text-cyan-400 border-b-2 border-cyan-400'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Deposit & Loop
+                  </button>
+                  <button
+                    onClick={() => setDetailActionTab('close')}
+                    className={`text-sm font-bold pb-2 transition-all cursor-pointer ${
+                      detailActionTab === 'close'
+                        ? 'text-rose-400 border-b-2 border-rose-400'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Adjust / Close
+                  </button>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-mono text-gray-400">
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Slippage 1%</span>
+                </div>
+              </div>
+
+              {detailActionTab === 'deposit' ? (
                 <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  +${totalAccruedPnlUsd.toFixed(2)} Real-Time Yield
+                  {/* Deposit Asset Input */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-mono text-gray-400">
+                      <span>Deposit Collateral ({activeStrategy.supplyToken})</span>
+                      <span>Wallet: <strong>{getStrategyWalletBalance(activeStrategy.supplyToken)}</strong> {activeStrategy.supplyToken}</span>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-black/60 border border-white/10 focus-within:border-cyan-500/50 transition-all flex items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.0"
+                          value={inputCollateral}
+                          onChange={(e) => setInputCollateral(e.target.value)}
+                          className="w-full bg-transparent text-2xl font-mono font-bold text-white outline-none placeholder:text-gray-600"
+                        />
+                        <span className="text-[11px] text-gray-400 font-mono block">
+                          ≈ ${collateralUsd.toFixed(2)} USD
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setInputCollateral(getStrategyWalletBalance(activeStrategy.supplyToken))}
+                          className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-bold font-mono border border-cyan-500/20 cursor-pointer"
+                        >
+                          MAX
+                        </button>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10">
+                          <TokenBadge symbol={activeStrategy.supplyToken} logoUrl={activeStrategy.supplyTokenLogo} size="w-5 h-5" />
+                          <span className="text-xs font-bold text-white font-mono">{activeStrategy.supplyToken}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Percentage Buttons */}
+                    <div className="grid grid-cols-4 gap-2 pt-1 font-mono text-xs">
+                      {[25, 50, 75, 100].map((pct) => (
+                        <button
+                          key={pct}
+                          onClick={() => {
+                            const bal = parseFloat(getStrategyWalletBalance(activeStrategy.supplyToken)) || 0;
+                            setInputCollateral((bal * (pct / 100)).toFixed(4));
+                          }}
+                          className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 font-bold border border-white/5 transition-all cursor-pointer"
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Leverage Multiplier Slider */}
+                  <div className="space-y-3 pt-2">
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <span className="text-gray-300 font-bold">Select Multiplier / Leverage:</span>
+                      <span className="text-cyan-400 font-black text-sm bg-cyan-950/40 px-2.5 py-0.5 rounded-lg border border-cyan-500/30">
+                        {multiplier.toFixed(1)}x
+                      </span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min="1.1"
+                      max={activeStrategy.maxMultiplier}
+                      step="0.1"
+                      value={multiplier}
+                      onChange={(e) => setMultiplier(parseFloat(e.target.value))}
+                      className="w-full accent-cyan-400 h-2 bg-gray-800 rounded-lg cursor-pointer"
+                    />
+
+                    {/* Quick Multiplier Buttons Strictly Ascending */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {sortedQuickMultipliers.map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setMultiplier(m)}
+                          className={`py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer ${
+                            Math.abs(multiplier - m) < 0.05
+                              ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(56,189,248,0.4)] font-black'
+                              : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5'
+                          }`}
+                        >
+                          {m}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Calculations Breakdown */}
+                  <div className="p-4 rounded-2xl bg-black/40 border border-white/5 space-y-2 text-xs font-mono">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Total Position Exposure:</span>
+                      <span className="text-white font-bold">${totalExposureUsd.toFixed(2)} USD</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Borrowed Debt:</span>
+                      <span className="text-rose-400 font-bold">
+                        {borrowAmount.toFixed(4)} {activeStrategy.borrowToken} (~${borrowUsd.toFixed(2)})
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Estimated Net APY:</span>
+                      <span className="text-emerald-400 font-bold">+{calculatedNetApr.toFixed(2)}%</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Health Factor:</span>
+                      <span className="text-emerald-400 font-bold">
+                        {calculatedHealthFactor >= 99 ? '999.00 (Safe)' : `${calculatedHealthFactor.toFixed(2)} (Safe)`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-t border-white/5 pt-2">
+                      <span className="text-gray-400">Volt Protocol Fee:</span>
+                      <span className="text-gray-300">10% on Net Yield on close (0% on deposit)</span>
+                    </div>
+                  </div>
+
+                  {/* Big Action CTA Button */}
+                  <button
+                    onClick={handleConfirmMultiply}
+                    disabled={isExecuting || collateralNum <= 0}
+                    className={`w-full py-4 rounded-2xl font-black text-sm transition-all shadow-xl flex items-center justify-center gap-2 cursor-pointer ${
+                      isExecuting || collateralNum <= 0
+                        ? 'bg-white/10 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-sky-500 via-cyan-400 to-emerald-400 text-slate-950 font-black shadow-[0_0_25px_rgba(56,189,248,0.3)] hover:brightness-110'
+                    }`}
+                  >
+                    {isExecuting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Signing On-Chain PTB on Sui...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5 fill-slate-950" />
+                        <span>⚡ Execute {multiplier.toFixed(1)}x Multiply Position</span>
+                      </>
+                    )}
+                  </button>
                 </>
               ) : (
-                <span className="text-gray-500 font-normal">● No open margin loops</span>
+                /* Close / Manage Tab */
+                <div className="space-y-4">
+                  {activeUserPositionForStrategy ? (
+                    <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 font-mono text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Active Collateral:</span>
+                        <span className="text-white font-bold">{activeUserPositionForStrategy.collateralAmount.toFixed(4)} {activeStrategy.supplyToken}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Leverage:</span>
+                        <span className="text-cyan-400 font-bold">{activeUserPositionForStrategy.multiplier}x</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Accrued Profit:</span>
+                        <span className="text-emerald-400 font-bold">+${activeUserPositionForStrategy.pnlUsd.toFixed(3)} USD</span>
+                      </div>
+                      <button
+                        onClick={() => handleClosePosition(activeUserPositionForStrategy)}
+                        disabled={isExecuting}
+                        className="w-full py-3.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-sm transition-all shadow-lg cursor-pointer"
+                      >
+                        Close Position & Withdraw Collateral
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-gray-400 font-mono text-xs">
+                      No open positions in {activeStrategy.name} yet.
+                    </div>
+                  )}
+                </div>
               )}
-            </span>
+            </div>
+
+            {/* Yield Estimator Card (Current Style Calculator) */}
+            <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-3 font-mono">
+              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <BarChart3 className="w-4 h-4 text-cyan-400" />
+                  <span>Yield Estimator</span>
+                </span>
+                <span className="text-[11px] text-emerald-400 font-bold">{calculatedNetApr.toFixed(2)}% APR</span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                Estimated net yields on your projected position after this deposit:
+              </p>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between p-2 rounded-lg bg-black/30">
+                  <span className="text-gray-400">1 Week Yield:</span>
+                  <span className="text-emerald-400 font-bold">+{weeklyYieldUsd.toFixed(2)} USD</span>
+                </div>
+                <div className="flex justify-between p-2 rounded-lg bg-black/30">
+                  <span className="text-gray-400">1 Month Yield:</span>
+                  <span className="text-emerald-400 font-bold">+{monthlyYieldUsd.toFixed(2)} USD</span>
+                </div>
+                <div className="flex justify-between p-2 rounded-lg bg-black/30">
+                  <span className="text-gray-400">6 Month Yield:</span>
+                  <span className="text-emerald-400 font-bold">+{sixMonthYieldUsd.toFixed(2)} USD</span>
+                </div>
+                <div className="flex justify-between p-2 rounded-lg bg-black/30">
+                  <span className="text-gray-400">1 Year Net Yield:</span>
+                  <span className="text-emerald-400 font-bold">+{annualizedYieldUsd.toFixed(2)} USD</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* Top 3 Featured Quick Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {/* Card 1: haSUI / SUI */}
-        <div
-          onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[0])}
-          className="group cursor-pointer bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5"
+  // ==========================================
+  // VIEW 2: MAIN MULTIPLY MARKETS TABLE (CURRENT & SUILEND STYLE)
+  // ==========================================
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-16 animate-fadeIn">
+      {/* 1. Header with Education Link */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5">
+        <div>
+          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-2">
+            <span>Multiply</span>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              Up to 15x
+            </span>
+          </h1>
+          <p className="text-xs text-gray-400 mt-1 max-w-2xl font-mono">
+            Effortlessly earn yields with automated compounding loops, powered by Current & Suilend Engine on Sui.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setInfoModalOpen(true)}
+          className="flex items-center gap-1.5 text-xs font-mono text-cyan-300 hover:text-cyan-200 transition-all bg-cyan-950/20 hover:bg-cyan-950/40 border border-cyan-500/30 px-3.5 py-2 rounded-xl cursor-pointer self-start md:self-auto"
         >
-          <div className="flex items-center justify-between mb-2">
+          <BookOpen className="w-4 h-4 text-cyan-400" />
+          <span>How Multiply Works</span>
+        </button>
+      </div>
+
+      {/* 2. Top 3 Featured Hero Cards (Current Style) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        {/* Card 1: aUSN / USDC */}
+        <div
+          onClick={() => handleOpenStrategyDetail(MULTIPLY_STRATEGIES[4])}
+          className="group cursor-pointer bg-[#0c101a] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5 flex items-center justify-between"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span className="text-2xl font-black text-amber-400 font-mono">15.0%</span>
+              <span className="text-[10px] font-mono uppercase text-gray-400">Max APR</span>
+            </div>
+            <div className="text-xs text-gray-300 font-medium">aUSN / USDC • 15.0x RWA Loop</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <TokenBadge symbol="aUSN" logoUrl="/tokens/usdc.svg" size="w-8 h-8" />
+            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+          </div>
+        </div>
+
+        {/* Card 2: USDsui / USDC */}
+        <div
+          onClick={() => handleOpenStrategyDetail(MULTIPLY_STRATEGIES[1])}
+          className="group cursor-pointer bg-[#0c101a] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5 flex items-center justify-between"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+              <span className="text-2xl font-black text-cyan-300 font-mono">12.4%</span>
+              <span className="text-[10px] font-mono uppercase text-gray-400">Max APR</span>
+            </div>
+            <div className="text-xs text-gray-300 font-medium">USDsui / USDC • Suilend Stable Loop</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <TokenBadge symbol="USDsui" logoUrl="/tokens/usdc.svg" size="w-8 h-8" />
+            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+          </div>
+        </div>
+
+        {/* Card 3: haSUI / SUI */}
+        <div
+          onClick={() => handleOpenStrategyDetail(MULTIPLY_STRATEGIES[5])}
+          className="group cursor-pointer bg-[#0c101a] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5 flex items-center justify-between"
+        >
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-400" />
               <span className="text-2xl font-black text-emerald-400 font-mono">24.8%</span>
-              <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
+              <span className="text-[10px] font-mono uppercase text-gray-400">Max APR</span>
             </div>
-            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              9.8x LST Loop
-            </span>
+            <div className="text-xs text-gray-300 font-medium">haSUI / SUI • 9.8x LST Pegged</div>
           </div>
-          <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
-            <span>haSUI / SUI • Pegged Staking</span>
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-          </div>
-        </div>
-
-        {/* Card 2: Long SUI */}
-        <div
-          onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[2])}
-          className="group cursor-pointer bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-cyan-400" />
-              <span className="text-2xl font-black text-cyan-300 font-mono">28.4%</span>
-              <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
-            </div>
-            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-              4.0x Long SUI
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
-            <span>SUI / USDC • Leveraged Upside</span>
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-          </div>
-        </div>
-
-        {/* Card 3: Stable Loop */}
-        <div
-          onClick={() => handleOpenMultiplyModal(MULTIPLY_STRATEGIES[4])}
-          className="group cursor-pointer bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-cyan-400" />
-              <span className="text-2xl font-black text-cyan-300 font-mono">16.8%</span>
-              <span className="text-[10px] font-mono uppercase text-gray-400">Max APY</span>
-            </div>
-            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-              4.8x RWA Loop
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-xs text-gray-300 font-medium">
-            <span>USDY / USDC • US Treasury Yield</span>
+          <div className="flex items-center gap-2">
+            <TokenBadge symbol="haSUI" logoUrl="/tokens/hasui.svg" size="w-8 h-8" />
             <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
           </div>
         </div>
       </div>
 
-      {/* Active User Positions Widget */}
-      {activePositions.length > 0 && (
-        <div className="bg-[#0b0e17] border border-white/10 rounded-2xl p-5 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
-                <Coins className="w-4 h-4 text-cyan-400" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">Your Active Multiply Positions</h3>
-                <span className="text-xs text-gray-400 font-mono">Total Positions Value: <strong>${totalPositionsValueUsd.toFixed(2)} USD</strong></span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 text-xs font-mono">
-              <div>
-                <span className="text-gray-400 block">Total Collateral:</span>
-                <span className="text-white font-bold">${totalPositionsCollateralUsd.toFixed(2)}</span>
-              </div>
-              <div>
-                <span className="text-gray-400 block">Accrued Yield:</span>
-                <span className="text-emerald-400 font-bold">+${totalAccruedPnlUsd.toFixed(2)} USD</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-            {activePositions.map((pos) => (
-              <div
-                key={pos.id}
-                className="bg-[#121624] border border-white/10 rounded-2xl p-4 space-y-3 relative overflow-hidden"
+      {/* 3. Market Submarket Selector & Category Tabs (Current Style) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-[#0b0e17] border border-white/10">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          {/* Submarket Selector */}
+          <div className="flex items-center gap-1 border-r border-white/10 pr-2">
+            {[
+              { id: 'all', label: 'All Markets' },
+              { id: 'main', label: 'Main Market' },
+              { id: 'suilend', label: 'Suilend v2' },
+              { id: 'scallop', label: 'Scallop' },
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setSelectedMarket(m.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all shrink-0 cursor-pointer ${
+                  selectedMarket === m.id
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    : 'text-gray-400 hover:text-white bg-transparent'
+                }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-white">{pos.strategyName}</span>
-                  <span className="px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold">
-                    {pos.multiplier}x Multiplier
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div className="bg-black/30 p-2 rounded-xl">
-                    <span className="text-gray-400 text-[10px] uppercase block">Position Value</span>
-                    <span className="text-white font-bold">${pos.totalExposureUsd.toFixed(2)}</span>
-                  </div>
-                  <div className="bg-black/30 p-2 rounded-xl">
-                    <span className="text-gray-400 text-[10px] uppercase block">Health Factor</span>
-                    <span className="text-emerald-400 font-bold">{pos.healthFactor.toFixed(2)} (Safe)</span>
-                  </div>
-                  <div className="bg-black/30 p-2 rounded-xl">
-                    <span className="text-gray-400 text-[10px] uppercase block">Net APY</span>
-                    <span className="text-cyan-300 font-bold">{pos.netApr.toFixed(2)}%</span>
-                  </div>
-                  <div className="bg-black/30 p-2 rounded-xl">
-                    <span className="text-gray-400 text-[10px] uppercase block">Accrued Yield</span>
-                    <span className="text-emerald-400 font-bold">+${pos.pnlUsd.toFixed(3)}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    onClick={() => setManagingPosition(pos)}
-                    className="w-full py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all cursor-pointer"
-                  >
-                    Manage / De-leverage
-                  </button>
-                  <button
-                    onClick={() => handleClosePosition(pos)}
-                    className="py-2 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white font-bold text-xs transition-all cursor-pointer"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
+                {m.label}
+              </button>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* 2. Strategy Filters & Search Bar (Harmonized with Pools) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-[#0b0e17] border border-white/10">
-        {/* Strategy Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {[
-            { id: 'all', label: 'All Markets (6)' },
-            { id: 'lst', label: '💧 LST Pegged' },
-            { id: 'long_sui', label: '📈 Long SUI' },
-            { id: 'short_sui', label: '📉 Short SUI' },
-            { id: 'stablecoin', label: '💵 Stablecoin' },
-            { id: 'rwa', label: '🏛️ RWA' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedFilter(tab.id as any)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                selectedFilter === tab.id
-                  ? 'bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black shadow-[0_0_15px_rgba(56,189,248,0.25)]'
-                  : 'text-gray-400 hover:text-white bg-transparent hover:bg-white/5'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {/* Category Tabs */}
+          <div className="flex items-center gap-1">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'lst', label: 'LST' },
+              { id: 'rwa', label: 'RWA' },
+              { id: 'long_sui', label: 'Long SUI' },
+              { id: 'short_sui', label: 'Short SUI' },
+              { id: 'stablecoin', label: 'Stablecoin' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedFilter(tab.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  selectedFilter === tab.id
+                    ? 'bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black shadow-[0_0_15px_rgba(56,189,248,0.25)]'
+                    : 'text-gray-400 hover:text-white bg-transparent hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Search */}
@@ -876,7 +1391,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search strategies or tokens..."
+            placeholder="Search strategy..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-3 py-1.5 bg-black/40 border border-white/10 rounded-xl text-xs text-white placeholder:text-gray-500 outline-none focus:border-cyan-500/50 font-mono"
@@ -884,97 +1399,108 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         </div>
       </div>
 
-      {/* 3. Main Multiply Market Table (Harmonized with Pools & Vaults) */}
+      {/* 4. Main Multiply Market Table (Current & Suilend Layout) */}
       <div className="bg-[#0b0e17] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-white/5 bg-[#090d16] text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                <th className="py-4 px-5">Supply (Collateral)</th>
-                <th className="py-4 px-5">Borrow (Debt)</th>
+              <tr className="border-b border-white/5 bg-[#090d16] text-[11px] font-bold text-gray-400 uppercase tracking-wider font-mono">
+                <th className="py-4 px-5">Supply</th>
+                <th className="py-4 px-5">Borrow</th>
                 <th className="py-4 px-4">Strategy</th>
-                <th className="py-4 px-4 text-right">Max Net APR</th>
+                <th className="py-4 px-4 text-right">Max APR</th>
                 <th className="py-4 px-4 text-right">Max Multiplier</th>
                 <th className="py-4 px-4 text-right">Supply APR</th>
                 <th className="py-4 px-4 text-right">Borrow APR</th>
                 <th className="py-4 px-5 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 text-xs font-mono">
+            <tbody className="divide-y divide-white/5">
               {filteredStrategies.map((strat) => (
                 <tr
                   key={strat.id}
-                  className="hover:bg-white/[0.03] transition-colors group"
+                  onClick={() => handleOpenStrategyDetail(strat)}
+                  className="hover:bg-cyan-950/10 transition-colors group cursor-pointer"
                 >
                   {/* Supply Asset */}
                   <td className="py-4 px-5">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={strat.supplyTokenLogo}
-                        alt=""
-                        className="w-8 h-8 rounded-full border border-white/10 bg-black p-0.5 shrink-0"
-                        onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
-                      />
+                      <TokenBadge symbol={strat.supplyToken} logoUrl={strat.supplyTokenLogo} size="w-7 h-7" />
                       <div>
-                        <div className="font-bold text-white text-sm">{strat.supplyToken}</div>
-                        <div className="text-[10px] text-gray-400">${(strat.supplyTvlUsd / 1e6).toFixed(1)}M TVL</div>
+                        <span className="text-white font-bold text-sm block font-mono group-hover:text-cyan-300 transition-colors">
+                          {strat.supplyToken}
+                        </span>
+                        <span className="text-gray-400 text-[11px] font-mono">
+                          ${(strat.supplyTvlUsd / 1e6).toFixed(2)}M TVL
+                        </span>
                       </div>
                     </div>
                   </td>
 
                   {/* Borrow Asset */}
                   <td className="py-4 px-5">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={strat.borrowTokenLogo}
-                        alt=""
-                        className="w-8 h-8 rounded-full border border-white/10 bg-black p-0.5 shrink-0"
-                        onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
-                      />
+                    <div className="flex items-center gap-2.5">
+                      <TokenBadge symbol={strat.borrowToken} logoUrl={strat.borrowTokenLogo} size="w-6 h-6" />
                       <div>
-                        <div className="font-bold text-white text-sm">{strat.borrowToken}</div>
-                        <div className="text-[10px] text-gray-400">${(strat.borrowBorrowedUsd / 1e6).toFixed(1)}M Borrowed</div>
+                        <span className="text-gray-200 font-bold text-sm block font-mono">
+                          {strat.borrowToken}
+                        </span>
+                        <span className="text-gray-500 text-[10px] font-mono">
+                          ${(strat.borrowBorrowedUsd / 1e6).toFixed(2)}M Borrowed
+                        </span>
                       </div>
                     </div>
                   </td>
 
-                  {/* Strategy Badge */}
+                  {/* Strategy Tag */}
                   <td className="py-4 px-4">
-                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${strat.strategyBadgeColor}`}>
-                      {strat.strategyType}
-                    </span>
+                    <div className="flex flex-col items-start gap-1">
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${strat.strategyBadgeColor}`}>
+                        {strat.strategyType}
+                      </span>
+                      <span className="text-[10px] font-mono text-gray-500">
+                        {strat.protocol}
+                      </span>
+                    </div>
                   </td>
 
-                  {/* Max Net APR */}
+                  {/* Max APR */}
                   <td className="py-4 px-4 text-right">
-                    <div className="font-bold text-base text-emerald-400 flex items-center justify-end gap-1 font-mono">
-                      <Zap className="w-3.5 h-3.5 fill-emerald-400" />
-                      {strat.maxApr.toFixed(1)}%
+                    <div className="flex items-center justify-end gap-1 font-mono font-black text-sm text-emerald-400">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{strat.maxApr.toFixed(1)}%</span>
                     </div>
                   </td>
 
                   {/* Max Multiplier */}
                   <td className="py-4 px-4 text-right">
-                    <span className="font-bold text-cyan-300 bg-cyan-500/15 px-2.5 py-0.5 rounded-lg border border-cyan-500/30">
+                    <span className="text-xs font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded border border-white/5">
                       {strat.maxMultiplier}x
                     </span>
                   </td>
 
                   {/* Supply APR */}
-                  <td className="py-4 px-4 text-right text-gray-300 font-mono">
-                    {strat.supplyApr.toFixed(2)}%
+                  <td className="py-4 px-4 text-right">
+                    <span className="text-xs font-mono text-cyan-300 font-medium">
+                      {strat.supplyApr.toFixed(1)}%
+                    </span>
                   </td>
 
                   {/* Borrow APR */}
-                  <td className="py-4 px-4 text-right text-rose-300 font-medium font-mono">
-                    {strat.borrowApr.toFixed(2)}%
+                  <td className="py-4 px-4 text-right">
+                    <span className="text-xs font-mono text-gray-400 font-medium">
+                      {strat.borrowApr.toFixed(1)}%
+                    </span>
                   </td>
 
                   {/* Action Button */}
                   <td className="py-4 px-5 text-right">
                     <button
-                      onClick={() => handleOpenMultiplyModal(strat)}
-                      className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ml-auto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenStrategyDetail(strat);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 font-mono font-black text-xs transition-all border border-cyan-500/30 hover:border-transparent shadow-[0_0_12px_rgba(56,189,248,0.15)] cursor-pointer inline-flex items-center gap-1"
                     >
                       <span>Multiply</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -987,202 +1513,46 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         </div>
       </div>
 
-      {/* Interactive Multiply Modal */}
-      {activeStrategy && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in font-mono">
-          <div className="bg-[#0e121d] border border-white/10 rounded-3xl w-full max-w-lg p-6 space-y-5 shadow-2xl relative">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-cyan-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-white">{activeStrategy.name}</h3>
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>Supply {activeStrategy.supplyToken}</span>
-                    <span>•</span>
-                    <span>Borrow {activeStrategy.borrowToken}</span>
-                  </div>
-                </div>
+      {/* Educational Modal: How Multiply Works */}
+      {infoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#0b0e17] border border-cyan-500/30 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-base font-bold text-white">How Multiply & Looping Works</h3>
               </div>
               <button
-                onClick={() => setActiveStrategy(null)}
-                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer"
+                onClick={() => setInfoModalOpen(false)}
+                className="p-1 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Collateral Input */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-gray-400 font-mono">
-                <span>Deposit Collateral:</span>
-                <span>Wallet Balance: {getStrategyWalletBalance(activeStrategy.supplyToken)} {activeStrategy.supplyToken}</span>
+            <div className="space-y-3 text-xs text-gray-300 leading-relaxed font-mono">
+              <p>
+                <strong>Multiply (Looping)</strong> is an automated DeFi capital-efficiency engine built directly on top of Sui lending markets (NAVI, Scallop, Suilend).
+              </p>
+              <div className="p-3.5 rounded-xl bg-cyan-950/20 border border-cyan-500/20 space-y-2">
+                <span className="text-cyan-300 font-bold block">Atomic Sui PTB Execution:</span>
+                <ol className="list-decimal pl-4 space-y-1 text-gray-400 text-[11px]">
+                  <li>You deposit collateral (e.g. <strong>SUI</strong> or <strong>sSUI</strong>).</li>
+                  <li>Volt takes an instant flash loan in borrow currency (e.g. <strong>USDC</strong>).</li>
+                  <li>Auto-swaps the borrowed token into collateral via Cetus / DeepBook.</li>
+                  <li>Deposits everything into the lending vault and borrows to repay the flash loan.</li>
+                </ol>
               </div>
-              <div className="relative bg-[#090b10] border border-white/10 focus-within:border-cyan-500/50 rounded-2xl p-3 transition-all">
-                <div className="flex items-center justify-between">
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="0.0"
-                    value={inputCollateral}
-                    onChange={(e) => setInputCollateral(e.target.value)}
-                    className="w-full bg-transparent text-xl font-mono font-bold text-white outline-none placeholder-gray-600"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setInputCollateral(getStrategyWalletBalance(activeStrategy.supplyToken))}
-                      className="px-2 py-1 rounded bg-cyan-500/10 text-cyan-300 text-[11px] font-bold hover:bg-cyan-500/20 border border-cyan-500/20 cursor-pointer"
-                    >
-                      MAX
-                    </button>
-                    <span className="font-bold text-sm text-white px-2 py-1 rounded-xl bg-white/5">
-                      {activeStrategy.supplyToken}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-[11px] font-mono text-gray-500 mt-1">
-                  ≈ ${collateralUsd.toFixed(2)} USD
-                </div>
-              </div>
-            </div>
-
-            {/* Leverage / Multiplier Selector & Slider */}
-            <div className="space-y-2 bg-[#080b12] p-4 rounded-2xl border border-white/10">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-gray-300 font-bold">Select Multiplier / Leverage:</span>
-                <span className="text-cyan-300 font-black text-sm">{multiplier.toFixed(1)}x</span>
-              </div>
-
-              {/* Slider */}
-              <input
-                type="range"
-                min="1.2"
-                max={activeStrategy.maxMultiplier}
-                step="0.1"
-                value={multiplier}
-                onChange={(e) => setMultiplier(parseFloat(e.target.value))}
-                className="w-full accent-cyan-400 cursor-pointer"
-              />
-
-              {/* Quick Multiplier Buttons */}
-              <div className="flex items-center gap-1.5 pt-1">
-                {Array.from(new Set([1.5, 2.0, 3.0, 5.0, activeStrategy.maxMultiplier].filter(v => v <= activeStrategy.maxMultiplier))).sort((a, b) => a - b).map((val) => (
-                  <button
-                    key={val}
-                    onClick={() => setMultiplier(val)}
-                    className={`flex-1 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                      multiplier === val
-                        ? 'bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black shadow-md'
-                        : 'bg-white/5 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {val}x
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Position Summary & Risk Metrics */}
-            <div className="bg-[#0b0e17] border border-white/5 rounded-2xl p-4 space-y-2.5 text-xs font-mono">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Total Position Exposure:</span>
-                <span className="text-white font-bold">${totalExposureUsd.toFixed(2)} USD</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Borrowed Debt:</span>
-                <span className="text-rose-300 font-bold">{borrowAmount.toFixed(4)} {activeStrategy.borrowToken} (~${borrowUsd.toFixed(2)})</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Estimated Net APY:</span>
-                <span className="text-emerald-400 font-black text-sm">+{calculatedNetApr.toFixed(2)}%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Health Factor:</span>
-                <span className={`font-bold ${calculatedHealthFactor > 1.5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {calculatedHealthFactor.toFixed(2)} (Safe)
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Liquidation Safety:</span>
-                <span className="text-cyan-400 font-semibold">{activeStrategy.liquidationRisk}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-white/5 pt-2 text-[11px]">
-                <span className="text-gray-500">Volt Protocol Fee:</span>
-                <span className="text-gray-400">10% on Net Yield on close (0% on deposit)</span>
-              </div>
-            </div>
-
-            {/* Action Button */}
-            <button
-              onClick={handleConfirmMultiply}
-              disabled={isExecuting || collateralNum <= 0}
-              className={`w-full py-3.5 rounded-2xl font-black text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer ${
-                isExecuting || collateralNum <= 0
-                  ? 'bg-white/10 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black shadow-[0_0_20px_rgba(56,189,248,0.25)]'
-              }`}
-            >
-              {isExecuting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
-                  Signing on Sui Mainnet...
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
-                  Execute {multiplier.toFixed(1)}x Multiply Position
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Position Manage / De-leverage Modal */}
-      {managingPosition && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in font-mono">
-          <div className="bg-[#0e121d] border border-white/10 rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h3 className="text-lg font-black text-white">Manage Position</h3>
-              <button
-                onClick={() => setManagingPosition(null)}
-                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="bg-[#0b0e17] p-4 rounded-2xl space-y-2 text-xs font-mono border border-white/5">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Strategy:</span>
-                <span className="text-white font-bold">{managingPosition.strategyName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Multiplier:</span>
-                <span className="text-cyan-300 font-bold">{managingPosition.multiplier}x</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Collateral:</span>
-                <span className="text-white font-bold">${managingPosition.collateralUsd.toFixed(2)} USD</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Total Value:</span>
-                <span className="text-white font-bold">${managingPosition.totalExposureUsd.toFixed(2)} USD</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Net Accrued Yield:</span>
-                <span className="text-emerald-400 font-bold">+${managingPosition.pnlUsd.toFixed(3)} USD</span>
-              </div>
+              <p className="text-[11px] text-gray-400">
+                All 4 steps happen in <strong>1 single transaction block (PTB)</strong> on Sui. Zero manual swaps, zero intermediate risk, with 100% non-custodial custody.
+              </p>
             </div>
 
             <button
-              onClick={() => handleClosePosition(managingPosition)}
-              disabled={isExecuting}
-              className="w-full py-3.5 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-sm transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+              onClick={() => setInfoModalOpen(false)}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
             >
-              {isExecuting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Close Position & Repay Debt'}
+              Got it
             </button>
           </div>
         </div>
