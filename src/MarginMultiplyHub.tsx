@@ -35,9 +35,49 @@ import {
   Filter
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
-import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
+import {
+  depositCoin,
+  withdrawCoin,
+  borrowCoin,
+  repayDebt,
+  updateOraclePTB,
+  getAddressPortfolio,
+  getHealthFactorCall,
+  pool as naviPool,
+} from 'navi-sdk';
 import { VOLT_TREASURY_ADDRESS } from './constants';
 import { getOwnedCoinObjects } from './coinHelper';
+
+const getNaviPoolConfig = (symbol: string) => {
+  const s = symbol.toUpperCase();
+  if (s === 'SUI') return naviPool.Sui;
+  if (s === 'HASUI') return naviPool.haSui || naviPool.Sui;
+  if (s === 'VSUI') return naviPool.vSui || naviPool.Sui;
+  if (s === 'SSUI') return naviPool.SpringSui || naviPool.haSui || naviPool.Sui;
+  if (s === 'USDY') return naviPool.USDY || naviPool.nUSDC;
+  if (s === 'USDSUI') return naviPool.USDSUI || naviPool.nUSDC;
+  if (s === 'USDC' || s === 'AUSN' || s === 'EEARN') return naviPool.nUSDC;
+  return naviPool.Sui;
+};
+
+const getNaviPortfolioKey = (symbol: string): string => {
+  const s = symbol.toUpperCase();
+  if (s === 'SUI') return 'Sui';
+  if (s === 'HASUI') return 'haSui';
+  if (s === 'VSUI') return 'vSui';
+  if (s === 'SSUI') return 'SpringSui';
+  if (s === 'USDY') return 'USDY';
+  if (s === 'USDSUI') return 'USDSUI';
+  if (s === 'USDC' || s === 'AUSN' || s === 'EEARN') return 'nUSDC';
+  return 'Sui';
+};
+
+const getTokenDecimals = (symbol: string): number => {
+  const s = symbol.toUpperCase();
+  if (s.includes('USD') || s === 'EEARN') return 6;
+  if (s.includes('BTC')) return 8;
+  return 9;
+};
 
 export type MarginStrategyFilter = 'all' | 'lst' | 'long_sui' | 'short_sui' | 'stablecoin' | 'rwa';
 export type MarketFilter = 'all' | 'main' | 'suilend' | 'scallop';
@@ -386,6 +426,7 @@ interface MarginMultiplyHubProps {
   liveTokenPrices?: Record<string, number>;
   effectiveFeeRate?: number;
   userTraderTier?: any;
+  cetusClient?: any;
   onNavigateToSwap: (fromToken: string, toToken: string) => void;
   showNotification: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string, actionLabel?: string, actionUrl?: string) => void;
 }
@@ -399,6 +440,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   liveTokenPrices = {},
   effectiveFeeRate,
   userTraderTier,
+  cetusClient,
   onNavigateToSwap,
   showNotification,
 }) => {
@@ -424,11 +466,73 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   // Live On-Chain Oracles Synchronization State
   const [liveRates, setLiveRates] = useState<Record<string, { supplyApr?: number; borrowApr?: number; maxApr?: number; tvlUsd?: number }>>({});
   const [llamaPoolIds, setLlamaPoolIds] = useState<Record<string, string>>({});
+  const [llamaBorrowPoolIds, setLlamaBorrowPoolIds] = useState<Record<string, string>>({});
   const [historicalRawApy, setHistoricalRawApy] = useState<Array<{ timestamp: string; apy: number }>>([]);
+  const [historicalBorrowRawApy, setHistoricalBorrowRawApy] = useState<Array<{ timestamp: string; apy: number }>>([]);
   const [isChartLoading, setIsChartLoading] = useState<boolean>(false);
   const [suiOraclePrice, setSuiOraclePrice] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
+
+  // Real On-Chain NAVI Portfolio & Health Factor State
+  const [onChainPortfolio, setOnChainPortfolio] = useState<Record<string, { supplyBalance: number; borrowBalance: number }>>({});
+  const [onChainHealthFactor, setOnChainHealthFactor] = useState<number | null>(null);
+  const [isPortfolioLoading, setIsPortfolioLoading] = useState<boolean>(false);
+  const [adjustActionType, setAdjustActionType] = useState<'add_collateral' | 'repay_debt' | 'close_withdraw'>('add_collateral');
+  const [adjustAmount, setAdjustAmount] = useState<string>('');
+
+  const fetchOnChainPortfolio = async () => {
+    if (!currentAccount?.address || !suiClient) {
+      setOnChainPortfolio({});
+      setOnChainHealthFactor(null);
+      return;
+    }
+    setIsPortfolioLoading(true);
+    try {
+      const [portfolioMap, hfResult] = await Promise.all([
+        getAddressPortfolio(currentAccount.address, false, suiClient, true, [
+          'Sui',
+          'haSui',
+          'vSui',
+          'nUSDC',
+          'USDY',
+          'USDSUI',
+          'SpringSui',
+        ]),
+        getHealthFactorCall(currentAccount.address, suiClient).catch(() => null),
+      ]);
+
+      const parsed: Record<string, { supplyBalance: number; borrowBalance: number }> = {};
+      if (portfolioMap instanceof Map) {
+        portfolioMap.forEach((val, key) => {
+          parsed[key] = {
+            supplyBalance: Number(val?.supplyBalance || 0),
+            borrowBalance: Number(val?.borrowBalance || 0),
+          };
+        });
+      }
+      setOnChainPortfolio(parsed);
+
+      if (Array.isArray(hfResult) && hfResult.length > 0) {
+        const hfVal = Number(hfResult[0]) / 1e27;
+        if (Number.isFinite(hfVal) && hfVal > 0 && hfVal < 1000) {
+          setOnChainHealthFactor(hfVal);
+        } else {
+          setOnChainHealthFactor(null);
+        }
+      } else {
+        setOnChainHealthFactor(null);
+      }
+    } catch (err) {
+      console.warn('On-chain portfolio fetch notice:', err);
+    } finally {
+      setIsPortfolioLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOnChainPortfolio();
+  }, [currentAccount?.address]);
 
   // Background Live Sync Function (DefiLlama, NAVI, Suilend & Live SUI Price Oracle)
   const syncLiveRates = async () => {
@@ -486,6 +590,24 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             poolMap['ember-eearn-usdc-loop'] = naviUsdc.pool;
           }
           setLlamaPoolIds(poolMap);
+
+          const borrowPoolMap: Record<string, string> = {};
+          if (naviSui?.pool) {
+            borrowPoolMap['hasui-sui-loop'] = naviSui.pool;
+            borrowPoolMap['vsui-sui-loop'] = naviSui.pool;
+          }
+          if (scallopSui?.pool) borrowPoolMap['short-sui-hedge'] = scallopSui.pool;
+          else if (naviSui?.pool) borrowPoolMap['short-sui-hedge'] = naviSui.pool;
+          if (suilendSui?.pool) borrowPoolMap['suilend-ssui-sui-loop'] = suilendSui.pool;
+          if (suilendUsdc?.pool) borrowPoolMap['suilend-usdsui-usdc-loop'] = suilendUsdc.pool;
+          if (naviUsdc?.pool) {
+            borrowPoolMap['long-sui-alpha'] = naviUsdc.pool;
+            borrowPoolMap['usdc-usdsui-stable-loop'] = naviUsdc.pool;
+            borrowPoolMap['usdy-usdc-rwa-loop'] = naviUsdc.pool;
+            borrowPoolMap['current-ausn-usdc-loop'] = naviUsdc.pool;
+            borrowPoolMap['ember-eearn-usdc-loop'] = naviUsdc.pool;
+          }
+          setLlamaBorrowPoolIds(borrowPoolMap);
 
           if (!data?.rates) {
             const fallbackRates: any = {};
@@ -592,27 +714,45 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     localStorage.setItem('volt_multiply_positions', JSON.stringify(activePositions));
   }, [activePositions]);
 
-  // Fetch Real Historical APY Series from DefiLlama when viewing a strategy
+  // Fetch Real Historical Supply + Borrow APY Series from DefiLlama when viewing a strategy
   useEffect(() => {
     if (!activeStrategy) {
       setHistoricalRawApy([]);
+      setHistoricalBorrowRawApy([]);
       return;
     }
     const poolId = llamaPoolIds[activeStrategy.id];
+    const borrowPoolId = llamaBorrowPoolIds[activeStrategy.id];
     if (!poolId) return;
 
     let cancelled = false;
     setIsChartLoading(true);
-    fetch(`https://yields.llama.fi/chart/${poolId}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json) => {
-        if (cancelled || !json?.data || !Array.isArray(json.data)) return;
-        const cleaned = json.data
-          .filter((pt: any) => typeof pt.apy === 'number' && pt.timestamp)
-          .map((pt: any) => ({ timestamp: pt.timestamp as string, apy: pt.apy as number }));
-        setHistoricalRawApy(cleaned);
+    Promise.all([
+      fetch(`https://yields.llama.fi/chart/${poolId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      borrowPoolId && borrowPoolId !== poolId
+        ? fetch(`https://yields.llama.fi/chart/${borrowPoolId}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+        : Promise.resolve(null),
+    ])
+      .then(([supplyJson, borrowJson]) => {
+        if (cancelled) return;
+        if (supplyJson?.data && Array.isArray(supplyJson.data)) {
+          const cleaned = supplyJson.data
+            .filter((pt: any) => typeof pt.apy === 'number' && pt.timestamp)
+            .map((pt: any) => ({ timestamp: pt.timestamp as string, apy: pt.apy as number }));
+          setHistoricalRawApy(cleaned);
+        }
+        if (borrowJson?.data && Array.isArray(borrowJson.data)) {
+          const cleanedBorrow = borrowJson.data
+            .filter((pt: any) => typeof pt.apy === 'number' && pt.timestamp)
+            .map((pt: any) => ({
+              timestamp: pt.timestamp as string,
+              apy: typeof pt.apyBorrow === 'number' ? pt.apyBorrow : (pt.apy as number),
+            }));
+          setHistoricalBorrowRawApy(cleanedBorrow);
+        } else {
+          setHistoricalBorrowRawApy([]);
+        }
       })
-      .catch(() => {})
       .finally(() => {
         if (!cancelled) setIsChartLoading(false);
       });
@@ -620,7 +760,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [activeStrategy?.id, llamaPoolIds]);
+  }, [activeStrategy?.id, llamaPoolIds, llamaBorrowPoolIds]);
 
   // Wallet Balance Helper (Reads real on-chain raw MIST/base-unit balances from App.tsx GraphQL map)
   const getStrategyWalletBalance = (tokenSymbol: string, coinType?: string): string => {
@@ -734,7 +874,25 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     return threshold / effectiveLtv;
   }, [activeStrategy, multiplier]);
 
-  // Real On-Chain Historical Net APR Chart Geometry (from DefiLlama daily data)
+  // Exact Liquidation Price (USD) for directional strategies
+  const calculatedLiquidationPriceUsd = useMemo(() => {
+    if (!activeStrategy || multiplier <= 1.0) return null;
+    if (activeStrategy.liquidationRisk.includes('Soft-Pegged') || activeStrategy.strategyType === 'Stablecoin' || activeStrategy.strategyType === 'RWA') {
+      return null;
+    }
+    const debtRatio = (multiplier - 1) / multiplier;
+    const threshold = activeStrategy.liquidationThreshold;
+    if (activeStrategy.strategyType === 'Short SUI') {
+      const suiPrice = getLiveAssetPriceUsd(activeStrategy.borrowToken);
+      if (!suiPrice || debtRatio <= 0) return null;
+      return (suiPrice * threshold) / debtRatio;
+    }
+    const supplyPrice = getLiveAssetPriceUsd(activeStrategy.supplyToken);
+    if (!supplyPrice || threshold <= 0) return null;
+    return (supplyPrice * debtRatio) / threshold;
+  }, [activeStrategy, multiplier, liveTokenPrices, suiOraclePrice]);
+
+  // Real On-Chain Historical Net APR Chart Geometry (from DefiLlama daily Supply + Borrow data)
   const historicalChartMetrics = useMemo(() => {
     if (!activeStrategy || historicalRawApy.length === 0) {
       return null;
@@ -752,10 +910,16 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     const sliced = historicalRawApy.slice(-daysCount);
     if (sliced.length < 2) return null;
 
+    const borrowByDate = new Map<string, number>();
+    for (const b of historicalBorrowRawApy) {
+      borrowByDate.set(b.timestamp.slice(0, 10), b.apy);
+    }
+
     const lstStakingBoost = activeStrategy.strategyType === 'LST Pegged' ? 3.3 : 0;
     const points = sliced.map((d) => {
       const supply = d.apy + lstStakingBoost;
-      const net = Math.max(0, supply * multiplier - activeStrategy.borrowApr * (multiplier - 1));
+      const histBorrow = borrowByDate.get(d.timestamp.slice(0, 10)) ?? activeStrategy.borrowApr;
+      const net = Math.max(0, supply * multiplier - histBorrow * (multiplier - 1));
       return { timestamp: d.timestamp, netApr: net };
     });
 
@@ -785,7 +949,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       minApr: minVal,
       maxApr: maxVal,
     };
-  }, [activeStrategy, historicalRawApy, chartTimeframe, multiplier]);
+  }, [activeStrategy, historicalRawApy, historicalBorrowRawApy, chartTimeframe, multiplier]);
 
   // Open Detail View
   const handleOpenStrategyDetail = (strat: MultiplyStrategy) => {
@@ -798,7 +962,17 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     setDetailActionTab('deposit');
   };
 
-  // Execute On-Chain Multiply (PTB with tx.pure.u64 serialization)
+  const recordMultiplyAffiliateFee = (feeUsd: number) => {
+    if (!Number.isFinite(feeUsd) || feeUsd <= 0) return;
+    try {
+      const prev = parseFloat(localStorage.getItem('volt_multiply_fee_volume') || '0') || 0;
+      localStorage.setItem('volt_multiply_fee_volume', (prev + feeUsd).toFixed(6));
+    } catch {
+      // Ignore storage error
+    }
+  };
+
+  // Execute On-Chain Multiply (PTB with Atomic NAVI + Cetus Loop & tx.pure.u64 serialization)
   const handleConfirmMultiply = async () => {
     if (!activeStrategy) return;
     if (collateralNum <= 0) {
@@ -818,8 +992,11 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       const feeRate = effectiveFeeRate ?? 0.0025;
       const feeRateBps = BigInt(Math.max(1, Math.round(feeRate * 10000)));
+      const depositPoolCfg = getNaviPoolConfig(depositTokenSymbol);
+      const depositDecimals = getTokenDecimals(depositTokenSymbol);
+      let depositedToNavi = false;
 
-      // Real On-Chain PTB Execution with NAVI / Scallop / Haedal / Suilend / Ember Move Call
+      // Real On-Chain PTB Execution with NAVI / Haedal / Cetus
       if (depositTokenSymbol === 'SUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
         const feeMist = (totalMist * feeRateBps) / 10000n;
@@ -830,10 +1007,11 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
         }
         const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
-        await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(netMist));
+        await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netMist));
+        depositedToNavi = true;
 
       } else if (depositTokenSymbol.includes('USD') || depositTokenSymbol === 'eEARN') {
-        const totalUnits = BigInt(Math.floor(collateralNum * 1e6));
+        const totalUnits = BigInt(Math.floor(collateralNum * Math.pow(10, depositDecimals)));
         const feeUnits = (totalUnits * feeRateBps) / 10000n;
         const netUnits = totalUnits - feeUnits;
 
@@ -843,7 +1021,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         }
         const totalBalance = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
         if (totalBalance < totalUnits) {
-          throw new Error(`Insufficient ${depositTokenSymbol} balance (${(Number(totalBalance) / 1e6).toFixed(2)} available).`);
+          throw new Error(`Insufficient ${depositTokenSymbol} balance (${(Number(totalBalance) / Math.pow(10, depositDecimals)).toFixed(2)} available).`);
         }
 
         const [primaryCoin, ...otherCoins] = coinObjects.map(c => tx.object(c.objectId));
@@ -855,7 +1033,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
         }
         const [splitCoin] = tx.splitCoins(primaryCoin, [netUnits]);
-        await depositCoin(tx, naviPool.nUSDC, splitCoin, tx.pure.u64(netUnits));
+        await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netUnits));
+        depositedToNavi = true;
 
       } else if (depositTokenSymbol === 'haSUI' || depositTokenSymbol === 'sSUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
@@ -888,7 +1067,59 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
         }
         const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
-        await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(netMist));
+        await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netMist));
+        depositedToNavi = true;
+      }
+
+      // Atomic Leveraged Borrow + Re-Deposit Loop when multiplier > 1.0 and borrow >= $0.50
+      let executedAtomicLoop = false;
+      if (depositedToNavi && multiplier > 1.0 && borrowUsd >= 0.5 && borrowTokenPriceUsd > 0) {
+        const borrowDecimals = getTokenDecimals(activeStrategy.borrowToken);
+        const borrowUnits = Math.floor(borrowAmount * Math.pow(10, borrowDecimals));
+        const borrowPoolCfg = getNaviPoolConfig(activeStrategy.borrowToken);
+
+        if (borrowUnits > 0) {
+          await updateOraclePTB(tx, suiClient);
+          const [borrowedCoin] = await borrowCoin(tx, borrowPoolCfg, borrowUnits);
+
+          if (activeStrategy.supplyToken === activeStrategy.borrowToken) {
+            await depositCoin(tx, getNaviPoolConfig(activeStrategy.supplyToken), borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
+            executedAtomicLoop = true;
+          } else if (cetusClient && typeof cetusClient.findRouters === 'function' && typeof cetusClient.routerSwap === 'function') {
+            try {
+              const route = await cetusClient.findRouters({
+                from: activeStrategy.borrowCoinType,
+                target: activeStrategy.supplyCoinType,
+                amount: borrowUnits.toString(),
+                byAmountIn: true,
+              });
+              if (route && !route.insufficientLiquidity) {
+                const swappedCoin = await cetusClient.routerSwap({
+                  router: route,
+                  txb: tx,
+                  inputCoin: borrowedCoin,
+                  slippage: 0.01,
+                });
+                const expectedOut = Math.floor(Number(route.amountOut || 0) * 0.985);
+                if (expectedOut > 0) {
+                  await depositCoin(tx, getNaviPoolConfig(activeStrategy.supplyToken), swappedCoin, tx.pure.u64(BigInt(expectedOut)));
+                  executedAtomicLoop = true;
+                } else {
+                  tx.transferObjects([swappedCoin], currentAccount.address);
+                }
+              } else {
+                await depositCoin(tx, borrowPoolCfg, borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
+                executedAtomicLoop = true;
+              }
+            } catch {
+              await depositCoin(tx, borrowPoolCfg, borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
+              executedAtomicLoop = true;
+            }
+          } else {
+            await depositCoin(tx, borrowPoolCfg, borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
+            executedAtomicLoop = true;
+          }
+        }
       }
 
       const result = await signAndExecute({ transaction: tx });
@@ -896,6 +1127,9 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       if (!digest) {
         throw new Error('Transaction was not confirmed on-chain (missing digest).');
       }
+
+      recordMultiplyAffiliateFee(collateralUsd * feeRate);
+      fetchOnChainPortfolio();
 
       const newPosition: ActiveMarginPosition = {
         id: 'pos_' + Date.now(),
@@ -922,13 +1156,83 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       showNotification(
         'success',
         'Leveraged Multiply Position Opened',
-        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Deposited Asset: ${collateralNum.toFixed(4)} ${depositTokenSymbol} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: ${(feeRate * 100).toFixed(2)}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Deposited Asset: ${collateralNum.toFixed(4)} ${depositTokenSymbol} (~$${collateralUsd.toFixed(2)})\n• Atomic Borrow Loop: ${executedAtomicLoop ? 'Executed On-Chain (NAVI + Cetus)' : 'Single-Step Collateral Deposit (<$0.50 dust guard)'}\n• Protocol Tier Fee: ${(feeRate * 100).toFixed(2)}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
     } catch (err: any) {
       console.error('Multiply execution error:', err);
       showNotification('error', 'Execution Failed', err.message || 'Failed to execute Multiply position.');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  // Adjust Position (Add Collateral or Repay Debt on-chain)
+  const handleAdjustPosition = async (action: 'add_collateral' | 'repay_debt', amountStr: string) => {
+    if (!activeStrategy) return;
+    const amt = parseFloat(amountStr.replace(',', '.')) || 0;
+    if (amt <= 0) {
+      showNotification('warning', 'Invalid Amount', 'Please enter an amount greater than 0.');
+      return;
+    }
+    if (!currentAccount?.address || !signAndExecute) {
+      showNotification('warning', 'Connect Wallet', 'Please connect your Sui wallet.');
+      return;
+    }
+
+    setIsExecuting(true);
+    try {
+      const tx = new Transaction();
+      tx.setSender(currentAccount.address);
+
+      const targetSymbol = action === 'add_collateral' ? activeStrategy.supplyToken : activeStrategy.borrowToken;
+      const targetCoinType = action === 'add_collateral' ? activeStrategy.supplyCoinType : activeStrategy.borrowCoinType;
+      const poolCfg = getNaviPoolConfig(targetSymbol);
+      const decimals = getTokenDecimals(targetSymbol);
+      const units = BigInt(Math.floor(amt * Math.pow(10, decimals)));
+
+      let targetCoin: any;
+      if (targetSymbol === 'SUI') {
+        const [split] = tx.splitCoins(tx.gas, [units]);
+        targetCoin = split;
+      } else {
+        const coinObjects = await getOwnedCoinObjects(currentAccount.address, targetCoinType);
+        if (!coinObjects || coinObjects.length === 0) {
+          throw new Error(`No ${targetSymbol} coins found in your wallet.`);
+        }
+        const totalBalance = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
+        if (totalBalance < units) {
+          throw new Error(`Insufficient ${targetSymbol} balance.`);
+        }
+        const [primaryCoin, ...otherCoins] = coinObjects.map((c) => tx.object(c.objectId));
+        if (otherCoins.length > 0) tx.mergeCoins(primaryCoin, otherCoins);
+        const [split] = tx.splitCoins(primaryCoin, [units]);
+        targetCoin = split;
+      }
+
+      if (action === 'add_collateral') {
+        await depositCoin(tx, poolCfg, targetCoin, tx.pure.u64(units));
+      } else {
+        await repayDebt(tx, poolCfg, targetCoin, Number(units));
+      }
+
+      const result = await signAndExecute({ transaction: tx });
+      const digest = (result as any)?.digest;
+      if (!digest) throw new Error('Transaction was not confirmed on-chain.');
+
+      setAdjustAmount('');
+      fetchOnChainPortfolio();
+      showNotification(
+        'success',
+        action === 'add_collateral' ? 'Collateral Added' : 'Debt Repaid',
+        `${action === 'add_collateral' ? 'Supplied' : 'Repaid'} ${amt.toFixed(4)} ${targetSymbol} on-chain.\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        'View on Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`
+      );
+    } catch (err: any) {
+      console.error('Adjust failed:', err);
+      showNotification('error', 'Adjust Failed', err.message || 'Failed to adjust position.');
     } finally {
       setIsExecuting(false);
     }
@@ -957,25 +1261,20 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       }
 
       // Genuine on-chain withdrawal from protocol
-      if (pos.supplyToken === 'SUI') {
-        const mist = BigInt(Math.floor(pos.collateralAmount * 1e9));
-        const [withdrawnCoin] = await withdrawCoin(tx, naviPool.Sui, mist);
-        tx.transferObjects([withdrawnCoin], currentAccount.address);
-      } else if (pos.supplyToken.includes('USD') || pos.supplyToken === 'eEARN') {
-        const units = BigInt(Math.floor(pos.collateralAmount * 1e6));
-        const [withdrawnCoin] = await withdrawCoin(tx, naviPool.nUSDC, units);
-        tx.transferObjects([withdrawnCoin], currentAccount.address);
-      } else {
-        const mist = BigInt(Math.floor(pos.collateralAmount * 1e9));
-        const [withdrawnCoin] = await withdrawCoin(tx, naviPool.haSui, mist);
-        tx.transferObjects([withdrawnCoin], currentAccount.address);
-      }
+      const closePoolCfg = getNaviPoolConfig(pos.supplyToken);
+      const closeDecimals = getTokenDecimals(pos.supplyToken);
+      const closeUnits = BigInt(Math.floor(pos.collateralAmount * Math.pow(10, closeDecimals)));
+      const [withdrawnCoin] = await withdrawCoin(tx, closePoolCfg, Number(closeUnits));
+      tx.transferObjects([withdrawnCoin], currentAccount.address);
 
       const result = await signAndExecute({ transaction: tx });
       const digest = (result as any)?.digest;
       if (!digest) {
         throw new Error('Transaction was not confirmed on-chain (missing digest).');
       }
+
+      recordMultiplyAffiliateFee(feeTaken);
+      fetchOnChainPortfolio();
 
       setActivePositions((prev) => prev.filter((p) => p.id !== pos.id));
       setManagingPosition(null);
@@ -1112,41 +1411,68 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column (Stats, Vault Data, Diagram, Historical Chart) - 7 cols */}
           <div className="lg:col-span-7 space-y-5">
-            {/* Card 1: Your Position Summary */}
-            <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <span className="text-sm font-bold text-white">Your Position</span>
-                <span className="text-xs font-mono text-cyan-400">
-                  {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.multiplier}x Active` : 'No Open Position'}
-                </span>
-              </div>
+            {/* Card 1: Your Position Summary (Live On-Chain NAVI + Local Tracking) */}
+            {(() => {
+              const liveSupply = onChainPortfolio[getNaviPortfolioKey(activeStrategy.supplyToken)]?.supplyBalance || 0;
+              const liveBorrow = onChainPortfolio[getNaviPortfolioKey(activeStrategy.borrowToken)]?.borrowBalance || 0;
+              const hasLiveOnChain = liveSupply > 0.00001 || liveBorrow > 0.00001;
+              const displaySupply = hasLiveOnChain ? liveSupply : (activeUserPositionForStrategy?.collateralAmount || 0);
+              const displayBorrow = hasLiveOnChain ? liveBorrow : (activeUserPositionForStrategy?.borrowAmount || 0);
+              const hasAnyPos = hasLiveOnChain || Boolean(activeUserPositionForStrategy);
+              const displayHf = onChainHealthFactor ?? activeUserPositionForStrategy?.healthFactor ?? null;
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-                  <span className="text-gray-400 block text-[10px] uppercase">Your Supply</span>
-                  <span className="text-white font-bold text-sm">
-                    {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.collateralAmount.toFixed(4)} ${activeStrategy.supplyToken}` : '—'}
-                  </span>
-                  <span className="text-gray-500 text-[10px] block">Supply APR: {activeStrategy.supplyApr}%</span>
-                </div>
+              return (
+                <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <span className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Your Position</span>
+                      {hasLiveOnChain && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          ON-CHAIN LIVE
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs font-mono text-cyan-400">
+                      {hasAnyPos
+                        ? displayHf
+                          ? `HF: ${displayHf >= 99 ? 'Safe' : displayHf.toFixed(2)}`
+                          : `${activeUserPositionForStrategy?.multiplier || 1.0}x Active`
+                        : isPortfolioLoading
+                        ? 'Syncing...'
+                        : 'No Open Position'}
+                    </span>
+                  </div>
 
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-                  <span className="text-gray-400 block text-[10px] uppercase">Your Borrow</span>
-                  <span className="text-white font-bold text-sm">
-                    {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.borrowAmount.toFixed(4)} ${activeStrategy.borrowToken}` : '—'}
-                  </span>
-                  <span className="text-gray-500 text-[10px] block">Borrow APR: {activeStrategy.borrowApr}%</span>
-                </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                      <span className="text-gray-400 block text-[10px] uppercase">Your Supply</span>
+                      <span className="text-white font-bold text-sm">
+                        {displaySupply > 0 ? `${displaySupply.toFixed(4)} ${activeStrategy.supplyToken}` : '—'}
+                      </span>
+                      <span className="text-gray-500 text-[10px] block">Supply APR: {activeStrategy.supplyApr}%</span>
+                    </div>
 
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5">
-                  <span className="text-gray-400 block text-[10px] uppercase">Net APR</span>
-                  <span className="text-emerald-400 font-black text-sm">
-                    {activeUserPositionForStrategy ? `${activeUserPositionForStrategy.netApr.toFixed(2)}%` : '—'}
-                  </span>
-                  <span className="text-gray-500 text-[10px] block">Multiplier: {activeUserPositionForStrategy?.multiplier || '—'}x</span>
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                      <span className="text-gray-400 block text-[10px] uppercase">Your Borrow</span>
+                      <span className="text-white font-bold text-sm">
+                        {displayBorrow > 0 ? `${displayBorrow.toFixed(4)} ${activeStrategy.borrowToken}` : '—'}
+                      </span>
+                      <span className="text-gray-500 text-[10px] block">Borrow APR: {activeStrategy.borrowApr}%</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                      <span className="text-gray-400 block text-[10px] uppercase">Net APR</span>
+                      <span className="text-emerald-400 font-black text-sm">
+                        {hasAnyPos ? `${(activeUserPositionForStrategy?.netApr ?? calculatedNetApr).toFixed(2)}%` : '—'}
+                      </span>
+                      <span className="text-gray-500 text-[10px] block">
+                        Multiplier: {activeUserPositionForStrategy?.multiplier || (hasLiveOnChain ? '1.0' : '—')}x
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Card 2: Vault Data & Configurations */}
             <div className="p-5 rounded-2xl bg-[#0c101a] border border-white/10 shadow-xl space-y-4">
@@ -1490,6 +1816,14 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                         {calculatedHealthFactor >= 99 ? '999.00 (Safe)' : `${calculatedHealthFactor.toFixed(2)} (Safe)`}
                       </span>
                     </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Liquidation Price:</span>
+                      <span className={calculatedLiquidationPriceUsd ? 'text-amber-300 font-bold' : 'text-gray-400'}>
+                        {calculatedLiquidationPriceUsd !== null
+                          ? `$${calculatedLiquidationPriceUsd.toFixed(4)} (${activeStrategy.strategyType === 'Short SUI' ? activeStrategy.borrowToken : activeStrategy.supplyToken})`
+                          : 'Pegged / N/A'}
+                      </span>
+                    </div>
                     <div className="flex justify-between items-center border-t border-white/5 pt-2">
                       <span className="text-gray-400">Volt Protocol Fee:</span>
                       <span className="text-gray-300">
@@ -1522,35 +1856,103 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   </button>
                 </>
               ) : (
-                /* Close / Manage Tab */
-                <div className="space-y-4">
-                  {activeUserPositionForStrategy ? (
-                    <div className="p-4 rounded-2xl bg-black/40 border border-white/10 space-y-3 font-mono text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Active Collateral:</span>
-                        <span className="text-white font-bold">{activeUserPositionForStrategy.collateralAmount.toFixed(4)} {activeStrategy.supplyToken}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Leverage:</span>
-                        <span className="text-cyan-400 font-bold">{activeUserPositionForStrategy.multiplier}x</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Accrued Profit:</span>
-                        <span className="text-emerald-400 font-bold">+${activeUserPositionForStrategy.pnlUsd.toFixed(3)} USD</span>
-                      </div>
-                      <button
-                        onClick={() => handleClosePosition(activeUserPositionForStrategy)}
-                        disabled={isExecuting}
-                        className="w-full py-3.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-sm transition-all shadow-lg cursor-pointer"
-                      >
-                        Close Position & Withdraw Collateral
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center text-gray-400 font-mono text-xs">
-                      No open positions in {activeStrategy.name} yet.
-                    </div>
-                  )}
+                /* Adjust / Close On-Chain Tab */
+                <div className="space-y-4 font-mono text-xs">
+                  {(() => {
+                    const liveSupply = onChainPortfolio[getNaviPortfolioKey(activeStrategy.supplyToken)]?.supplyBalance || 0;
+                    const liveBorrow = onChainPortfolio[getNaviPortfolioKey(activeStrategy.borrowToken)]?.borrowBalance || 0;
+                    const hasAnyPos = liveSupply > 0.00001 || liveBorrow > 0.00001 || Boolean(activeUserPositionForStrategy);
+
+                    return (
+                      <>
+                        <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-black/50 border border-white/10">
+                          {[
+                            { id: 'add_collateral' as const, label: 'Add Collateral' },
+                            { id: 'repay_debt' as const, label: 'Repay Debt' },
+                            { id: 'close_withdraw' as const, label: 'Withdraw' },
+                          ].map((tab) => (
+                            <button
+                              key={tab.id}
+                              onClick={() => {
+                                setAdjustActionType(tab.id);
+                                setAdjustAmount('');
+                              }}
+                              className={`py-2 rounded-lg font-bold transition-all cursor-pointer ${
+                                adjustActionType === tab.id
+                                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                  : 'text-gray-400 hover:text-white'
+                              }`}
+                            >
+                              {tab.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">On-Chain Supply:</span>
+                            <span className="text-white font-bold">
+                              {(liveSupply > 0 ? liveSupply : activeUserPositionForStrategy?.collateralAmount || 0).toFixed(4)} {activeStrategy.supplyToken}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">On-Chain Borrow:</span>
+                            <span className="text-rose-400 font-bold">
+                              {(liveBorrow > 0 ? liveBorrow : activeUserPositionForStrategy?.borrowAmount || 0).toFixed(4)} {activeStrategy.borrowToken}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">On-Chain Health Factor:</span>
+                            <span className="text-emerald-400 font-bold">
+                              {onChainHealthFactor ? onChainHealthFactor.toFixed(2) : 'Safe / N/A'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {adjustActionType !== 'close_withdraw' ? (
+                          <div className="space-y-3">
+                            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                placeholder="0.00"
+                                value={adjustAmount}
+                                onChange={(e) => setAdjustAmount(e.target.value)}
+                                className="w-full bg-transparent text-lg font-black text-white focus:outline-none"
+                              />
+                              <span className="text-cyan-400 font-bold shrink-0">
+                                {adjustActionType === 'add_collateral' ? activeStrategy.supplyToken : activeStrategy.borrowToken}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleAdjustPosition(adjustActionType, adjustAmount)}
+                              disabled={isExecuting}
+                              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black text-sm transition-all shadow-lg cursor-pointer hover:brightness-110 disabled:opacity-50"
+                            >
+                              {isExecuting
+                                ? 'Signing On-Chain PTB...'
+                                : adjustActionType === 'add_collateral'
+                                ? `Supply ${activeStrategy.supplyToken} Collateral`
+                                : `Repay ${activeStrategy.borrowToken} Debt`}
+                            </button>
+                          </div>
+                        ) : hasAnyPos && activeUserPositionForStrategy ? (
+                          <button
+                            onClick={() => handleClosePosition(activeUserPositionForStrategy)}
+                            disabled={isExecuting}
+                            className="w-full py-3.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-sm transition-all shadow-lg cursor-pointer disabled:opacity-50"
+                          >
+                            {isExecuting ? 'Withdrawing On-Chain...' : 'Close Position & Withdraw Collateral'}
+                          </button>
+                        ) : (
+                          <div className="p-6 text-center text-gray-400 rounded-2xl bg-black/30 border border-white/5">
+                            No tracked position to close. Use Add Collateral or Repay Debt for direct NAVI pool management.
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>

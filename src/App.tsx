@@ -3358,6 +3358,7 @@ export default function App() {
               liveTokenPrices={liveTokenPrices}
               effectiveFeeRate={effectiveFeeRate}
               userTraderTier={userTraderTier}
+              cetusClient={cetusClient}
               onNavigateToSwap={(from, to) => {
                 if (from) {
                   const f = POPULAR_TOKENS.find(t => t.symbol === from);
