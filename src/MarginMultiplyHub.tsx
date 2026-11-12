@@ -31,7 +31,8 @@ import {
   Settings,
   HelpCircle,
   Layers,
-  BarChart3
+  BarChart3,
+  Filter
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
@@ -353,6 +354,32 @@ export const MULTIPLY_STRATEGIES: MultiplyStrategy[] = [
     pointsMultiplier: 18
   },
   {
+    id: 'scallop-sui-usdc-loop',
+    name: 'SUI / USDC Scallop Leverage Loop',
+    supplyToken: 'SUI',
+    supplyTokenLogo: '/tokens/sui.svg',
+    supplyCoinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
+    supplyTvlUsd: 31200000,
+    borrowToken: 'USDC',
+    borrowTokenLogo: '/tokens/usdc.svg',
+    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    borrowBorrowedUsd: 14200000,
+    strategyType: 'Long SUI',
+    strategyBadgeColor: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
+    maxApr: 26.50,
+    maxMultiplier: 4.0,
+    defaultMultiplier: 2.5,
+    supplyApr: 6.90,
+    borrowApr: 4.80,
+    liquidationRisk: 'Low Risk',
+    liquidationThreshold: 0.82,
+    protocol: 'Scallop',
+    protocolLogo: '/tokens/sca.svg',
+    marketGroup: 'scallop',
+    description: 'Supplies SUI into Scallop Money Market, borrows USDC and loops back via Cetus/Aftermath to amplify SUI staking and liquidity incentives.',
+    pointsMultiplier: 16
+  },
+  {
     id: 'usdc-usdsui-stable-loop',
     name: 'USDC / USDSUI Stable Loop',
     supplyToken: 'USDC',
@@ -428,6 +455,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 }) => {
   // Navigation & Filtering
   const [selectedMarket, setSelectedMarket] = useState<MarketFilter>('all');
+  const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<MarginStrategyFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStrategy, setActiveStrategy] = useState<MultiplyStrategy | null>(null);
@@ -547,6 +575,18 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   const top3Strategies = useMemo(() => {
     return [...dynamicStrategies].sort((a, b) => b.maxApr - a.maxApr).slice(0, 3);
   }, [dynamicStrategies]);
+
+  // Market Options for Dropdown (Current Finance Style)
+  const marketOptions = useMemo(() => [
+    { id: 'all' as MarketFilter, label: 'All Markets', count: dynamicStrategies.length },
+    { id: 'main' as MarketFilter, label: 'Main Market', count: dynamicStrategies.filter((s) => s.marketGroup === 'main').length },
+    { id: 'suilend' as MarketFilter, label: 'Suilend v2', count: dynamicStrategies.filter((s) => s.marketGroup === 'suilend').length },
+    { id: 'scallop' as MarketFilter, label: 'Scallop', count: dynamicStrategies.filter((s) => s.marketGroup === 'scallop').length },
+  ], [dynamicStrategies]);
+
+  const activeMarket = useMemo(() => {
+    return marketOptions.find((m) => m.id === selectedMarket) || marketOptions[0];
+  }, [marketOptions, selectedMarket]);
 
   // Active Positions Store
   const [activePositions, setActivePositions] = useState<ActiveMarginPosition[]>(() => {
@@ -1425,33 +1465,78 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         })}
       </div>
 
-      {/* 3. Market Submarket Selector & Category Tabs (Current Style) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-[#0b0e17] border border-white/10">
+      {/* 3. Market Dropdown & Category Tabs (Current Finance Style) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2.5 rounded-2xl bg-[#0b0e17] border border-white/10">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {/* Submarket Selector */}
-          <div className="flex items-center gap-1 border-r border-white/10 pr-2">
-            {[
-              { id: 'all', label: 'All Markets' },
-              { id: 'main', label: 'Main Market' },
-              { id: 'suilend', label: 'Suilend v2' },
-              { id: 'scallop', label: 'Scallop' },
-            ].map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setSelectedMarket(m.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all shrink-0 cursor-pointer ${
-                  selectedMarket === m.id
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                    : 'text-gray-400 hover:text-white bg-transparent'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
+          {/* Market Dropdown Selector */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setIsMarketDropdownOpen((prev) => !prev)}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/40 text-white font-mono text-xs font-bold transition-all cursor-pointer shadow-sm select-none"
+            >
+              <span>{activeMarket.label}</span>
+              <span className="text-[10px] text-gray-400 bg-black/40 px-1.5 py-0.5 rounded border border-white/5">
+                {activeMarket.count}
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isMarketDropdownOpen ? 'rotate-180 text-cyan-400' : ''}`} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isMarketDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setIsMarketDropdownOpen(false)}
+                />
+                <div className="absolute top-full left-0 mt-2 w-56 bg-[#0c101a] border border-cyan-500/25 rounded-xl p-1.5 shadow-2xl z-40 backdrop-blur-xl animate-fadeIn">
+                  <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-500 border-b border-white/5 mb-1 font-bold">
+                    Lending Market
+                  </div>
+                  {marketOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => {
+                        setSelectedMarket(opt.id);
+                        setIsMarketDropdownOpen(false);
+                        // Auto-reset category filter if new market has 0 strategies in the selected category
+                        if (opt.id !== 'all' && selectedFilter !== 'all') {
+                          const hasStrategiesInFilter = dynamicStrategies.some((s) => {
+                            if (s.marketGroup !== opt.id) return false;
+                            if (selectedFilter === 'lst' && s.strategyType !== 'LST Pegged') return false;
+                            if (selectedFilter === 'long_sui' && s.strategyType !== 'Long SUI') return false;
+                            if (selectedFilter === 'short_sui' && s.strategyType !== 'Short SUI') return false;
+                            if (selectedFilter === 'stablecoin' && s.strategyType !== 'Stablecoin') return false;
+                            if (selectedFilter === 'rwa' && s.strategyType !== 'RWA') return false;
+                            return true;
+                          });
+                          if (!hasStrategiesInFilter) {
+                            setSelectedFilter('all');
+                          }
+                        }
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                        selectedMarket === opt.id
+                          ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
+                          : 'text-gray-300 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                        selectedMarket === opt.id ? 'bg-cyan-400/20 text-cyan-200' : 'bg-black/40 text-gray-400'
+                      }`}>
+                        {opt.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1">
+          <div className="h-4 w-px bg-white/10 shrink-0 mx-1" />
+
+          {/* Category Tabs (Single "All" button) */}
+          <div className="flex items-center gap-1 shrink-0">
             {[
               { id: 'all', label: 'All' },
               { id: 'lst', label: 'LST' },
@@ -1597,6 +1682,31 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   </td>
                 </tr>
               ))}
+              {filteredStrategies.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-cyan-950/40 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                        <Filter className="w-5 h-5" />
+                      </div>
+                      <p className="text-white font-mono text-sm font-bold">No strategies found</p>
+                      <p className="text-gray-400 text-xs font-mono max-w-sm">
+                        There are no strategies matching the selected market and category combination.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setSelectedMarket('all');
+                          setSelectedFilter('all');
+                          setSearchQuery('');
+                        }}
+                        className="mt-2 px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 font-mono text-xs font-bold transition-all border border-cyan-500/30 cursor-pointer"
+                      >
+                        Reset All Filters
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
