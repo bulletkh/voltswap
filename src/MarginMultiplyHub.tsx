@@ -40,6 +40,8 @@ import {
   withdrawCoin,
   borrowCoin,
   repayDebt,
+  flashloan,
+  repayFlashLoan,
   updateOraclePTB,
   getAddressPortfolio,
   getHealthFactorCall,
@@ -987,34 +989,17 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
     setIsExecuting(true);
     try {
-      const tx = new Transaction();
-      tx.setSender(currentAccount.address);
-
       const feeRate = effectiveFeeRate ?? 0.0025;
       const feeRateBps = BigInt(Math.max(1, Math.round(feeRate * 10000)));
       const depositPoolCfg = getNaviPoolConfig(depositTokenSymbol);
       const depositDecimals = getTokenDecimals(depositTokenSymbol);
-      let depositedToNavi = false;
+      const borrowDecimals = getTokenDecimals(activeStrategy.borrowToken);
+      const borrowPoolCfg = getNaviPoolConfig(activeStrategy.borrowToken);
 
-      // Real On-Chain PTB Execution with NAVI / Haedal / Cetus
-      if (depositTokenSymbol === 'SUI') {
-        const totalMist = BigInt(Math.floor(collateralNum * 1e9));
-        const feeMist = (totalMist * feeRateBps) / 10000n;
-        const netMist = totalMist - feeMist;
-
-        if (feeMist > 0n) {
-          const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
-          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
-        }
-        const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
-        await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netMist));
-        depositedToNavi = true;
-
-      } else if (depositTokenSymbol.includes('USD') || depositTokenSymbol === 'eEARN') {
+      // Pre-fetch owned coin objects once if depositing non-SUI token
+      let cachedCoinObjects: any[] | null = null;
+      if (depositTokenSymbol.includes('USD') || depositTokenSymbol === 'eEARN') {
         const totalUnits = BigInt(Math.floor(collateralNum * Math.pow(10, depositDecimals)));
-        const feeUnits = (totalUnits * feeRateBps) / 10000n;
-        const netUnits = totalUnits - feeUnits;
-
         const coinObjects = await getOwnedCoinObjects(currentAccount.address, depositCoinType);
         if (!coinObjects || coinObjects.length === 0) {
           throw new Error(`No ${depositTokenSymbol} coins found in your wallet. Please swap or deposit ${depositTokenSymbol} first.`);
@@ -1023,110 +1008,146 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         if (totalBalance < totalUnits) {
           throw new Error(`Insufficient ${depositTokenSymbol} balance (${(Number(totalBalance) / Math.pow(10, depositDecimals)).toFixed(2)} available).`);
         }
-
-        const [primaryCoin, ...otherCoins] = coinObjects.map(c => tx.object(c.objectId));
-        if (otherCoins.length > 0) {
-          tx.mergeCoins(primaryCoin, otherCoins);
-        }
-        if (feeUnits > 0n) {
-          const [feeCoin] = tx.splitCoins(primaryCoin, [feeUnits]);
-          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
-        }
-        const [splitCoin] = tx.splitCoins(primaryCoin, [netUnits]);
-        await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netUnits));
-        depositedToNavi = true;
-
-      } else if (depositTokenSymbol === 'haSUI' || depositTokenSymbol === 'sSUI') {
-        const totalMist = BigInt(Math.floor(collateralNum * 1e9));
-        const feeMist = (totalMist * feeRateBps) / 10000n;
-        const netMist = totalMist - feeMist;
-
-        if (feeMist > 0n) {
-          const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
-          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
-        }
-        const [stakeCoin] = tx.splitCoins(tx.gas, [netMist]);
-        const [receiptCoin] = tx.moveCall({
-          target: '0x2c68443db9e8c813b194010c11040a3ce59f47e4eb97a2ec805371505dad7459::staking::request_stake',
-          typeArguments: [],
-          arguments: [
-            tx.object('0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d'),
-            stakeCoin,
-            tx.pure.address('0x0000000000000000000000000000000000000000000000000000000000000000'),
-          ],
-        });
-        tx.transferObjects([receiptCoin], currentAccount.address);
-
-      } else {
-        const totalMist = BigInt(Math.floor(collateralNum * 1e9));
-        const feeMist = (totalMist * feeRateBps) / 10000n;
-        const netMist = totalMist - feeMist;
-
-        if (feeMist > 0n) {
-          const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
-          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
-        }
-        const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
-        await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netMist));
-        depositedToNavi = true;
+        cachedCoinObjects = coinObjects;
       }
 
-      // Atomic Leveraged Borrow + Re-Deposit Loop when multiplier > 1.0 and borrow >= $0.50
-      let executedAtomicLoop = false;
-      if (depositedToNavi && multiplier > 1.0 && borrowUsd >= 0.5 && borrowTokenPriceUsd > 0) {
-        const borrowDecimals = getTokenDecimals(activeStrategy.borrowToken);
-        const borrowUnits = Math.floor(borrowAmount * Math.pow(10, borrowDecimals));
-        const borrowPoolCfg = getNaviPoolConfig(activeStrategy.borrowToken);
+      const buildMultiplyTx = async (flashBorrowUnits: number): Promise<{ tx: Transaction; canLoop: boolean }> => {
+        const tx = new Transaction();
+        tx.setSender(currentAccount.address);
+        let depositedToNavi = false;
 
-        if (borrowUnits > 0) {
+        if (depositTokenSymbol === 'SUI') {
+          const totalMist = BigInt(Math.floor(collateralNum * 1e9));
+          const feeMist = (totalMist * feeRateBps) / 10000n;
+          const netMist = totalMist - feeMist;
+
+          if (feeMist > 0n) {
+            const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
+          await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netMist));
+          depositedToNavi = true;
+        } else if ((depositTokenSymbol.includes('USD') || depositTokenSymbol === 'eEARN') && cachedCoinObjects) {
+          const totalUnits = BigInt(Math.floor(collateralNum * Math.pow(10, depositDecimals)));
+          const feeUnits = (totalUnits * feeRateBps) / 10000n;
+          const netUnits = totalUnits - feeUnits;
+
+          const [primaryCoin, ...otherCoins] = cachedCoinObjects.map((c) => tx.object(c.objectId));
+          if (otherCoins.length > 0) {
+            tx.mergeCoins(primaryCoin, otherCoins);
+          }
+          if (feeUnits > 0n) {
+            const [feeCoin] = tx.splitCoins(primaryCoin, [feeUnits]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [splitCoin] = tx.splitCoins(primaryCoin, [netUnits]);
+          await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netUnits));
+          depositedToNavi = true;
+        } else if (depositTokenSymbol === 'haSUI' || depositTokenSymbol === 'sSUI') {
+          const totalMist = BigInt(Math.floor(collateralNum * 1e9));
+          const feeMist = (totalMist * feeRateBps) / 10000n;
+          const netMist = totalMist - feeMist;
+
+          if (feeMist > 0n) {
+            const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [stakeCoin] = tx.splitCoins(tx.gas, [netMist]);
+          const [receiptCoin] = tx.moveCall({
+            target: '0x2c68443db9e8c813b194010c11040a3ce59f47e4eb97a2ec805371505dad7459::staking::request_stake',
+            typeArguments: [],
+            arguments: [
+              tx.object('0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d'),
+              stakeCoin,
+              tx.pure.address('0x0000000000000000000000000000000000000000000000000000000000000000'),
+            ],
+          });
+          tx.transferObjects([receiptCoin], currentAccount.address);
+        } else {
+          const totalMist = BigInt(Math.floor(collateralNum * 1e9));
+          const feeMist = (totalMist * feeRateBps) / 10000n;
+          const netMist = totalMist - feeMist;
+
+          if (feeMist > 0n) {
+            const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
+          await depositCoin(tx, depositPoolCfg, splitCoin, tx.pure.u64(netMist));
+          depositedToNavi = true;
+        }
+
+        if (depositedToNavi && flashBorrowUnits > 0) {
           try {
             await updateOraclePTB(suiClient, tx);
           } catch (oracleErr) {
             console.warn('Pyth oracle pre-update skipped in browser:', oracleErr);
           }
-          const [borrowedCoin] = await borrowCoin(tx, borrowPoolCfg, borrowUnits);
 
-          if (activeStrategy.supplyToken === activeStrategy.borrowToken) {
-            await depositCoin(tx, getNaviPoolConfig(activeStrategy.supplyToken), borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
-            executedAtomicLoop = true;
-          } else if (cetusClient && typeof cetusClient.findRouters === 'function' && typeof cetusClient.routerSwap === 'function') {
-            try {
-              const route = await cetusClient.findRouters({
-                from: activeStrategy.borrowCoinType,
-                target: activeStrategy.supplyCoinType,
-                amount: borrowUnits.toString(),
-                byAmountIn: true,
-              });
-              if (route && !route.insufficientLiquidity) {
-                const swappedCoin = await cetusClient.routerSwap({
-                  router: route,
-                  txb: tx,
-                  inputCoin: borrowedCoin,
-                  slippage: 0.01,
-                });
-                const expectedOut = Math.floor(Number(route.amountOut || 0) * 0.985);
-                if (expectedOut > 0) {
-                  await depositCoin(tx, getNaviPoolConfig(activeStrategy.supplyToken), swappedCoin, tx.pure.u64(BigInt(expectedOut)));
-                  executedAtomicLoop = true;
-                } else {
-                  tx.transferObjects([swappedCoin], currentAccount.address);
-                }
-              } else {
-                await depositCoin(tx, borrowPoolCfg, borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
-                executedAtomicLoop = true;
-              }
-            } catch {
-              await depositCoin(tx, borrowPoolCfg, borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
+          // Real NAVI Flash-Loan -> Deposit Collateral -> Borrow -> Repay Flash-Loan
+          const [flashBalance, receipt] = await flashloan(tx, borrowPoolCfg, flashBorrowUnits);
+          const [flashCoin] = tx.moveCall({
+            target: '0x2::coin::from_balance',
+            typeArguments: [borrowPoolCfg.type],
+            arguments: [flashBalance],
+          });
+
+          await depositCoin(tx, borrowPoolCfg, flashCoin, tx.pure.u64(BigInt(flashBorrowUnits)));
+
+          const flashFeeBuffer = Math.max(1000, Math.ceil(flashBorrowUnits * 0.0007));
+          const repayUnits = flashBorrowUnits + flashFeeBuffer;
+          const [borrowedCoin] = await borrowCoin(tx, borrowPoolCfg, repayUnits);
+          const [repayBalance] = tx.moveCall({
+            target: '0x2::coin::into_balance',
+            typeArguments: [borrowPoolCfg.type],
+            arguments: [borrowedCoin],
+          });
+          const [remainderBalance] = await repayFlashLoan(tx, borrowPoolCfg, receipt, repayBalance);
+          const [remainderCoin] = tx.moveCall({
+            target: '0x2::coin::from_balance',
+            typeArguments: [borrowPoolCfg.type],
+            arguments: [remainderBalance],
+          });
+          tx.transferObjects([remainderCoin], currentAccount.address);
+          return { tx, canLoop: true };
+        }
+
+        return { tx, canLoop: false };
+      };
+
+      // Dry-run Flash-Loan loop so wallet never shows "This transaction will fail"
+      let finalTx: Transaction | null = null;
+      let executedAtomicLoop = false;
+
+      if (multiplier > 1.0 && borrowUsd >= 0.5 && borrowTokenPriceUsd > 0) {
+        const targetBorrowUnits = Math.floor(borrowAmount * Math.pow(10, borrowDecimals));
+        const safeLtvBorrowUnits = Math.floor((collateralUsd / borrowTokenPriceUsd) * 2.1 * Math.pow(10, borrowDecimals));
+
+        const candidates = Array.from(new Set([targetBorrowUnits, safeLtvBorrowUnits].filter((u) => u > 0)));
+        for (const units of candidates) {
+          try {
+            const candidate = await buildMultiplyTx(units);
+            if (!candidate.canLoop) break;
+            const builtBytes = await candidate.tx.build({ client: suiClient });
+            const dryRun = await suiClient.dryRunTransactionBlock({ transactionBlock: builtBytes });
+            if (dryRun?.effects?.status?.status === 'success') {
+              finalTx = candidate.tx;
               executedAtomicLoop = true;
+              break;
             }
-          } else {
-            await depositCoin(tx, borrowPoolCfg, borrowedCoin, tx.pure.u64(BigInt(borrowUnits)));
-            executedAtomicLoop = true;
+          } catch {
+            // Try next safe LTV candidate or deposit-only fallback
           }
         }
       }
 
-      const result = await signAndExecute({ transaction: tx });
+      if (!finalTx) {
+        const fallback = await buildMultiplyTx(0);
+        finalTx = fallback.tx;
+      }
+
+      const result = await signAndExecute({ transaction: finalTx });
       const digest = (result as any)?.digest;
       if (!digest) {
         throw new Error('Transaction was not confirmed on-chain (missing digest).');
