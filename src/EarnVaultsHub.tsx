@@ -29,7 +29,8 @@ import {
   Loader2,
   BookOpen,
   Award,
-  ShieldAlert
+  ShieldAlert,
+  RefreshCw
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
