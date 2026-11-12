@@ -1077,14 +1077,14 @@ export default function App() {
     return out < 0.01 ? out.toFixed(6) : out.toFixed(4);
   }, [fromAmount, effectiveLimitRate]);
 
-  // Grid DCA preview calculation
+  // Grid DCA preview calculation (dynamically linked to Trader Tier & Discounts)
   const gridLevelsPreview = useMemo(() => {
     const amt = parseAmount(fromAmount);
     if (amt <= 0) return [];
     const isFromSui = fromToken.symbol === 'SUI' || fromToken.address === '0x2::sui::SUI' || fromToken.address.endsWith('::sui::SUI');
     const rate = currentPairRate > 0 ? currentPairRate : 0.84;
     const levels = [];
-    const feeRate = 0.0015; // 0.15% Volt Protocol fee
+    const feeRate = effectiveFeeRate; // Dynamic fee based on user's VIP tier & discounts
     const netAmt = amt * (1 - feeRate);
     const stepAmt = netAmt / gridSteps;
 
@@ -1104,7 +1104,7 @@ export default function App() {
       });
     }
     return levels;
-  }, [fromAmount, fromToken, currentPairRate, gridSteps, gridSpanPct]);
+  }, [fromAmount, fromToken, currentPairRate, gridSteps, gridSpanPct, effectiveFeeRate]);
 
   const rawToAmount = realQuoteOutput || (parseAmount(fromAmount) > 0 ? ((parseAmount(fromAmount) * fromPrice) / toPrice).toFixed(4) : '0.00');
 
@@ -1331,7 +1331,7 @@ export default function App() {
         }
 
         const rawTotalIn = BigInt(rawIn);
-        const feeRateBps = 15n; // 0.15% Volt Protocol fee routed to Treasury
+        const feeRateBps = BigInt(Math.max(1, Math.round(effectiveFeeRate * 10000))); // Dynamic Tier Protocol Fee (e.g. 25 bps for Plankton, down to 3 bps for Leviathan)
         const feeRaw = (rawTotalIn * feeRateBps) / 10000n;
         const netIn = rawTotalIn - feeRaw;
 
@@ -1462,7 +1462,7 @@ export default function App() {
             fromAmount: fromAmount,
             volumeUsd: (amt * fromPrice) || (amt * 0.85),
             swapMode: 'Limit Order (DeepBook v3)',
-            feeRate: 0.0,
+            feeRate: effectiveFeeRate,
             tierName: userTraderTier.name,
             tierEmoji: userTraderTier.badgeEmoji,
             tierId: userTraderTier.id,
@@ -1509,8 +1509,8 @@ export default function App() {
         const txb = new Transaction();
         txb.setSender(currentAccount.address);
 
-        // 1. Deduct Protocol Fee (0.15%) directly to VOLT_TREASURY_ADDRESS
-        const feeRateBps = 15n;
+        // 1. Deduct Protocol Fee directly to VOLT_TREASURY_ADDRESS based on User's Trader Tier
+        const feeRateBps = BigInt(Math.max(1, Math.round(effectiveFeeRate * 10000)));
         const feeRaw = (rawTotalIn * feeRateBps) / 10000n;
         const netSpendableRaw = rawTotalIn - feeRaw;
 
@@ -1649,7 +1649,7 @@ export default function App() {
         showNotification(
           'success',
           `Deployed ${gridSteps}x On-Chain Grid Orders!`,
-          `Successfully placed ${gridSteps} DeepBook v3 Limit Orders in a single PTB:\n• Protocol Fee: 0.15% sent to Treasury\n• Maker Fee: 0.00% (Zero Slippage)\n• Grid Spread: ${gridSpanPct}%\n\nAll orders are live in DeepBook v3 orderbook.`,
+          `Successfully placed ${gridSteps} DeepBook v3 Limit Orders in a single PTB:\n• Protocol Fee: ${(effectiveFeeRate * 100).toFixed(2)}% (${userTraderTier.badgeEmoji} ${userTraderTier.name}) sent to Treasury\n• Maker Fee: 0.00% (Zero Slippage)\n• Grid Spread: ${gridSpanPct}%\n\nAll orders are live in DeepBook v3 orderbook.`,
           'View on SuiScan',
           `https://suiscan.xyz/mainnet/tx/${res.digest}`
         );
@@ -1665,7 +1665,7 @@ export default function App() {
             fromAmount: fromAmount,
             volumeUsd: amt * fromPrice,
             swapMode: `Grid DCA ${gridSteps}x (DeepBook v3)`,
-            feeRate: 0.0015,
+            feeRate: effectiveFeeRate,
             tierName: userTraderTier.name,
             tierEmoji: userTraderTier.badgeEmoji,
             discountPct: userTraderTier.discountPct,
@@ -2424,8 +2424,18 @@ export default function App() {
                       </div>
                     </div>
                     <div className="text-[11px] text-gray-400 flex items-center justify-between">
-                      <span>Executes on DeepBook v3 with zero slippage.</span>
-                      <span className="text-cyan-400 font-bold font-mono">Maker Fee: 0.00%</span>
+                      <span className="flex items-center gap-1.5">
+                        <Coins className="w-3 h-3 text-cyan-400" /> Protocol Fee:
+                        <span className="text-cyan-300 font-bold font-mono">{(effectiveFeeRate * 100).toFixed(2)}%</span>
+                        {userTraderTier.discountPct > 0 ? (
+                          <span className="text-[10px] text-emerald-400 font-bold font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                            {userTraderTier.badgeEmoji} -{userTraderTier.discountPct}% VIP
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-500 font-mono">({userTraderTier.badgeEmoji} {userTraderTier.name})</span>
+                        )}
+                      </span>
+                      <span className="text-emerald-400 font-bold font-mono">Maker Fee: 0.00%</span>
                     </div>
                   </div>
                 )}
@@ -2535,9 +2545,20 @@ export default function App() {
                         <span className="text-gray-400 flex items-center gap-1">
                           <Coins className="w-3.5 h-3.5 text-cyan-400" /> Protocol Treasury Fee:
                         </span>
-                        <span className="font-mono font-bold text-cyan-300">
-                          0.15% (~{(parseAmount(fromAmount) * 0.0015).toFixed(4)} {fromToken.symbol})
-                        </span>
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <span className="font-bold text-cyan-300">
+                            {(effectiveFeeRate * 100).toFixed(2)}% (~{(parseAmount(fromAmount) * effectiveFeeRate).toFixed(4)} {fromToken.symbol})
+                          </span>
+                          {userTraderTier.discountPct > 0 ? (
+                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.2 rounded-full">
+                              {userTraderTier.badgeEmoji} -{userTraderTier.discountPct}% VIP
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.2 rounded">
+                              {userTraderTier.badgeEmoji} {userTraderTier.name}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center justify-between text-gray-400">
                         <span>DeepBook v3 CLOB Execution:</span>
