@@ -1067,12 +1067,12 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
               />
 
               {/* Quick Multiplier Buttons */}
-              <div className="grid grid-cols-5 gap-1.5 pt-1">
-                {[1.5, 2.0, 3.0, 5.0, activeStrategy.maxMultiplier].map((val) => (
+              <div className="flex items-center gap-1.5 pt-1">
+                {Array.from(new Set([1.5, 2.0, 3.0, 5.0, activeStrategy.maxMultiplier].filter(v => v <= activeStrategy.maxMultiplier))).sort((a, b) => a - b).map((val) => (
                   <button
                     key={val}
                     onClick={() => setMultiplier(val)}
-                    className={`py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                    className={`flex-1 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                       multiplier === val
                         ? 'bg-gradient-to-r from-sky-500 to-cyan-400 text-slate-950 font-black shadow-md'
                         : 'bg-white/5 text-gray-400 hover:text-white'

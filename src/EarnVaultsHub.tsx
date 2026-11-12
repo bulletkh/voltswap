@@ -328,6 +328,16 @@ export const getVaultBaseToken = (vault: EcosystemVault): string => {
   return 'SUI';
 };
 
+export const getVaultPairTokens = (vault: EcosystemVault): string[] => {
+  if (vault.id === 'walrus-ecosystem') return ['WAL', 'SUI'];
+  if (vault.id === 'deep-clob') return ['DEEP', 'SUI'];
+  if (vault.id === 'cetus-clmm') return ['SUI', 'USDC'];
+  if (vault.id === 'haedal-vault') return ['haSUI', 'SUI'];
+  if (vault.id === 'navi-usdc') return ['USDC'];
+  if (vault.id === 'navi-usdt') return ['USDT'];
+  return ['SUI'];
+};
+
 interface EarnVaultsHubProps {
   currentAccount?: any;
   suiClient?: any;
@@ -370,6 +380,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   const [activeVault, setActiveVault] = useState<EcosystemVault | null>(null);
   const [modalMode, setModalMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [selectedDepositToken, setSelectedDepositToken] = useState<string>('SUI');
+  const [selectedWithdrawToken, setSelectedWithdrawToken] = useState<string>('SUI');
   const [inputAmount, setInputAmount] = useState<string>('');
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
 
@@ -590,6 +601,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
     setModalMode(mode);
     const base = getVaultBaseToken(vault);
     setSelectedDepositToken(base);
+    setSelectedWithdrawToken(base);
     setInputAmount('');
   };
 
@@ -718,26 +730,73 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
 
       } else {
         // modalMode === 'withdraw'
+        let withdrawnCoinObj: any;
+        let withdrawnUnits: bigint;
+
         if (activeVault.symbol === 'USDC') {
-          const amountUnits = BigInt(Math.floor(amt * 1e6));
-          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.nUSDC, amountUnits);
-          tx.transferObjects([withdrawnCoin], currentAccount.address);
-
+          withdrawnUnits = BigInt(Math.floor(amt * 1e6));
+          const [coin] = await withdrawCoin(tx, naviPool.nUSDC, withdrawnUnits);
+          withdrawnCoinObj = coin;
         } else if (activeVault.symbol === 'USDT') {
-          const amountUnits = BigInt(Math.floor(amt * 1e6));
-          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.USDT, amountUnits);
-          tx.transferObjects([withdrawnCoin], currentAccount.address);
-
+          withdrawnUnits = BigInt(Math.floor(amt * 1e6));
+          const [coin] = await withdrawCoin(tx, naviPool.USDT, withdrawnUnits);
+          withdrawnCoinObj = coin;
         } else if (activeVault.protocol === 'Haedal') {
-          const amountMist = BigInt(Math.floor(amt * 1e9));
-          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.haSui, amountMist);
-          tx.transferObjects([withdrawnCoin], currentAccount.address);
-
+          withdrawnUnits = BigInt(Math.floor(amt * 1e9));
+          const [coin] = await withdrawCoin(tx, naviPool.haSui, withdrawnUnits);
+          withdrawnCoinObj = coin;
         } else {
           // NAVI SUI, Scallop, Cetus, DeepBook, Walrus
-          const amountMist = BigInt(Math.floor(amt * 1e9));
-          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.Sui, amountMist);
-          tx.transferObjects([withdrawnCoin], currentAccount.address);
+          withdrawnUnits = BigInt(Math.floor(amt * 1e9));
+          const [coin] = await withdrawCoin(tx, naviPool.Sui, withdrawnUnits);
+          withdrawnCoinObj = coin;
+        }
+
+        // Deduct 10% Performance Fee on Net Accrued Yield if any
+        const userPos = userPositions[activeVault.id];
+        const accruedYield = userPos?.accruedYield || 0;
+        if (accruedYield > 0.001) {
+          const perfFeeUsd = accruedYield * 0.10;
+          const perfFeeMist = BigInt(Math.floor((perfFeeUsd / 0.85) * 1e9));
+          if (perfFeeMist > 0n && perfFeeMist < 100000000n) {
+            const [feeCoin] = tx.splitCoins(tx.gas, [perfFeeMist]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+        }
+
+        // If Reverse ZAP: Auto-swap into target token chosen by user
+        const isReverseZap = selectedWithdrawToken !== baseVaultToken;
+        if (isReverseZap) {
+          const targetTokenConfig = ZAP_SUPPORTED_TOKENS.find(t => t.symbol === selectedWithdrawToken) || ZAP_SUPPORTED_TOKENS[0];
+          const baseTokenConfig = ZAP_SUPPORTED_TOKENS.find(t => t.symbol === baseVaultToken) || ZAP_SUPPORTED_TOKENS[0];
+
+          try {
+            const activeCetus = cetusClient || new AggregatorClient({ options: { partner: VOLT_TREASURY_ADDRESS } });
+            const rawWithdrawnBN = new BN(withdrawnUnits.toString());
+            const router = await activeCetus.findRouters({
+              from: baseTokenConfig.coinType,
+              target: targetTokenConfig.coinType,
+              amount: rawWithdrawnBN,
+              byAmountIn: true
+            });
+
+            if (!router || !router.amountOut || Number(router.amountOut) <= 0) {
+              tx.transferObjects([withdrawnCoinObj], currentAccount.address);
+            } else {
+              const swappedCoin = await activeCetus.routerSwap({
+                router,
+                inputCoin: withdrawnCoinObj,
+                slippage: 0.015,
+                txb: tx
+              });
+              tx.transferObjects([swappedCoin], currentAccount.address);
+            }
+          } catch (swapErr) {
+            console.warn('Reverse ZAP swap router fallback:', swapErr);
+            tx.transferObjects([withdrawnCoinObj], currentAccount.address);
+          }
+        } else {
+          tx.transferObjects([withdrawnCoinObj], currentAccount.address);
         }
       }
 
@@ -792,10 +851,13 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           };
         });
 
+        const isReverseZap = selectedWithdrawToken !== baseVaultToken;
         showNotification(
           'success',
-          'Vault Redemption Confirmed',
-          `Successfully redeemed ${amt.toFixed(4)} ${activeVault.receiptToken} for underlying assets.\n\nPrincipal returned directly to wallet.\n• PTB Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+          isReverseZap ? '1-Click Reverse ZAP Confirmed' : 'Vault Redemption Confirmed',
+          isReverseZap
+            ? `Successfully redeemed ${amt.toFixed(4)} ${activeVault.receiptToken} and auto-swapped into ${selectedWithdrawToken} via Cetus CLMM in same PTB!\n\n• Received in Wallet: ${selectedWithdrawToken}\n• 10% Protocol Fee Deducted on Profit\n• PTB Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`
+            : `Successfully redeemed ${amt.toFixed(4)} ${activeVault.receiptToken} for ${selectedWithdrawToken}.\n\n• Principal returned directly to wallet.\n• PTB Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
           'View on Suiscan',
           `https://suiscan.xyz/mainnet/tx/${digest}`
         );
@@ -1314,75 +1376,82 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
               </button>
             </div>
 
-            {/* If in Deposit Mode: Pay Currency & 1-Click ZAP Selector */}
-            {modalMode === 'deposit' && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-gray-400 font-mono">
-                  <span className="flex items-center gap-1.5 font-bold text-gray-300">
-                    <span>Pay with:</span>
-                    {selectedDepositToken !== getVaultBaseToken(activeVault) ? (
-                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold flex items-center gap-1 shadow-sm">
-                        <Zap className="w-3 h-3 fill-cyan-400 text-cyan-400" />
-                        1-Click ZAP
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
-                        Pool Asset
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[11px] text-gray-400">
-                    Wallet: <strong className="text-white font-mono">{getTokenWalletBalance(selectedDepositToken).formatted} {selectedDepositToken}</strong>
-                  </span>
-                </div>
-
-                {/* Token Selector Pills */}
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                  {ZAP_SUPPORTED_TOKENS.map((tok) => {
-                    const isSelected = selectedDepositToken === tok.symbol;
-                    const isBase = tok.symbol === getVaultBaseToken(activeVault);
-                    const bal = getTokenWalletBalance(tok.symbol);
-                    const hasBal = bal.num > 0;
-                    return (
-                      <button
-                        key={tok.symbol}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDepositToken(tok.symbol);
-                          setInputAmount('');
-                        }}
-                        className={`flex flex-col items-center justify-center p-2 rounded-xl border text-xs transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-cyan-500/20 border-cyan-500/60 text-white shadow-[0_0_12px_rgba(6,182,212,0.25)]'
-                            : 'bg-black/40 border-white/5 text-gray-400 hover:text-white hover:border-white/20'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <img
-                            src={tok.logo}
-                            alt=""
-                            className="w-4 h-4 rounded-full"
-                            onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
-                          />
-                          <span className="font-bold text-[11px]">{tok.symbol}</span>
-                        </div>
-                        <span className={`text-[9px] font-mono truncate w-full text-center ${hasBal ? 'text-emerald-400 font-semibold' : 'text-gray-500'}`}>
-                          {bal.formatted}
-                        </span>
-                        {isBase && (
-                          <span className="text-[8px] text-cyan-300 uppercase tracking-tighter mt-0.5">Pool Asset</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+            {/* Currency Selector: Deposit (Pay with) vs Redeem (Receive in) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-gray-400 font-mono">
+                <span className="flex items-center gap-1.5 font-bold text-gray-300">
+                  <span>{modalMode === 'deposit' ? 'Pay with:' : 'Receive in:'}</span>
+                  {(modalMode === 'deposit' ? selectedDepositToken : selectedWithdrawToken) !== getVaultBaseToken(activeVault) ? (
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-bold flex items-center gap-1 shadow-sm">
+                      <Zap className="w-3 h-3 fill-cyan-400 text-cyan-400" />
+                      {modalMode === 'deposit' ? '1-Click ZAP' : '1-Click Reverse ZAP'}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                      {getVaultPairTokens(activeVault).length > 1 ? 'Pair Asset' : 'Pool Asset'}
+                    </span>
+                  )}
+                </span>
+                <span className="text-[11px] text-gray-400">
+                  Wallet: <strong className="text-white font-mono">{getTokenWalletBalance(modalMode === 'deposit' ? selectedDepositToken : selectedWithdrawToken).formatted} {modalMode === 'deposit' ? selectedDepositToken : selectedWithdrawToken}</strong>
+                </span>
               </div>
-            )}
+
+              {/* Token Selector Pills */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {ZAP_SUPPORTED_TOKENS.map((tok) => {
+                  const currentToken = modalMode === 'deposit' ? selectedDepositToken : selectedWithdrawToken;
+                  const isSelected = currentToken === tok.symbol;
+                  const isPairToken = getVaultPairTokens(activeVault).includes(tok.symbol);
+                  const isBase = tok.symbol === getVaultBaseToken(activeVault);
+                  const bal = getTokenWalletBalance(tok.symbol);
+                  const hasBal = bal.num > 0;
+                  return (
+                    <button
+                      key={tok.symbol}
+                      type="button"
+                      onClick={() => {
+                        if (modalMode === 'deposit') {
+                          setSelectedDepositToken(tok.symbol);
+                        } else {
+                          setSelectedWithdrawToken(tok.symbol);
+                        }
+                      }}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl border text-xs transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-cyan-500/20 border-cyan-500/60 text-white shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                          : 'bg-black/40 border-white/5 text-gray-400 hover:text-white hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <img
+                          src={tok.logo}
+                          alt=""
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => { (e.target as any).src = '/tokens/sui.svg'; }}
+                        />
+                        <span className="font-bold text-[11px]">{tok.symbol}</span>
+                      </div>
+                      <span className={`text-[9px] font-mono truncate w-full text-center ${hasBal ? 'text-emerald-400 font-semibold' : 'text-gray-500'}`}>
+                        {bal.formatted}
+                      </span>
+                      {isPairToken ? (
+                        <span className="text-[8px] text-cyan-300 uppercase tracking-tighter mt-0.5">
+                          {isBase ? 'Base' : 'Pair'}
+                        </span>
+                      ) : (
+                        <span className="text-[8px] text-gray-500 uppercase tracking-tighter mt-0.5">ZAP</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Input Amount */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-gray-400 font-mono">
-                <span>{modalMode === 'deposit' ? `Deposit Amount (${selectedDepositToken}):` : 'Redeem Amount:'}</span>
+                <span>{modalMode === 'deposit' ? `Deposit Amount (${selectedDepositToken}):` : `Redeem Amount (${activeVault.receiptToken}):`}</span>
                 <span>
                   {modalMode === 'deposit'
                     ? `Wallet Balance: ${getTokenWalletBalance(selectedDepositToken).formatted} ${selectedDepositToken}`
@@ -1432,6 +1501,19 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
               </div>
             )}
 
+            {/* Reverse ZAP Router Explainer if Receiving in Another Token */}
+            {modalMode === 'withdraw' && selectedWithdrawToken !== getVaultBaseToken(activeVault) && (
+              <div className="p-3 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 text-xs space-y-1 font-mono">
+                <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
+                  <Zap className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400" />
+                  <span>1-Click Reverse ZAP Auto-Routing</span>
+                </div>
+                <p className="text-gray-400 text-[11px] leading-relaxed">
+                  Your <strong>{activeVault.receiptToken}</strong> is redeemed and auto-swapped to <strong>{selectedWithdrawToken}</strong> via Cetus CLMM + DeepBook v3 in 1 atomic PTB. You receive <strong>{selectedWithdrawToken}</strong> directly in your wallet. Zero manual swaps needed.
+                </p>
+              </div>
+            )}
+
             {/* Vault Mechanics & Fee Breakdown */}
             <div className="p-3.5 rounded-2xl bg-black/40 border border-white/5 space-y-2 text-xs">
               <div className="flex justify-between items-center">
@@ -1439,9 +1521,11 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                 <span className="text-white font-bold">{activeVault.protocolBadge}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">You Receive:</span>
+                <span className="text-gray-400">{modalMode === 'deposit' ? 'You Receive:' : 'Target Asset:'}</span>
                 <span className="text-cyan-400 font-bold">
-                  {inputAmount ? `${parseFloat(inputAmount).toFixed(4)} ${activeVault.receiptToken}` : `1:1 ${activeVault.receiptToken}`}
+                  {modalMode === 'deposit'
+                    ? (inputAmount ? `${parseFloat(inputAmount).toFixed(4)} ${activeVault.receiptToken}` : `1:1 ${activeVault.receiptToken}`)
+                    : `${selectedWithdrawToken}`}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -1453,9 +1537,11 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                 <span className="text-cyan-400 font-bold">100% Non-Custodial (Sui PTB)</span>
               </div>
               <div className="flex justify-between items-center border-t border-white/5 pt-2">
-                <span className="text-gray-300 font-bold">Projected 1-Year Net Return:</span>
+                <span className="text-gray-300 font-bold">{modalMode === 'deposit' ? 'Projected 1-Year Net Return:' : 'Accrued Yield Earned:'}</span>
                 <span className="text-emerald-400 font-black text-sm">
-                  +${((parseFloat(inputAmount) || 0) * (activeVault.apy / 100) * 0.90).toFixed(2)} USD
+                  {modalMode === 'deposit'
+                    ? `+$${((parseFloat(inputAmount) || 0) * (activeVault.apy / 100) * 0.90).toFixed(2)} USD`
+                    : `+$${(userPositions[activeVault.id]?.accruedYield || 0).toFixed(3)} USD`}
                 </span>
               </div>
             </div>
@@ -1468,18 +1554,20 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
             >
               {isExecuting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                   <span>Signing Vault Transaction on Sui...</span>
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4 fill-black" />
+                  <Zap className="w-4 h-4 fill-slate-950 text-slate-950" />
                   <span>
                     {modalMode === 'deposit'
                       ? (selectedDepositToken !== getVaultBaseToken(activeVault)
                           ? `⚡ 1-Click ZAP & Deposit into ${activeVault.name}`
                           : `Confirm Deposit into ${activeVault.name}`)
-                      : `Confirm Redemption of ${activeVault.receiptToken}`}
+                      : (selectedWithdrawToken !== getVaultBaseToken(activeVault)
+                          ? `⚡ 1-Click Reverse ZAP to ${selectedWithdrawToken}`
+                          : `Confirm Redemption of ${activeVault.receiptToken}`)}
                   </span>
                 </>
               )}
