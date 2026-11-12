@@ -1079,7 +1079,11 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const borrowPoolCfg = getNaviPoolConfig(activeStrategy.borrowToken);
 
         if (borrowUnits > 0) {
-          await updateOraclePTB(tx, suiClient);
+          try {
+            await updateOraclePTB(suiClient, tx);
+          } catch (oracleErr) {
+            console.warn('Pyth oracle pre-update skipped in browser:', oracleErr);
+          }
           const [borrowedCoin] = await borrowCoin(tx, borrowPoolCfg, borrowUnits);
 
           if (activeStrategy.supplyToken === activeStrategy.borrowToken) {
