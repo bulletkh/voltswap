@@ -1278,14 +1278,95 @@ export default function App() {
           }
         }
 
-        // For limit order placed above market rate:
-        // Execute real on-chain transaction registering the Limit Order on Sui
+        // REAL DEEPBOOK V3 ON-CHAIN LIMIT ORDER EXECUTION
+        const DEEPBOOK_PACKAGE_ID = '0xbca0cefe720330e7bb4f2283438b68de6a0e656688db4ac90d61e71fe6151fe8';
+        const SUI_USDC_POOL_ID = '0xe05dafb5133bcffb8d59f4e12465dc0e9faeaa05e3e342a08fe135800e3e4407';
+        const CLOCK_ID = '0x0000000000000000000000000000000000000000000000000000000000000006';
+        const SUI_TYPE = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI';
+        const USDC_TYPE = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC';
+
+        const savedManagerId = localStorage.getItem(`volt_deepbook_balance_manager_${currentAccount.address}`);
+        let managerRef: any;
+
+        if (savedManagerId) {
+          managerRef = txb.object(savedManagerId);
+        } else {
+          const [newManager] = txb.moveCall({
+            target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::new`
+          });
+          managerRef = newManager;
+        }
+
+        let inputCoinObj: any;
         if (isFromSui) {
-          const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(rawIn)]);
-          txb.transferObjects([coin], txb.pure.address(currentAccount.address));
+          const [splitCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(rawIn)]);
+          inputCoinObj = splitCoin;
+        } else {
+          const rawNeeded = BigInt(rawIn);
+          const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
+          const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
+          if (otherCoins.length > 0) txb.mergeCoins(primaryCoin, otherCoins);
+          const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(rawNeeded.toString())]);
+          inputCoinObj = splitCoin;
+        }
+
+        // 1. Deposit base or quote asset into DeepBook BalanceManager
+        txb.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+          arguments: [managerRef, inputCoinObj],
+          typeArguments: [isFromSui ? SUI_TYPE : USDC_TYPE]
+        });
+
+        // 2. Generate Trade Proof as Owner
+        const [proof] = txb.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
+          arguments: [managerRef]
+        });
+
+        // 3. Place real Limit Order on DeepBook v3 Orderbook
+        // Conversion: floatScalar (1e9) * quoteScalar (1e6) / baseScalar (1e9) = 1e6
+        const priceScaled = BigInt(Math.max(1, Math.round(effectiveRate * 1000000)));
+        const qtyScaled = BigInt(rawIn);
+        const clientOrderId = BigInt(Date.now());
+        const expirationMs = BigInt(Date.now() + 30 * 24 * 3600 * 1000); // 30 days
+
+        txb.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::pool::place_limit_order`,
+          arguments: [
+            txb.object(SUI_USDC_POOL_ID),
+            managerRef,
+            proof,
+            txb.pure.u64(clientOrderId),
+            txb.pure.u8(0), // OrderType.NO_RESTRICTION
+            txb.pure.u8(0), // SelfMatchingOptions.SELF_MATCHING_ALLOWED
+            txb.pure.u64(priceScaled),
+            txb.pure.u64(qtyScaled),
+            txb.pure.bool(!isFromSui), // isBid: true for buying SUI, false for selling SUI
+            txb.pure.bool(false), // payWithDeep: false
+            txb.pure.u64(expirationMs),
+            txb.object(CLOCK_ID)
+          ],
+          typeArguments: [SUI_TYPE, USDC_TYPE]
+        });
+
+        // 4. If newly created BalanceManager, share it so it persists on Sui
+        if (!savedManagerId) {
+          txb.moveCall({
+            target: '0x2::transfer::public_share_object',
+            arguments: [managerRef],
+            typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`]
+          });
         }
 
         const res = await signAndExecute({ transaction: txb });
+
+        // Save created BalanceManager ID for future 1-click orders
+        if (!savedManagerId && res?.effects?.created) {
+          const createdShared = res.effects.created.find((c: any) => c.owner && typeof c.owner === 'object' && 'Shared' in c.owner);
+          if (createdShared?.reference?.objectId) {
+            localStorage.setItem(`volt_deepbook_balance_manager_${currentAccount.address}`, createdShared.reference.objectId);
+          }
+        }
         setSwapTxDigest(res.digest);
         setIsSwapping(false);
 
@@ -1936,12 +2017,11 @@ export default function App() {
 
               {/* Swap Card */}
               <div className="bg-[#0b0e17]/95 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.6)] relative overflow-hidden">
-                {/* 3-Mode Clean Switcher: Market | Limit | DCA */}
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#06080e] border border-white/[0.06] rounded-2xl mb-4">
+                {/* 2-Mode Institutional Switcher: Market | Limit (100% On-Chain) */}
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#06080e] border border-white/[0.06] rounded-2xl mb-4">
                   {[
                     { id: 'market', label: 'Market', icon: Zap },
-                    { id: 'limit', label: 'Limit', icon: Target },
-                    { id: 'dca', label: 'DCA', icon: Clock }
+                    { id: 'limit', label: 'Limit', icon: Target }
                   ].map((m) => {
                     const Icon = m.icon;
                     const isActive = swapMode === m.id;
@@ -1958,7 +2038,7 @@ export default function App() {
                             : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
                         }`}
                       >
-                        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? (m.id === 'market' ? 'text-cyan-400' : m.id === 'limit' ? 'text-cyan-400' : 'text-purple-400') : ''}`} />
+                        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : ''}`} />
                         <span>{m.label}</span>
                       </button>
                     );
@@ -1969,19 +2049,10 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
                       {swapMode === 'market' && 'Swap'}
-                      {swapMode === 'limit' && 'Limit Order'}
-                      {swapMode === 'dca' && 'DCA Stream'}
+                      {swapMode === 'limit' && 'DeepBook Limit Order'}
                     </span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
-                      swapMode === 'market'
-                        ? 'text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 font-bold'
-                        : swapMode === 'limit'
-                        ? 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 font-bold'
-                        : 'text-purple-400 bg-purple-500/10 border border-purple-500/20 font-bold'
-                    }`}>
-                      {swapMode === 'market' && 'Cetus + DeepBook v3'}
-                      {swapMode === 'limit' && 'DeepBook CLOB'}
-                      {swapMode === 'dca' && 'Auto PTB Grid'}
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 font-bold">
+                      {swapMode === 'market' ? 'Cetus + DeepBook v3' : 'DeepBook v3 CLOB'}
                     </span>
                   </div>
 
@@ -2254,61 +2325,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* MODE SPECIFIC CONTROLS: DCA (Auto Dollar-Cost Averaging) */}
-                {swapMode === 'dca' && (
-                  <div className="mt-4 p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/30 space-y-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-purple-400 flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-purple-400" /> DCA Schedule Settings
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-mono">Auto PTB Execution</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <span className="text-[10px] text-gray-400 block mb-1">Buy Frequency</span>
-                        <div className="grid grid-cols-4 gap-1">
-                          {(['1h', '4h', '24h', '7d'] as const).map((int) => (
-                            <button
-                              key={int}
-                              onClick={() => setDcaInterval(int)}
-                              className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                                dcaInterval === int
-                                  ? 'bg-purple-500 text-white shadow-md'
-                                  : 'bg-white/5 text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              {int}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-gray-400 block mb-1">Number of Orders</span>
-                        <div className="grid grid-cols-3 gap-1">
-                          {['3', '5', '10'].map((cnt) => (
-                            <button
-                              key={cnt}
-                              onClick={() => setDcaOrdersCount(cnt)}
-                              className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                                dcaOrdersCount === cnt
-                                  ? 'bg-purple-500 text-white shadow-md'
-                                  : 'bg-white/5 text-gray-400 hover:text-white'
-                              }`}
-                            >
-                              {cnt}x
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-2 rounded-xl bg-black/40 text-[11px] text-gray-300 font-mono flex items-center justify-between">
-                      <span>Order size per round:</span>
-                      <span className="text-purple-300 font-bold">
-                        {(parseAmount(fromAmount) / parseInt(dcaOrdersCount)).toFixed(2)} {fromToken.symbol} / {dcaInterval}
-                      </span>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Expected Rebound or Arb Profit Calculator (Triggered via Dip Signal) */}
                 {selectedDipDeal && selectedDipDeal.token === toToken.symbol && (() => {
@@ -2675,7 +2692,6 @@ export default function App() {
                         <Zap className="w-5 h-5 fill-slate-950 text-slate-950" />
                         {swapMode === 'market' && `Swap ${fromToken.symbol} for ${toToken.symbol}`}
                         {swapMode === 'limit' && `Place DeepBook Limit Order @ ${effectiveLimitRate < 0.01 ? effectiveLimitRate.toFixed(6) : effectiveLimitRate.toFixed(4)} ${toToken.symbol}`}
-                        {swapMode === 'dca' && `Start ${dcaOrdersCount}x DCA Stream (${dcaInterval})`}
                       </>
                     )}
                   </button>
