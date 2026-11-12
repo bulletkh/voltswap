@@ -3325,6 +3325,7 @@ export default function App() {
               userBalances={userBalances}
               effectiveFeeRate={effectiveFeeRate}
               userTraderTier={userTraderTier}
+              cetusClient={cetusClient}
               onNavigateToSwap={(from, to) => {
                 if (from) {
                   const f = POPULAR_TOKENS.find(t => t.symbol === from);
