@@ -603,7 +603,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       }
       return true;
     }).sort((a, b) => b.maxApr - a.maxApr);
-  }, [selectedMarket, selectedFilter, searchQuery]);
+  }, [dynamicStrategies, selectedMarket, selectedFilter, searchQuery]);
 
   // Collateral & Yield Calculations
   const collateralNum = parseFloat(inputCollateral.replace(',', '.')) || 0;
