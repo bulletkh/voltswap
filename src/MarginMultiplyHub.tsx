@@ -413,6 +413,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
   // Strategy Execution State
   const [inputCollateral, setInputCollateral] = useState<string>('');
+  const [depositAssetRole, setDepositAssetRole] = useState<'supply' | 'borrow'>('supply');
+  const [isDepositTokenOpen, setIsDepositTokenOpen] = useState(false);
   const [multiplier, setMultiplier] = useState<number>(3.0);
   const [isExecuting, setIsExecuting] = useState(false);
   const [managingPosition, setManagingPosition] = useState<ActiveMarginPosition | null>(null);
@@ -592,14 +594,25 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     }).sort((a, b) => b.maxApr - a.maxApr);
   }, [dynamicStrategies, selectedMarket, selectedFilter, searchQuery]);
 
+  // Active Deposit Asset (Supports depositing either Supply or Borrow coin of the pair)
+  const depositTokenSymbol = activeStrategy
+    ? (depositAssetRole === 'supply' ? activeStrategy.supplyToken : activeStrategy.borrowToken)
+    : '';
+  const depositTokenLogo = activeStrategy
+    ? (depositAssetRole === 'supply' ? activeStrategy.supplyTokenLogo : activeStrategy.borrowTokenLogo)
+    : '';
+  const depositCoinType = activeStrategy
+    ? (depositAssetRole === 'supply' ? activeStrategy.supplyCoinType : activeStrategy.borrowCoinType)
+    : '';
+
   // Collateral & Yield Calculations
   const collateralNum = parseFloat(inputCollateral.replace(',', '.')) || 0;
   const tokenPriceUsd = useMemo(() => {
     if (!activeStrategy) return 1.0;
-    if (activeStrategy.supplyToken.includes('USD') || activeStrategy.supplyToken === 'eEARN') return 1.0;
-    if (activeStrategy.supplyToken.includes('BTC')) return 96500.0;
-    return 0.85; // SUI/sSUI/haSUI reference price
-  }, [activeStrategy]);
+    if (depositTokenSymbol.includes('USD') || depositTokenSymbol === 'eEARN') return 1.0;
+    if (depositTokenSymbol.includes('BTC')) return 96500.0;
+    return 0.85; // SUI/sSUI/haSUI/vSUI reference price
+  }, [activeStrategy, depositTokenSymbol]);
 
   const collateralUsd = collateralNum * tokenPriceUsd;
   const totalExposureUsd = collateralUsd * multiplier;
@@ -628,6 +641,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   const handleOpenStrategyDetail = (strat: MultiplyStrategy) => {
     setActiveStrategy(strat);
     setMultiplier(strat.defaultMultiplier);
+    setDepositAssetRole('supply');
+    setIsDepositTokenOpen(false);
     setInputCollateral('');
     setDetailSubTab('overview');
     setDetailActionTab('deposit');
@@ -655,7 +670,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       const feeRateBps = BigInt(Math.max(1, Math.round(feeRate * 10000)));
 
       // Real On-Chain PTB Execution with NAVI / Scallop / Haedal / Suilend / Ember Move Call
-      if (activeStrategy.supplyToken === 'SUI') {
+      if (depositTokenSymbol === 'SUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
         const feeMist = (totalMist * feeRateBps) / 10000n;
         const netMist = totalMist - feeMist;
@@ -667,18 +682,18 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
         await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(netMist));
 
-      } else if (activeStrategy.supplyToken.includes('USD') || activeStrategy.supplyToken === 'eEARN') {
+      } else if (depositTokenSymbol.includes('USD') || depositTokenSymbol === 'eEARN') {
         const totalUnits = BigInt(Math.floor(collateralNum * 1e6));
         const feeUnits = (totalUnits * feeRateBps) / 10000n;
         const netUnits = totalUnits - feeUnits;
 
-        const coinObjects = await getOwnedCoinObjects(currentAccount.address, activeStrategy.supplyCoinType);
+        const coinObjects = await getOwnedCoinObjects(currentAccount.address, depositCoinType);
         if (!coinObjects || coinObjects.length === 0) {
-          throw new Error(`No ${activeStrategy.supplyToken} coins found in your wallet. Please swap or deposit ${activeStrategy.supplyToken} first.`);
+          throw new Error(`No ${depositTokenSymbol} coins found in your wallet. Please swap or deposit ${depositTokenSymbol} first.`);
         }
         const totalBalance = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
         if (totalBalance < totalUnits) {
-          throw new Error(`Insufficient ${activeStrategy.supplyToken} balance (${(Number(totalBalance) / 1e6).toFixed(2)} available).`);
+          throw new Error(`Insufficient ${depositTokenSymbol} balance (${(Number(totalBalance) / 1e6).toFixed(2)} available).`);
         }
 
         const [primaryCoin, ...otherCoins] = coinObjects.map(c => tx.object(c.objectId));
@@ -692,7 +707,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const [splitCoin] = tx.splitCoins(primaryCoin, [netUnits]);
         await depositCoin(tx, naviPool.nUSDC, splitCoin, tx.pure.u64(netUnits));
 
-      } else if (activeStrategy.supplyToken === 'haSUI' || activeStrategy.supplyToken === 'sSUI') {
+      } else if (depositTokenSymbol === 'haSUI' || depositTokenSymbol === 'sSUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
         const feeMist = (totalMist * feeRateBps) / 10000n;
         const netMist = totalMist - feeMist;
@@ -733,7 +748,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         id: 'pos_' + Date.now(),
         strategyId: activeStrategy.id,
         strategyName: activeStrategy.name,
-        supplyToken: activeStrategy.supplyToken,
+        supplyToken: depositTokenSymbol,
         borrowToken: activeStrategy.borrowToken,
         collateralAmount: collateralNum,
         collateralUsd: collateralUsd,
@@ -754,7 +769,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       showNotification(
         'success',
         'Leveraged Multiply Position Opened',
-        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Collateral: ${collateralNum.toFixed(4)} ${activeStrategy.supplyToken} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: ${(feeRate * 100).toFixed(2)}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Deposited Asset: ${collateralNum.toFixed(4)} ${depositTokenSymbol} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: ${(feeRate * 100).toFixed(2)}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -1138,12 +1153,12 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   {/* Deposit Asset Input */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs font-mono text-gray-400">
-                      <span>Deposit Collateral ({activeStrategy.supplyToken})</span>
-                      <span>Wallet: <strong>{getStrategyWalletBalance(activeStrategy.supplyToken)}</strong> {activeStrategy.supplyToken}</span>
+                      <span>Deposit Asset ({depositTokenSymbol})</span>
+                      <span>Wallet: <strong>{getStrategyWalletBalance(depositTokenSymbol)}</strong> {depositTokenSymbol}</span>
                     </div>
 
-                    <div className="p-3.5 rounded-2xl bg-black/60 border border-white/10 focus-within:border-cyan-500/50 transition-all flex items-center justify-between gap-3">
-                      <div className="flex-1">
+                    <div className="relative p-3.5 rounded-2xl bg-black/60 border border-white/10 focus-within:border-cyan-500/50 transition-all flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
                         <input
                           type="text"
                           inputMode="decimal"
@@ -1152,21 +1167,87 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                           onChange={(e) => setInputCollateral(e.target.value)}
                           className="w-full bg-transparent text-2xl font-mono font-bold text-white outline-none placeholder:text-gray-600"
                         />
-                        <span className="text-[11px] text-gray-400 font-mono block">
+                        <span className="text-[11px] text-gray-400 font-mono block truncate">
                           ≈ ${collateralUsd.toFixed(2)} USD
+                          {depositAssetRole === 'borrow' && (
+                            <span className="text-cyan-400 ml-1.5">• Auto-converts to {activeStrategy.supplyToken}</span>
+                          )}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
-                          onClick={() => setInputCollateral(getStrategyWalletBalance(activeStrategy.supplyToken))}
+                          onClick={() => setInputCollateral(getStrategyWalletBalance(depositTokenSymbol))}
                           className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-bold font-mono border border-cyan-500/20 cursor-pointer"
                         >
                           MAX
                         </button>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10">
-                          <TokenBadge symbol={activeStrategy.supplyToken} logoUrl={activeStrategy.supplyTokenLogo} size="w-5 h-5" />
-                          <span className="text-xs font-bold text-white font-mono">{activeStrategy.supplyToken}</span>
+
+                        {/* Dual-Asset Dropdown Selector (Supply OR Borrow Coin) */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsDepositTokenOpen((prev) => !prev)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/40 transition-all cursor-pointer"
+                          >
+                            <TokenBadge symbol={depositTokenSymbol} logoUrl={depositTokenLogo} size="w-5 h-5" />
+                            <span className="text-xs font-bold text-white font-mono">{depositTokenSymbol}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isDepositTokenOpen ? 'rotate-180 text-cyan-400' : ''}`} />
+                          </button>
+
+                          {isDepositTokenOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setIsDepositTokenOpen(false)}
+                              />
+                              <div className="absolute right-0 top-full mt-2 w-56 bg-[#0c101a] border border-cyan-500/25 rounded-xl p-1.5 shadow-2xl z-50 backdrop-blur-xl animate-fadeIn">
+                                <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-500 border-b border-white/5 mb-1 font-bold">
+                                  Choose Deposit Coin
+                                </div>
+                                {[
+                                  {
+                                    role: 'supply' as const,
+                                    symbol: activeStrategy.supplyToken,
+                                    logo: activeStrategy.supplyTokenLogo,
+                                    tag: 'Collateral',
+                                  },
+                                  {
+                                    role: 'borrow' as const,
+                                    symbol: activeStrategy.borrowToken,
+                                    logo: activeStrategy.borrowTokenLogo,
+                                    tag: 'Auto-Loop',
+                                  },
+                                ].map((coin) => (
+                                  <button
+                                    key={coin.role}
+                                    type="button"
+                                    onClick={() => {
+                                      setDepositAssetRole(coin.role);
+                                      setIsDepositTokenOpen(false);
+                                      setInputCollateral('');
+                                    }}
+                                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                                      depositAssetRole === coin.role
+                                        ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
+                                        : 'text-gray-300 hover:text-white hover:bg-white/5'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <TokenBadge symbol={coin.symbol} logoUrl={coin.logo} size="w-4 h-4" />
+                                      <div className="text-left">
+                                        <span className="block font-bold">{coin.symbol}</span>
+                                        <span className="text-[9px] text-gray-400">{coin.tag}</span>
+                                      </div>
+                                    </div>
+                                    <span className="text-[10px] text-gray-400">
+                                      {getStrategyWalletBalance(coin.symbol)}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1177,7 +1258,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                         <button
                           key={pct}
                           onClick={() => {
-                            const bal = parseFloat(getStrategyWalletBalance(activeStrategy.supplyToken)) || 0;
+                            const bal = parseFloat(getStrategyWalletBalance(depositTokenSymbol)) || 0;
                             setInputCollateral((bal * (pct / 100)).toFixed(4));
                           }}
                           className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 font-bold border border-white/5 transition-all cursor-pointer"
