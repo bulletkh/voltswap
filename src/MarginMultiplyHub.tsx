@@ -1466,8 +1466,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       </div>
 
       {/* 3. Market Dropdown & Category Tabs (Current Finance Style) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2.5 rounded-2xl bg-[#0b0e17] border border-white/10">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+      <div className="relative z-30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2.5 rounded-2xl bg-[#0b0e17] border border-white/10">
+        <div className="flex items-center gap-2 min-w-0">
           {/* Market Dropdown Selector */}
           <div className="relative shrink-0">
             <button
@@ -1485,10 +1485,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             {isMarketDropdownOpen && (
               <>
                 <div
-                  className="fixed inset-0 z-30"
+                  className="fixed inset-0 z-40"
                   onClick={() => setIsMarketDropdownOpen(false)}
                 />
-                <div className="absolute top-full left-0 mt-2 w-56 bg-[#0c101a] border border-cyan-500/25 rounded-xl p-1.5 shadow-2xl z-40 backdrop-blur-xl animate-fadeIn">
+                <div className="absolute top-full left-0 mt-2 w-56 bg-[#0c101a] border border-cyan-500/25 rounded-xl p-1.5 shadow-2xl z-50 backdrop-blur-xl animate-fadeIn">
                   <div className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-gray-500 border-b border-white/5 mb-1 font-bold">
                     Lending Market
                   </div>
@@ -1536,7 +1536,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           <div className="h-4 w-px bg-white/10 shrink-0 mx-1" />
 
           {/* Category Tabs (Single "All" button) */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
             {[
               { id: 'all', label: 'All' },
               { id: 'lst', label: 'LST' },
