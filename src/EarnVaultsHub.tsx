@@ -307,7 +307,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   const [inputAmount, setInputAmount] = useState<string>('');
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
 
-  // User simulated active positions state
+  // User active positions state (strictly non-custodial / wallet-bound, no fake data)
   const [userPositions, setUserPositions] = useState<{
     [vaultId: string]: {
       stakedUsd: number;
@@ -316,28 +316,52 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
       lastTick: number;
       receiptToken: string;
     };
-  }>({
-    'haedal-hasui-sui-pegged': {
-      stakedUsd: 8730.00,
-      stakedAmount: 10270.58,
-      accruedYield: 42.18,
-      lastTick: Date.now(),
-      receiptToken: 'vLP-haSUI'
-    },
-    'navi-usdc': {
-      stakedUsd: 500.00,
-      stakedAmount: 500.00,
-      accruedYield: 2.14,
-      lastTick: Date.now(),
-      receiptToken: 'vUSDC'
-    }
-  });
+  }>({});
 
-  // Live Volt Points calculation
-  const [userVoltPoints, setUserVoltPoints] = useState<number>(14250);
+  // Real Volt Points state for connected user
+  const [userVoltPoints, setUserVoltPoints] = useState<number>(0);
 
-  // Live yield accretion & Points accrual
+  // Sync positions & points with connected wallet
   useEffect(() => {
+    if (!currentAccount?.address) {
+      setUserPositions({});
+      setUserVoltPoints(0);
+      return;
+    }
+
+    try {
+      const savedPositions = localStorage.getItem(`volt_vault_positions_${currentAccount.address}`);
+      if (savedPositions) {
+        setUserPositions(JSON.parse(savedPositions));
+      } else {
+        setUserPositions({});
+      }
+
+      const savedPoints = localStorage.getItem(`volt_points_${currentAccount.address}`);
+      if (savedPoints) {
+        setUserVoltPoints(parseInt(savedPoints, 10) || 0);
+      } else {
+        setUserVoltPoints(0);
+      }
+    } catch (_) {
+      setUserPositions({});
+      setUserVoltPoints(0);
+    }
+  }, [currentAccount?.address]);
+
+  // Persist updated positions & points to localStorage for current wallet
+  useEffect(() => {
+    if (!currentAccount?.address) return;
+    try {
+      localStorage.setItem(`volt_vault_positions_${currentAccount.address}`, JSON.stringify(userPositions));
+      localStorage.setItem(`volt_points_${currentAccount.address}`, userVoltPoints.toString());
+    } catch (_) {}
+  }, [userPositions, userVoltPoints, currentAccount?.address]);
+
+  // Live yield accretion for genuine active positions
+  useEffect(() => {
+    if (!currentAccount?.address) return;
+
     const timer = setInterval(() => {
       setUserPositions((prev) => {
         let changed = false;
@@ -359,10 +383,9 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         });
         return changed ? updated : prev;
       });
-    }, 2000);
-
+    }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [currentAccount?.address]);
 
   // Filtered & Sorted Vaults
   const filteredVaults = useMemo(() => {
@@ -534,10 +557,11 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   };
 
   const getWalletBalance = (symbol: string) => {
-    if (symbol.includes('SUI')) return userBalances['SUI'] || '5.02';
-    if (symbol === 'USDC') return userBalances['USDC'] || '150.00';
-    if (symbol === 'USDT') return userBalances['USDT'] || '50.00';
-    return '0.00';
+    if (!currentAccount?.address) return '0.00';
+    if (symbol.includes('SUI')) return userBalances['SUI'] || '0.00';
+    if (symbol === 'USDC') return userBalances['USDC'] || '0.00';
+    if (symbol === 'USDT') return userBalances['USDT'] || '0.00';
+    return userBalances[symbol] || '0.00';
   };
 
   return (

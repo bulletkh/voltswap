@@ -22,8 +22,9 @@ function getAudioContext(): AudioContext | null {
 }
 
 export const getSoundMuted = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return localStorage.getItem('volt_audio_muted') === 'true';
+  if (typeof window === 'undefined') return true;
+  // Default to muted for a professional, clean FinTech experience
+  return localStorage.getItem('volt_audio_muted') !== 'false';
 };
 
 export const setSoundMuted = (muted: boolean) => {

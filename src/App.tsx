@@ -1708,15 +1708,15 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-volt selection:text-black">
       {/* Top Protocol Status Bar */}
-      <div className="bg-gradient-to-r from-[#11141e] via-[#1b2230] to-[#11141e] border-b border-volt/20 py-2 px-4 text-center text-xs font-medium text-gray-300 flex items-center justify-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-        <span className="text-volt font-bold uppercase tracking-wider">SUI SMART MONEY TERMINAL:</span>
-        <span className="hidden sm:inline">Live On-Chain Whale Flow Radar + Atomic PTB Swap Routing (Cetus CLMM + DeepBook v3)</span>
+      <div className="bg-[#090b10] border-b border-white/[0.06] py-1.5 px-4 text-center text-[11px] font-mono text-gray-400 flex items-center justify-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="text-volt font-semibold tracking-wider">VOLT SMART ENGINE:</span>
+        <span className="hidden sm:inline text-gray-300">Live On-Chain Whale Radar • DeepBook v3 CLOB • Cetus CLMM Atomic Routing</span>
         <button
           onClick={() => setActiveTab('radar')}
-          className="text-white underline hover:text-volt transition-colors font-semibold ml-1 cursor-pointer"
+          className="text-volt hover:text-white transition-colors underline underline-offset-2 ml-1 cursor-pointer font-sans text-xs"
         >
-          Full Radar View →
+          Open Radar →
         </button>
       </div>
 
@@ -1739,7 +1739,7 @@ export default function App() {
             {[
               { id: 'swap', label: 'Trade', icon: Zap },
               { id: 'radar', label: 'Whale Radar', icon: Activity },
-              { id: 'margin', label: 'Perps', icon: TrendingUp },
+              { id: 'margin', label: 'Perps (Beta)', icon: TrendingUp },
               { id: 'earn', label: 'Pools', icon: Coins },
               ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
               { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },
@@ -1815,7 +1815,7 @@ export default function App() {
         {[
           { id: 'swap', label: 'Swap', icon: Zap },
           { id: 'radar', label: 'Radar', icon: Activity },
-          { id: 'margin', label: 'Perps', icon: TrendingUp },
+          { id: 'margin', label: 'Perps (Beta)', icon: TrendingUp },
           { id: 'earn', label: 'Pools', icon: Coins },
           ...(isCreatorConnected ? [{ id: 'treasury', label: 'Treasury', icon: ShieldCheck }] : []),
           { id: 'bridge', label: 'Bridge', icon: ArrowDownUp },

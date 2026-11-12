@@ -17,7 +17,10 @@ import {
   VolumeX,
   Bell,
 } from 'lucide-react';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
+import { POPULAR_TOKENS } from './constants';
 
+const defaultSuiClient = new SuiClient({ url: getFullnodeUrl('mainnet') });
 const GQL_URL = 'https://graphql.mainnet.sui.io/graphql';
 
 export interface ParsedWhaleSwap {
@@ -248,45 +251,49 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
 
   const inspectWalletXray = useCallback(
     async (addressToScan: string) => {
-      if (!addressToScan || !addressToScan.startsWith('0x')) return;
+      const cleanAddr = addressToScan?.trim();
+      if (!cleanAddr || !cleanAddr.startsWith('0x')) return;
       try {
         setIsLoadingXray(true);
-        const q = `
-        query GetBalances($addr: SuiAddress!) {
-          address(address: $addr) {
-            balances {
-              nodes {
-                coinType { repr }
-                totalBalance
+        let rawBalances: Array<{ coinType: string; totalBalance: string }> = [];
+
+        // 1. Try standard JSON-RPC getAllBalances (Reliable, fast, CORS-enabled)
+        try {
+          const res = await defaultSuiClient.getAllBalances({ owner: cleanAddr });
+          if (Array.isArray(res) && res.length > 0) {
+            rawBalances = res.map((b) => ({
+              coinType: b.coinType,
+              totalBalance: b.totalBalance,
+            }));
+          }
+        } catch (rpcErr) {
+          console.warn('RPC getAllBalances fallback to GraphQL/API:', rpcErr);
+        }
+
+        // 2. Fallback to GraphQL if RPC was empty or failed
+        if (rawBalances.length === 0) {
+          try {
+            const q = `
+            query GetBalances($addr: SuiAddress!) {
+              address(address: $addr) {
+                balances {
+                  nodes {
+                    coinType { repr }
+                    totalBalance
+                  }
+                }
               }
             }
-          }
-        }
-      `;
-        const res = await gqlQuery(q, { addr: addressToScan.trim() });
-        const nodes = res?.data?.address?.balances?.nodes || [];
-
-        const missingCts = nodes
-          .map((n: any) => n.coinType?.repr)
-          .filter((ct: string) => ct && !metaCache[ct]);
-
-        for (let i = 0; i < missingCts.length; i += 10) {
-          const chunk = missingCts.slice(i, i + 10);
-          const aliases = chunk
-            .map(
-              (ct: string, idx: number) =>
-                `c${idx}: coinMetadata(coinType: "${ct}") { decimals symbol }`
-            )
-            .join('\n');
-          const mRes = await gqlQuery(`query { ${aliases} }`);
-          const mData = mRes?.data || {};
-          chunk.forEach((ct: string, idx: number) => {
-            const info = mData[`c${idx}`];
-            metaCache[ct] = {
-              decimals: info?.decimals != null ? info.decimals : 9,
-              symbol: (info?.symbol || ct.split('::').pop() || 'UNK').toUpperCase(),
-            };
-          });
+            `;
+            const gRes = await gqlQuery(q, { addr: cleanAddr });
+            const nodes = gRes?.data?.address?.balances?.nodes || [];
+            rawBalances = nodes
+              .map((n: any) => ({
+                coinType: n.coinType?.repr,
+                totalBalance: n.totalBalance,
+              }))
+              .filter((x: any) => !!x.coinType);
+          } catch (_) {}
         }
 
         const priceLookup: Record<string, number> = {
@@ -298,23 +305,42 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
         signals.forEach((s) => {
           if (s.currentPrice > 0) priceLookup[s.symbol] = s.currentPrice;
         });
+        POPULAR_TOKENS.forEach((t) => {
+          if (t.priceUsd && t.priceUsd > 0) priceLookup[t.symbol.toUpperCase()] = t.priceUsd;
+        });
 
-        const parsed: Array<{ symbol: string; coinType: string; amount: number; usdVal: number }> =
-          [];
-        for (const n of nodes) {
-          const ct = n.coinType?.repr;
+        const parsed: Array<{ symbol: string; coinType: string; amount: number; usdVal: number }> = [];
+
+        for (const b of rawBalances) {
+          const ct = b.coinType;
           if (!ct) continue;
-          const m = metaCache[ct] || { decimals: 9, symbol: ct.split('::').pop() || 'UNK' };
-          const amt = Number(n.totalBalance || 0) / Math.pow(10, m.decimals);
+
+          let tokenSym = ct.split('::').pop()?.toUpperCase() || 'TOKEN';
+          let tokenDecimals = 9;
+
+          const known = POPULAR_TOKENS.find(
+            (t) => t.address.toLowerCase() === ct.toLowerCase() || t.symbol.toUpperCase() === tokenSym
+          );
+          if (known) {
+            tokenSym = known.symbol.toUpperCase();
+            tokenDecimals = known.decimals;
+          } else if (metaCache[ct]) {
+            tokenSym = metaCache[ct].symbol;
+            tokenDecimals = metaCache[ct].decimals;
+          }
+
+          const amt = Number(b.totalBalance || 0) / Math.pow(10, tokenDecimals);
           if (amt <= 0.0001) continue;
-          const p = priceLookup[m.symbol] || 0;
+
+          const p = priceLookup[tokenSym] || (tokenSym.includes('USD') ? 1.0 : 0);
           parsed.push({
-            symbol: m.symbol,
+            symbol: tokenSym,
             coinType: ct,
             amount: amt,
             usdVal: amt * p,
           });
         }
+
         parsed.sort((a, b) => b.usdVal - a.usdVal || b.amount - a.amount);
         setXrayBalances(parsed);
       } catch (e) {
@@ -1375,7 +1401,14 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
             </button>
           </div>
           {isLoadingXray ? (
-            <div style={{ padding: '20px', color: '#94a3b8' }}>Scanning balances...</div>
+            <div style={{ padding: '24px', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+              <span>Scanning Sui on-chain balances & assets...</span>
+            </div>
+          ) : xrayBalances.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.85rem', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              No active token balances detected for this address on Sui Mainnet.
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
               {xrayBalances.map((b) => (
@@ -1388,9 +1421,16 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
                     padding: '12px',
                   }}
                 >
-                  <div style={{ fontWeight: 800 }}>{b.symbol}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                    {b.amount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: 800, color: '#f8fafc' }}>{b.symbol}</div>
+                    {b.usdVal > 0 && (
+                      <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 600 }}>
+                        ${b.usdVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px' }}>
+                    {b.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
                   </div>
                 </div>
               ))}

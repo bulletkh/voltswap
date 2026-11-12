@@ -61,6 +61,19 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
   const baseToken = isQuoteUsd ? fromToken : (fromToken.symbol === 'USDC' || fromToken.symbol === 'USDT' ? toToken : fromToken);
   const quoteToken = baseToken === fromToken ? toToken : fromToken;
 
+  const isCexSupported = useMemo(() => {
+    const sym = baseToken.symbol.toUpperCase();
+    return ['SUI', 'CETUS', 'DEEP', 'BTC', 'WBTC', 'ETH', 'WETH', 'SOL', 'NAVX', 'SCA', 'HIPPO', 'BLUB'].includes(sym);
+  }, [baseToken.symbol]);
+
+  const [chartSource, setChartSource] = useState<'dexscreener' | 'tradingview'>('dexscreener');
+
+  useEffect(() => {
+    if (!isCexSupported) {
+      setChartSource('dexscreener');
+    }
+  }, [isCexSupported, baseToken.symbol]);
+
   // Base Exchange Rate from Props
   const effectiveBaseRate = useMemo(() => {
     if (toPrice <= 0) return 1.0;
@@ -353,6 +366,33 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
 
         {/* Center/Right: Terminal Mode Switcher & Tools */}
         <div className="flex items-center gap-2 flex-wrap">
+          {chartMode === 'chart' && (
+            <div className="flex items-center gap-1 bg-[#090b10] p-1 rounded-xl border border-white/[0.08]">
+              <button
+                onClick={() => setChartSource('dexscreener')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  chartSource === 'dexscreener'
+                    ? 'bg-volt/20 text-volt border border-volt/30 shadow-sm'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                title="View verified on-chain Sui DEX pool candlestick chart"
+              >
+                ⚡ On-Chain Pool
+              </button>
+              <button
+                onClick={() => setChartSource('tradingview')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  chartSource === 'tradingview'
+                    ? 'bg-[#1a1f2c] text-white border border-white/20 shadow-sm'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+                title="View Global CEX / TradingView Market Chart"
+              >
+                📈 CEX
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-1 bg-[#090b10] p-1 rounded-xl border border-white/[0.08]">
             <button
               onClick={() => setChartMode('chart')}
@@ -435,15 +475,23 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
       {/* 2. VIEWPORT CONTAINER (Matched Height to Swap Box) */}
       <div className="relative h-[520px] sm:h-[560px] w-full bg-[#0a0d14] rounded-2xl overflow-hidden border border-white/[0.06]">
         {chartMode === 'chart' ? (
-          /* TRADINGVIEW STREAMLINED REAL-TIME CHART (Minimalist, No Clutter, Clean Candles + Indicators) */
-          <iframe
-            key={`spot-tv-${tvSymbol}-${showDrawTools}`}
-            title="TradingView Real-Time Chart"
-            src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
-              tvSymbol
-            )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=${showDrawTools ? '0' : '1'}&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%230a0d14`}
-            className="w-full h-full border-0"
-          />
+          chartSource === 'dexscreener' ? (
+            <iframe
+              key={`spot-dex-${baseToken.address}`}
+              title="DexScreener On-Chain Sui Chart"
+              src={`https://dexscreener.com/sui/${encodeURIComponent(baseToken.address)}?embed=1&theme=dark&trades=0&info=0`}
+              className="w-full h-full border-0"
+            />
+          ) : (
+            <iframe
+              key={`spot-tv-${tvSymbol}-${showDrawTools}`}
+              title="TradingView Real-Time Chart"
+              src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
+                tvSymbol
+              )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=${showDrawTools ? '0' : '1'}&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%230a0d14`}
+              className="w-full h-full border-0"
+            />
+          )
         ) : chartMode === 'orderbook' ? (
           /* LIVE UPDATING DEEPBOOK V3 L2 ORDERBOOK */
           <div className="w-full h-full p-4 flex flex-col justify-between font-mono text-xs">
@@ -638,14 +686,23 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
               </button>
             </div>
             <div className="flex-1 p-4 bg-[#0a0d14]">
-              <iframe
-                key={`modal-tv-${tvSymbol}-${showDrawTools}`}
-                title="TradingView Real-Time Chart Modal"
-                src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
-                  tvSymbol
-                )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=${showDrawTools ? '0' : '1'}&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%230a0d14`}
-                className="w-full h-full border-0 rounded-2xl"
-              />
+              {chartSource === 'dexscreener' ? (
+                <iframe
+                  key={`modal-dex-${baseToken.address}`}
+                  title="DexScreener On-Chain Sui Chart Modal"
+                  src={`https://dexscreener.com/sui/${encodeURIComponent(baseToken.address)}?embed=1&theme=dark&trades=0&info=0`}
+                  className="w-full h-full border-0 rounded-2xl"
+                />
+              ) : (
+                <iframe
+                  key={`modal-tv-${tvSymbol}-${showDrawTools}`}
+                  title="TradingView Real-Time Chart Modal"
+                  src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
+                    tvSymbol
+                  )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=${showDrawTools ? '0' : '1'}&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%230a0d14`}
+                  className="w-full h-full border-0 rounded-2xl"
+                />
+              )}
             </div>
           </div>
         </div>
