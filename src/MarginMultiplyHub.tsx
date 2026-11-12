@@ -1263,7 +1263,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     }
   };
 
-  // Close Position
+  // Close Position (Uses real on-chain NAVI balance + dryRun preflight)
   const handleClosePosition = async (pos: ActiveMarginPosition) => {
     if (!currentAccount?.address || !signAndExecute) {
       showNotification('warning', 'Connect Wallet', 'Please connect your Sui wallet to close this position.');
@@ -1272,8 +1272,60 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
     setIsExecuting(true);
     try {
+      // 1. Fetch exact live on-chain NAVI supply/borrow balances
+      const portfolioMap = await getAddressPortfolio(currentAccount.address, false, suiClient, true, [
+        'Sui',
+        'haSui',
+        'vSui',
+        'nUSDC',
+        'USDY',
+        'USDSUI',
+        'SpringSui',
+      ]);
+
+      let targetSymbol = pos.supplyToken;
+      let poolKey = getNaviPortfolioKey(targetSymbol);
+      let liveSupply = Number(portfolioMap?.get(poolKey)?.supplyBalance || 0);
+
+      // Fallback check: if user deposited SUI into Sui pool for an LST strategy
+      if (liveSupply < 0.0001 && targetSymbol !== 'SUI') {
+        const suiSupply = Number(portfolioMap?.get('Sui')?.supplyBalance || 0);
+        if (suiSupply >= 0.0001) {
+          targetSymbol = 'SUI';
+          poolKey = 'Sui';
+          liveSupply = suiSupply;
+        }
+      }
+
+      if (liveSupply < 0.0001) {
+        setActivePositions((prev) => prev.filter((p) => p.id !== pos.id));
+        setManagingPosition(null);
+        fetchOnChainPortfolio();
+        showNotification(
+          'info',
+          'No On-Chain Balance Found',
+          `Your NAVI on-chain supply for ${pos.supplyToken} is already 0.0000. Cleared the local position record.`
+        );
+        return;
+      }
+
       const tx = new Transaction();
       tx.setSender(currentAccount.address);
+
+      // If user has active on-chain borrow in this strategy's borrow token, repay it first if SUI
+      const borrowPoolKey = getNaviPortfolioKey(pos.borrowToken);
+      const liveBorrow = Number(portfolioMap?.get(borrowPoolKey)?.borrowBalance || 0);
+      if (liveBorrow >= 0.0001) {
+        if (pos.borrowToken === 'SUI') {
+          const repayMist = Math.ceil(liveBorrow * 1.002 * 1e9);
+          const [repayCoin] = tx.splitCoins(tx.gas, [BigInt(repayMist)]);
+          await repayDebt(tx, getNaviPoolConfig('SUI'), repayCoin, repayMist);
+        } else {
+          throw new Error(
+            `You have ${liveBorrow.toFixed(4)} ${pos.borrowToken} active debt on-chain. Please use "Repay Debt" first before withdrawing 100% collateral.`
+          );
+        }
+      }
 
       // 10% performance fee on net profits sent to Treasury
       const netYield = Math.max(0, pos.pnlUsd);
@@ -1285,12 +1337,23 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
       }
 
-      // Genuine on-chain withdrawal from protocol
-      const closePoolCfg = getNaviPoolConfig(pos.supplyToken);
-      const closeDecimals = getTokenDecimals(pos.supplyToken);
-      const closeUnits = BigInt(Math.floor(pos.collateralAmount * Math.pow(10, closeDecimals)));
-      const [withdrawnCoin] = await withdrawCoin(tx, closePoolCfg, Number(closeUnits));
+      // Genuine on-chain withdrawal capped to 99.9% of liveSupply to avoid index rounding dust revert
+      const closePoolCfg = getNaviPoolConfig(targetSymbol);
+      const closeDecimals = getTokenDecimals(targetSymbol);
+      const safeWithdrawUnits = Math.floor(liveSupply * 0.999 * Math.pow(10, closeDecimals));
+      if (safeWithdrawUnits <= 0) {
+        throw new Error('On-chain balance is too small to withdraw.');
+      }
+      const [withdrawnCoin] = await withdrawCoin(tx, closePoolCfg, safeWithdrawUnits);
       tx.transferObjects([withdrawnCoin], currentAccount.address);
+
+      // Dry-run before opening wallet
+      const builtBytes = await tx.build({ client: suiClient });
+      const dryRun = await suiClient.dryRunTransactionBlock({ transactionBlock: builtBytes });
+      if (dryRun?.effects?.status?.status !== 'success') {
+        const errMsg = dryRun?.effects?.status?.error || 'Smart contract simulation rejected withdrawal.';
+        throw new Error(errMsg);
+      }
 
       const result = await signAndExecute({ transaction: tx });
       const digest = (result as any)?.digest;
@@ -1309,7 +1372,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       showNotification(
         'success',
         'Position Closed & Collateral Returned',
-        `Closed ${pos.multiplier}x ${pos.strategyName}.\n• Collateral Returned: ~$${pos.collateralUsd.toFixed(2)}\n• Net Yield: +$${netYield.toFixed(2)}\n• 10% Protocol Fee: $${feeTaken.toFixed(2)}\n• Total Payout: ~$${userPayout.toFixed(2)} USD.\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        `Closed ${pos.multiplier}x ${pos.strategyName}.\n• Withdrawn: ${(safeWithdrawUnits / Math.pow(10, closeDecimals)).toFixed(4)} ${targetSymbol}\n• Net Yield: +$${netYield.toFixed(2)}\n• 10% Protocol Fee: $${feeTaken.toFixed(2)}\n• Total Payout: ~$${userPayout.toFixed(2)} USD.\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -1884,7 +1947,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                 /* Adjust / Close On-Chain Tab */
                 <div className="space-y-4 font-mono text-xs">
                   {(() => {
-                    const liveSupply = onChainPortfolio[getNaviPortfolioKey(activeStrategy.supplyToken)]?.supplyBalance || 0;
+                    const primarySupply = onChainPortfolio[getNaviPortfolioKey(activeStrategy.supplyToken)]?.supplyBalance || 0;
+                    const suiFallbackSupply = activeStrategy.supplyToken !== 'SUI' ? (onChainPortfolio['Sui']?.supplyBalance || 0) : 0;
+                    const liveSupply = primarySupply > 0.00001 ? primarySupply : suiFallbackSupply;
+                    const liveSupplySymbol = primarySupply > 0.00001 ? activeStrategy.supplyToken : (suiFallbackSupply > 0.00001 ? 'SUI' : activeStrategy.supplyToken);
                     const liveBorrow = onChainPortfolio[getNaviPortfolioKey(activeStrategy.borrowToken)]?.borrowBalance || 0;
                     const hasAnyPos = liveSupply > 0.00001 || liveBorrow > 0.00001 || Boolean(activeUserPositionForStrategy);
 
@@ -1917,13 +1983,13 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                           <div className="flex justify-between">
                             <span className="text-gray-400">On-Chain Supply:</span>
                             <span className="text-white font-bold">
-                              {(liveSupply > 0 ? liveSupply : activeUserPositionForStrategy?.collateralAmount || 0).toFixed(4)} {activeStrategy.supplyToken}
+                              {liveSupply.toFixed(4)} {liveSupplySymbol}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-400">On-Chain Borrow:</span>
                             <span className="text-rose-400 font-bold">
-                              {(liveBorrow > 0 ? liveBorrow : activeUserPositionForStrategy?.borrowAmount || 0).toFixed(4)} {activeStrategy.borrowToken}
+                              {liveBorrow.toFixed(4)} {activeStrategy.borrowToken}
                             </span>
                           </div>
                           <div className="flex justify-between">
