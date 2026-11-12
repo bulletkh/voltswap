@@ -939,7 +939,7 @@ ${referralUrl}`;
                 disabled={claimableBalance < 10.00 || isClaiming}
                 className={`flex-1 py-3 px-4 rounded-xl font-extrabold text-xs sm:text-sm font-mono transition-all flex items-center justify-center gap-2 ${
                   claimableBalance >= 10.00 && !isClaiming
-                    ? 'bg-volt text-black shadow-volt-glow hover:bg-[#eafc6d] cursor-pointer active:scale-[0.98]'
+                    ? 'bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black shadow-[0_0_20px_rgba(56,189,248,0.25)] cursor-pointer active:scale-[0.98]'
                     : 'bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed'
                 }`}
               >
@@ -1352,7 +1352,7 @@ ${referralUrl}`;
 
           <button
             onClick={copyRefLink}
-            className="w-full md:w-auto shrink-0 px-6 py-3 rounded-2xl bg-volt text-black font-extrabold text-xs sm:text-sm shadow-volt-glow hover:bg-[#eafc6d] transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full md:w-auto shrink-0 px-6 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs sm:text-sm shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             {copiedLink ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
             {copiedLink ? 'Copied to Clipboard!' : 'Copy Referral Link'}
@@ -1460,7 +1460,7 @@ ${referralUrl}`;
                   const txt = activeTemplate === 'tg' ? telegramPostText : activeTemplate === 'x' ? xPostText : chatPostText;
                   copyTemplate(txt, activeTemplate);
                 }}
-                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-volt text-black font-extrabold text-xs shadow-volt-glow hover:bg-[#eafc6d] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {copiedTemplate === activeTemplate ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 {copiedTemplate === activeTemplate ? 'Copied to Clipboard!' : 'Copy Template Text'}
@@ -1680,7 +1680,7 @@ ${referralUrl}`;
 
             <button
               onClick={() => setClaimSuccessModal(null)}
-              className="w-full py-3 rounded-xl bg-volt text-black font-extrabold text-sm shadow-volt-glow hover:bg-[#eafc6d] cursor-pointer transition-all"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-sm shadow-[0_0_20px_rgba(56,189,248,0.25)] cursor-pointer transition-all"
             >
               Done
             </button>

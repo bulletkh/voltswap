@@ -468,7 +468,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               href={`https://suiscan.xyz/mainnet/account/${VOLT_TREASURY_ADDRESS}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-volt hover:text-[#eafc6d] font-bold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-bold transition-colors cursor-pointer"
             >
               Suiscan Vault Explorer <ExternalLink className="w-3.5 h-3.5" />
             </a>

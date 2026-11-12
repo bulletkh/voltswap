@@ -8,8 +8,8 @@ export const voltDarkTheme: ThemeVars = {
     primaryButton: '#121622',
     primaryButtonHover: '#1c2436',
     outlineButtonHover: '#1c2436',
-    walletItemHover: 'rgba(227, 250, 92, 0.08)',
-    walletItemSelected: 'rgba(227, 250, 92, 0.15)',
+    walletItemHover: 'rgba(56, 189, 248, 0.08)',
+    walletItemSelected: 'rgba(56, 189, 248, 0.16)',
     modalOverlay: 'rgba(5, 7, 11, 0.85)',
     modalPrimary: '#0d1017',
     modalSecondary: '#121622',
@@ -19,15 +19,15 @@ export const voltDarkTheme: ThemeVars = {
     dropdownMenuSeparator: 'rgba(255, 255, 255, 0.08)',
   },
   borderColors: {
-    outlineButton: 'rgba(227, 250, 92, 0.35)',
+    outlineButton: 'rgba(56, 189, 248, 0.35)',
   },
   colors: {
-    primaryButton: '#e3fa5c',
-    outlineButton: '#e3fa5c',
+    primaryButton: '#38bdf8',
+    outlineButton: '#38bdf8',
     body: '#ffffff',
     bodyMuted: '#94a3b8',
     bodyDanger: '#f87171',
-    iconButton: '#e3fa5c',
+    iconButton: '#38bdf8',
   },
   radii: {
     small: '10px',
@@ -36,8 +36,8 @@ export const voltDarkTheme: ThemeVars = {
     xlarge: '24px',
   },
   shadows: {
-    primaryButton: '0 0 16px rgba(227, 250, 92, 0.2)',
-    walletItemSelected: '0 0 12px rgba(227, 250, 92, 0.25)',
+    primaryButton: '0 0 16px rgba(56, 189, 248, 0.2)',
+    walletItemSelected: '0 0 12px rgba(56, 189, 248, 0.25)',
   },
   fontWeights: {
     normal: '400',

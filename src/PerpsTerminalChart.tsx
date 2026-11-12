@@ -718,7 +718,7 @@ export const PerpsTerminalChart: React.FC<PerpsTerminalChartProps> = ({
                       y1={currentPriceY}
                       x2={svgWidth - padRight}
                       y2={currentPriceY}
-                      stroke={priceDirection === 'up' ? '#10b981' : priceDirection === 'down' ? '#f43f5e' : '#d7f626'}
+                      stroke={priceDirection === 'up' ? '#10b981' : priceDirection === 'down' ? '#f43f5e' : '#38bdf8'}
                       strokeDasharray="3 3"
                       strokeWidth="1.2"
                     />
@@ -729,7 +729,7 @@ export const PerpsTerminalChart: React.FC<PerpsTerminalChartProps> = ({
                       width={padRight - 4}
                       height={18}
                       rx={4}
-                      fill={priceDirection === 'up' ? '#10b981' : priceDirection === 'down' ? '#f43f5e' : '#d7f626'}
+                      fill={priceDirection === 'up' ? '#10b981' : priceDirection === 'down' ? '#f43f5e' : '#38bdf8'}
                     />
                     <text
                       x={svgWidth - padRight + 4}

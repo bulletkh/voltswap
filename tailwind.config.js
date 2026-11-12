@@ -8,14 +8,14 @@ export default {
     extend: {
       colors: {
         volt: {
-          50: '#fbfef0',
-          100: '#f6fed2',
-          200: '#eefd9d',
-          300: '#e3fa5c',
-          400: '#d7f626',
-          500: '#c0dc11',
-          DEFAULT: '#e3fa5c',
-          glow: '#d7f626'
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          DEFAULT: '#38bdf8',
+          glow: '#0284c7'
         },
         dark: {
           900: '#0a0b0d',
@@ -25,7 +25,7 @@ export default {
         }
       },
       boxShadow: {
-        'volt-glow': '0 0 25px rgba(215, 246, 38, 0.25)',
+        'volt-glow': '0 0 25px rgba(56, 189, 248, 0.25)',
       }
     },
   },

@@ -109,12 +109,12 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
       ctx.fillRect(0, 0, 1200, 675);
 
       // Outer Neon Border
-      ctx.strokeStyle = 'rgba(215, 246, 38, 0.35)';
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
       ctx.lineWidth = 3;
       ctx.strokeRect(30, 30, 1140, 615);
 
       // 2. Header: Logo & Badge
-      ctx.fillStyle = '#d7f626';
+      ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 38px monospace';
       ctx.fillText('⚡ VOLT PROTOCOL', 70, 100);
 
@@ -156,7 +156,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
       ctx.font = '900 48px monospace';
       ctx.fillText(`${trade.fromAmount} ${trade.fromToken}`, 70, 290);
 
-      ctx.fillStyle = '#d7f626';
+      ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 44px sans-serif';
       ctx.fillText('➔', 620, 290);
 
@@ -193,7 +193,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
       ctx.font = 'bold 16px monospace';
       ctx.fillText('ROUTING ARCHITECTURE:', 745, 380);
 
-      ctx.fillStyle = '#d7f626';
+      ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 20px monospace';
       ctx.fillText(engineName, 745, 415);
 
@@ -203,12 +203,12 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
       ctx.fillText(`Vol: ~$${trade.volumeUsd.toFixed(2)} USD`, 745, 480);
 
       // 5. Footer: Referral & Call to Action
-      ctx.fillStyle = 'rgba(215, 246, 38, 0.08)';
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.08)';
       ctx.fillRect(70, 530, 1060, 80);
-      ctx.strokeStyle = 'rgba(215, 246, 38, 0.25)';
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
       ctx.strokeRect(70, 530, 1060, 80);
 
-      ctx.fillStyle = '#d7f626';
+      ctx.fillStyle = '#38bdf8';
       ctx.font = 'bold 20px monospace';
       ctx.fillText('JOIN VIA TRADER REFERRAL LINK:', 100, 578);
 
@@ -358,7 +358,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
           <button
             onClick={handleDownloadImage}
             disabled={isGeneratingImg}
-            className="py-3 px-3 rounded-xl bg-volt hover:bg-[#eafc6d] text-black font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-volt-glow active:scale-95 disabled:opacity-50"
+            className="py-3 px-3 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_20px_rgba(56,189,248,0.25)] active:scale-95 disabled:opacity-50"
           >
             <Download className="w-4 h-4 shrink-0" />
             <span>{isGeneratingImg ? 'Rendering...' : 'Download Card'}</span>

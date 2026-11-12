@@ -1585,7 +1585,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
                       setIsFastModalOpen(true);
                       playClickSound();
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-volt hover:bg-[#eafc6d] text-black font-mono font-black text-[11px] transition-all shadow-volt-glow cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-mono font-black text-[11px] transition-all shadow-[0_0_16px_rgba(56,189,248,0.25)] cursor-pointer"
                   >
                     ⚡ Enable
                   </button>
@@ -1876,7 +1876,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
                 isSubmitting || collateralAmount <= 0
                   ? 'bg-white/10 text-gray-500 cursor-not-allowed'
                   : fastSession.isActive
-                    ? 'bg-gradient-to-r from-volt via-[#eafc6d] to-volt text-black shadow-volt-glow hover:brightness-110'
+                    ? 'bg-gradient-to-r from-sky-500 via-sky-400 to-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(56,189,248,0.3)] hover:brightness-110'
                     : orderSide === 'long'
                       ? 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/30'
                       : 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/30'
@@ -2317,7 +2317,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
               <button
                 type="button"
                 onClick={applyCalculatorValues}
-                className="flex-1 py-3 rounded-2xl bg-volt hover:bg-[#eafc6d] text-black font-black text-xs uppercase tracking-wider transition-all shadow-volt-glow cursor-pointer"
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(56,189,248,0.25)] cursor-pointer"
               >
                 Apply to Order Form
               </button>
@@ -2439,7 +2439,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
                 type="button"
                 onClick={handleActivateFastTrading}
                 disabled={isSubmitting}
-                className="flex-1 py-3.5 rounded-2xl bg-volt hover:bg-[#eafc6d] text-black font-black text-xs uppercase tracking-wider transition-all shadow-volt-glow flex items-center justify-center gap-2 cursor-pointer"
+                className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(56,189,248,0.25)] flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
@@ -2617,7 +2617,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveTpSl}
-                  className="w-full py-3 rounded-2xl bg-volt hover:bg-[#eafc6d] text-black font-black text-xs uppercase tracking-wider transition-all shadow-volt-glow cursor-pointer mt-2"
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(56,189,248,0.25)] cursor-pointer mt-2"
                 >
                   Save TP / SL Targets
                 </button>
@@ -2702,7 +2702,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
                 <button
                   type="button"
                   onClick={handleAdjustMargin}
-                  className="w-full py-3 rounded-2xl bg-volt hover:bg-[#eafc6d] text-black font-black text-xs uppercase tracking-wider transition-all shadow-volt-glow cursor-pointer"
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(56,189,248,0.25)] cursor-pointer"
                 >
                   Confirm Margin Adjustment
                 </button>

@@ -971,7 +971,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                         ) : (
                           <button
                             onClick={() => { setActiveVault(vault); setModalMode('deposit'); }}
-                            className="px-5 py-2 rounded-xl bg-volt hover:bg-[#eafc6d] text-black font-black text-xs shadow-volt-glow transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                            className="px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                           >
                             <span>Deposit</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -1060,7 +1060,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                         ) : (
                           <button
                             onClick={() => { setActiveVault(vault); setModalMode('deposit'); }}
-                            className="px-5 py-1.5 rounded-xl bg-volt hover:bg-[#eafc6d] text-black font-black text-xs shadow-volt-glow flex items-center gap-1 cursor-pointer active:scale-95"
+                            className="px-5 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs shadow-[0_0_20px_rgba(56,189,248,0.25)] flex items-center gap-1 cursor-pointer active:scale-95"
                           >
                             <span>Deposit</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -1186,7 +1186,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
             <button
               onClick={handleConfirmOnChain}
               disabled={isExecuting}
-              className="w-full py-3.5 rounded-2xl bg-volt hover:bg-[#eafc6d] text-black font-extrabold text-sm shadow-volt-glow transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-extrabold text-sm shadow-[0_0_20px_rgba(56,189,248,0.25)] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isExecuting ? (
                 <>

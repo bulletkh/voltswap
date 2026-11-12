@@ -931,11 +931,12 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
   return (
     <div
       style={{
-        background: 'linear-gradient(180deg, rgba(13, 17, 28, 0.96) 0%, rgba(8, 11, 18, 0.98) 100%)',
-        border: '1px solid rgba(56, 189, 248, 0.22)',
-        borderRadius: '20px',
+        background: 'rgba(11, 14, 23, 0.95)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '24px',
         padding: '24px',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.55)',
+        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.6)',
         color: '#f8fafc',
       }}
     >
@@ -1134,9 +1135,9 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
                     key={sym}
                     onClick={() => setTokenFilter(sym)}
                     style={{
-                      background: isActive ? 'rgba(234, 252, 109, 0.2)' : 'rgba(255,255,255,0.04)',
-                      color: isActive ? '#eafc6d' : '#94a3b8',
-                      border: isActive ? '1px solid rgba(234, 252, 109, 0.45)' : '1px solid rgba(255,255,255,0.08)',
+                      background: isActive ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.04)',
+                      color: isActive ? '#38bdf8' : '#94a3b8',
+                      border: isActive ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid rgba(255,255,255,0.08)',
                       borderRadius: '8px',
                       padding: '4px 10px',
                       fontSize: '0.72rem',
@@ -1236,9 +1237,9 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
                           })
                         }
                         style={{
-                          background: 'rgba(215, 246, 38, 0.1)',
-                          color: '#d7f626',
-                          border: '1px solid rgba(215, 246, 38, 0.25)',
+                          background: 'rgba(56, 189, 248, 0.1)',
+                          color: '#38bdf8',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
                           borderRadius: '6px',
                           padding: '4px 6px',
                           fontSize: '0.68rem',
@@ -1263,9 +1264,9 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
                           })
                         }
                         style={{
-                          background: 'rgba(215, 246, 38, 0.1)',
-                          color: '#d7f626',
-                          border: '1px solid rgba(215, 246, 38, 0.25)',
+                          background: 'rgba(56, 189, 248, 0.1)',
+                          color: '#38bdf8',
+                          border: '1px solid rgba(56, 189, 248, 0.25)',
                           borderRadius: '6px',
                           padding: '4px 6px',
                           fontSize: '0.68rem',
@@ -1489,14 +1490,15 @@ export const WhaleRadar: React.FC<WhaleRadarProps> = ({
               }}
               style={{
                 flex: 1,
-                background: '#d7f626',
-                color: '#000',
+                background: '#38bdf8',
+                color: '#07090e',
                 fontWeight: 800,
                 fontSize: '0.75rem',
                 padding: '7px 12px',
                 borderRadius: '10px',
                 border: 'none',
                 cursor: 'pointer',
+                boxShadow: '0 0 16px rgba(56, 189, 248, 0.3)',
               }}
             >
               ⚡ Copy Trade at Whale Entry

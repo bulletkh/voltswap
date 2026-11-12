@@ -961,9 +961,9 @@ export default function App() {
                 uri: 'https://voltswap.org'
               },
               colors: {
-                primary: '#d7f626',
-                background: '#0c0e14',
-                card: '#12151d'
+                primary: '#38bdf8',
+                background: '#06080e',
+                card: '#0b0e17'
               },
               defaultDestination: {
                 chain: 'sui'
@@ -1722,9 +1722,9 @@ export default function App() {
       <header className="border-b border-white/[0.08] bg-[#090c15]/90 backdrop-blur-xl sticky top-0 z-40 px-4 lg:px-8 py-3 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('swap')}>
-            <div className="relative w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00f2fe] via-[#4facfe] to-[#38ef7d] p-[1.5px] shadow-[0_0_20px_rgba(0,242,254,0.3)] group-hover:shadow-[0_0_28px_rgba(56,239,125,0.4)] transition-all">
+            <div className="relative w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#0284c7] via-[#0ea5e9] to-[#38bdf8] p-[1.5px] shadow-[0_0_20px_rgba(56,189,248,0.25)] group-hover:shadow-[0_0_28px_rgba(56,189,248,0.4)] transition-all">
               <div className="w-full h-full bg-[#090d16] rounded-[14px] flex items-center justify-center">
-                <Zap className="w-5 h-5 text-volt fill-volt group-hover:scale-110 transition-transform" />
+                <Zap className="w-5 h-5 text-cyan-400 fill-cyan-400 group-hover:scale-110 transition-transform" />
               </div>
             </div>
             <div>
@@ -2622,7 +2622,7 @@ export default function App() {
                             });
                           }
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-volt hover:bg-[#eafc6d] text-black font-extrabold text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-volt-glow active:scale-95"
+                        className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-[0_0_16px_rgba(56,189,248,0.25)] active:scale-95"
                       >
                         <Share2 className="w-3 h-3" /> Share Card
                       </button>
@@ -2648,7 +2648,7 @@ export default function App() {
                 {/* Action Button */}
                 {!currentAccount ? (
                   <div className="mt-4">
-                    <ConnectButton className="w-full !rounded-2xl !py-4 !bg-gradient-to-r !from-[#22c55e] !via-[#10b981] !to-[#06b6d4] !text-black !font-black !text-base !shadow-[0_0_30px_rgba(16,185,129,0.3)] !w-full !justify-center hover:!scale-[1.01] transition-all cursor-pointer" />
+                    <ConnectButton className="w-full !rounded-2xl !py-4 !bg-gradient-to-r !from-[#0284c7] !via-[#0ea5e9] !to-[#38bdf8] !text-slate-950 !font-black !text-base !shadow-[0_0_25px_rgba(56,189,248,0.3)] !w-full !justify-center hover:!scale-[1.01] transition-all cursor-pointer" />
                   </div>
                 ) : (
                   <button
@@ -2659,7 +2659,7 @@ export default function App() {
                         ? 'bg-rose-500/[0.08] text-rose-300 border border-rose-500/20 cursor-not-allowed opacity-90 shadow-none'
                         : parseAmount(fromAmount) <= 0
                         ? 'bg-white/[0.04] text-gray-500 border border-white/[0.06] cursor-not-allowed shadow-none'
-                        : 'bg-gradient-to-r from-[#22c55e] via-[#10b981] to-[#06b6d4] text-slate-950 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] hover:scale-[1.008] active:scale-[0.99] disabled:opacity-50'
+                        : 'bg-gradient-to-r from-[#0284c7] via-[#0ea5e9] to-[#38bdf8] text-slate-950 shadow-[0_0_25px_rgba(56,189,248,0.3)] hover:shadow-[0_0_35px_rgba(56,189,248,0.5)] hover:scale-[1.008] active:scale-[0.99] disabled:opacity-50'
                     }`}
                   >
                     {isSwapping ? (
@@ -3104,12 +3104,12 @@ export default function App() {
         {/* TAB 3: BRIDGE (Cross-Chain Native In-App Engine) */}
         {activeTab === 'bridge' && (
           <div className="w-full max-w-lg">
-            <div className="bg-[#12151d] border border-white/10 rounded-3xl p-4 sm:p-6 shadow-2xl relative">
+            <div className="bg-[#0b0e17]/95 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.6)] relative overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold tracking-wide text-white flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-volt" /> Cross-Chain CCTP & Native Bridge
+                      <Zap className="w-4 h-4 text-cyan-400" /> Cross-Chain CCTP & Native Bridge
                     </span>
                     <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
                       Circle CCTP
@@ -3120,22 +3120,22 @@ export default function App() {
                   </span>
                 </div>
                 <span className="text-[11px] font-mono text-gray-400 flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-volt" /> ~45s Finality
+                  <Clock className="w-3 h-3 text-cyan-400" /> ~45s Finality
                 </span>
               </div>
 
-              <div className="w-full min-h-[520px] rounded-2xl overflow-hidden bg-[#0c0e14] border border-white/5 relative p-2 flex justify-center">
+              <div className="w-full min-h-[520px] rounded-2xl overflow-hidden bg-[#06080e] border border-white/[0.06] relative p-2 flex justify-center">
                 <div id="mayan-widget-root" className="w-full flex justify-center" />
               </div>
 
-              <div className="mt-4 pt-3 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+              <div className="mt-4 pt-3 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
                 <span className="text-gray-400 text-[11px]">Zero-slippage Circle CCTP routing</span>
                 <div className="flex items-center gap-3 text-[11px] text-gray-400">
                   <a
                     href="https://bridge.sui.io"
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:text-white flex items-center gap-1 transition-colors underline"
+                    className="hover:text-cyan-400 flex items-center gap-1 transition-colors underline"
                   >
                     Sui Native Bridge <ExternalLink className="w-3 h-3" />
                   </a>
@@ -3143,7 +3143,7 @@ export default function App() {
                     href="https://portalbridge.com"
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:text-white flex items-center gap-1 transition-colors underline"
+                    className="hover:text-cyan-400 flex items-center gap-1 transition-colors underline"
                   >
                     Wormhole Portal <ExternalLink className="w-3 h-3" />
                   </a>
@@ -3174,9 +3174,9 @@ export default function App() {
         {/* TAB 5: ARCHITECTURE & DOCS */}
         {activeTab === 'docs' && (
           <div className="w-full max-w-4xl space-y-6">
-            <div className="bg-[#12151d] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-volt/10 border border-volt/30 text-volt text-xs font-mono font-bold mb-4">
-                <Zap className="w-3.5 h-3.5" /> Volt Protocol Architecture
+            <div className="bg-[#0b0e17]/95 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-6 sm:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.6)]">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-xs font-mono font-bold mb-4">
+                <Zap className="w-3.5 h-3.5 text-cyan-400" /> Volt Protocol Architecture
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">
                 High-Frequency PTB Aggregation & On-Chain Smart Money Terminal
@@ -3185,23 +3185,23 @@ export default function App() {
                 Volt Protocol combines atomic Move Programmable Transaction Block (PTB) order splitting across{' '}
                 <strong className="text-white">DeepBook v3 CLOB</strong> and concentrated liquidity AMMs (
                 <strong className="text-white">Cetus, Turbos, Bluefin</strong>) with a live on-chain{' '}
-                <strong className="text-volt">Whale & Smart Money Flow Radar</strong>.
+                <strong className="text-cyan-400">Whale & Smart Money Flow Radar</strong>.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 rounded-2xl bg-[#0b0d13] border border-white/5">
-                  <h4 className="text-sm font-bold text-volt mb-1.5 font-mono">1. Atomic PTB Split-Routing</h4>
+                <div className="p-4 rounded-2xl bg-[#06080e] border border-white/[0.06]">
+                  <h4 className="text-sm font-bold text-cyan-400 mb-1.5 font-mono">1. Atomic PTB Split-Routing</h4>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     Instead of executing sequential transactions or single-pool swaps, Volt dynamically splits orders across CLOB limit ticks and AMM liquidity buckets inside a single Move PTB (~390ms finality).
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#0b0d13] border border-white/5">
+                <div className="p-4 rounded-2xl bg-[#06080e] border border-white/[0.06]">
                   <h4 className="text-sm font-bold text-emerald-400 mb-1.5 font-mono">2. Live Whale & Cluster Radar</h4>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     Streams real-time Sui Mainnet swap events via GraphQL, automatically detecting large whale entries, multi-wallet cluster dumps, and net token inflows with 1-click copy execution.
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#0b0d13] border border-white/5">
+                <div className="p-4 rounded-2xl bg-[#06080e] border border-white/[0.06]">
                   <h4 className="text-sm font-bold text-cyan-400 mb-1.5 font-mono">3. Non-Custodial Wallet X-Ray</h4>
                   <p className="text-xs text-gray-400 leading-relaxed">
                     Inspect any whale wallet&apos;s live token holdings directly inside the terminal before copying a trade. Zero custody — all swaps settle directly from and to your Sui wallet.
@@ -3548,7 +3548,7 @@ export default function App() {
                               `Successfully updated ${selectedOrderToManage.pair}:\n• New Price Target: $${newPrice} USD\n• Est. Output: ${(amtInNum * parseFloat(newPrice)).toFixed(4)} ${pairQuote}\n\nTarget synced with DeepBook v3.`
                             );
                           }}
-                          className="px-4 py-2.5 rounded-xl bg-volt hover:bg-[#eafc6d] text-black font-extrabold text-xs font-mono transition-all shadow-volt-glow flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs font-mono transition-all shadow-[0_0_16px_rgba(56,189,248,0.25)] flex items-center gap-1.5 cursor-pointer active:scale-95"
                         >
                           <Check className="w-3.5 h-3.5" /> Save & Update Target
                         </button>
