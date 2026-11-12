@@ -27,8 +27,9 @@ import {
   Coins
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
-import { depositCoin, pool as naviPool } from 'navi-sdk';
-import { VOLT_TREASURY_ADDRESS } from './EarnVaultsHub';
+import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
+import { VOLT_TREASURY_ADDRESS } from './constants';
+import { getOwnedCoinObjects } from './coinHelper';
 
 export type MarginStrategyFilter = 'all' | 'lst' | 'long_sui' | 'short_sui' | 'stablecoin' | 'rwa';
 
@@ -245,6 +246,8 @@ interface MarginMultiplyHubProps {
   signAndExecute?: (args: { transaction: Transaction }) => Promise<any>;
   currentAccountAddress?: string | null;
   userBalances?: Record<string, string>;
+  effectiveFeeRate?: number;
+  userTraderTier?: any;
   onNavigateToSwap: (fromToken: string, toToken: string) => void;
   showNotification: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string, actionLabel?: string, actionUrl?: string) => void;
 }
@@ -255,6 +258,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   signAndExecute,
   currentAccountAddress,
   userBalances = {},
+  effectiveFeeRate = 0.0025,
+  userTraderTier,
   onNavigateToSwap,
   showNotification
 }) => {
@@ -353,6 +358,57 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     return Math.min(999, Math.max(0.1, hf));
   }, [activeStrategy, totalExposureUsd, borrowUsd]);
 
+  // Helper to resolve accurate wallet balance from GraphQL userBalances map
+  const getStrategyWalletBalance = (tokenSymbol: string) => {
+    if (!currentAccount?.address) return '0.00';
+    const sym = tokenSymbol.toUpperCase();
+    let raw = '0';
+    let decimals = 9;
+
+    if (sym === 'USDC' || sym === 'USDY') {
+      decimals = 6;
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k.toLowerCase().includes(`::${sym.toLowerCase()}::${sym.toLowerCase()}`) || k.toLowerCase().endsWith(`::${sym.toLowerCase()}`)) {
+          raw = v;
+          break;
+        }
+      }
+    } else if (sym === 'HASUI') {
+      decimals = 9;
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k.toLowerCase().includes('::hasui::hasui')) {
+          raw = v;
+          break;
+        }
+      }
+      if (BigInt(raw || '0') <= 0n) {
+        for (const [k, v] of Object.entries(userBalances)) {
+          if (k === '0x2::sui::SUI' || k.toLowerCase().endsWith('::sui::sui')) {
+            raw = v;
+            break;
+          }
+        }
+      }
+    } else {
+      // SUI
+      decimals = 9;
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k === '0x2::sui::SUI' || k.toLowerCase().endsWith('::sui::sui')) {
+          raw = v;
+          break;
+        }
+      }
+    }
+
+    const rawBig = BigInt(raw || '0');
+    if (rawBig <= 0n) return '0.00';
+    const num = Number(rawBig) / Math.pow(10, decimals);
+    const effectiveNum = (decimals === 9 && num > 0.03) ? num - 0.02 : num;
+    const factor = Math.pow(10, decimals === 6 ? 2 : 4);
+    const floored = Math.floor(effectiveNum * factor) / factor;
+    return floored > 0 ? floored.toString() : '0.00';
+  };
+
   // Open Modal
   const handleOpenMultiplyModal = (strat: MultiplyStrategy) => {
     setActiveStrategy(strat);
@@ -376,20 +432,74 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     setIsExecuting(true);
     try {
       const tx = new Transaction();
+      tx.setSender(currentAccount.address);
+
+      const feeRate = effectiveFeeRate ?? 0.0025;
+      const feeRateBps = BigInt(Math.max(1, Math.round(feeRate * 10000)));
 
       // Real On-Chain PTB Execution with NAVI / Scallop / Haedal Move Call
       if (activeStrategy.supplyToken === 'SUI') {
-        const amountMist = BigInt(Math.floor(collateralNum * 1e9));
-        await depositCoin(tx, naviPool.Sui, tx.gas, amountMist);
+        const totalMist = BigInt(Math.floor(collateralNum * 1e9));
+        const feeMist = (totalMist * feeRateBps) / 10000n;
+        const netMist = totalMist - feeMist;
+
+        if (feeMist > 0n) {
+          const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+        }
+        const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
+        await depositCoin(tx, naviPool.Sui, splitCoin, netMist);
+
       } else if (activeStrategy.supplyToken === 'USDC') {
-        const amountUnits = BigInt(Math.floor(collateralNum * 1e6));
-        const [splitCoin] = tx.splitCoins(tx.gas, [amountUnits]);
-        await depositCoin(tx, naviPool.nUSDC, splitCoin, amountUnits);
+        const totalUnits = BigInt(Math.floor(collateralNum * 1e6));
+        const feeUnits = (totalUnits * feeRateBps) / 10000n;
+        const netUnits = totalUnits - feeUnits;
+
+        const coinObjects = await getOwnedCoinObjects(currentAccount.address, activeStrategy.supplyCoinType);
+        if (!coinObjects || coinObjects.length === 0) {
+          throw new Error('No USDC coins found in your wallet. Please swap or deposit USDC first.');
+        }
+        const totalBalance = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
+        if (totalBalance < totalUnits) {
+          throw new Error(`Insufficient USDC balance (${(Number(totalBalance) / 1e6).toFixed(2)} USDC available).`);
+        }
+
+        const [primaryCoin, ...otherCoins] = coinObjects.map(c => tx.object(c.objectId));
+        if (otherCoins.length > 0) {
+          tx.mergeCoins(primaryCoin, otherCoins);
+        }
+        if (feeUnits > 0n) {
+          const [feeCoin] = tx.splitCoins(primaryCoin, [feeUnits]);
+          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+        }
+        const [splitCoin] = tx.splitCoins(primaryCoin, [netUnits]);
+        await depositCoin(tx, naviPool.nUSDC, splitCoin, netUnits);
+
+      } else if (activeStrategy.supplyToken === 'haSUI') {
+        const totalMist = BigInt(Math.floor(collateralNum * 1e9));
+        const feeMist = (totalMist * feeRateBps) / 10000n;
+        const netMist = totalMist - feeMist;
+
+        if (feeMist > 0n) {
+          const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+        }
+        const [stakeCoin] = tx.splitCoins(tx.gas, [netMist]);
+        const [haSuiCoin] = tx.moveCall({
+          target: '0x2c68443db9e8c813b194010c11040a3ce59f47e4eb97a2ec805371505dad7459::staking::request_stake',
+          typeArguments: [],
+          arguments: [
+            tx.object('0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d'),
+            stakeCoin,
+            tx.pure.address('0x0000000000000000000000000000000000000000000000000000000000000000'),
+          ],
+        });
+        tx.transferObjects([haSuiCoin], currentAccount.address);
+
       } else {
-        // haSUI / USDY: deposit or staking request Move call
-        const amountMist = BigInt(Math.floor(collateralNum * 1e9));
-        const [splitCoin] = tx.splitCoins(tx.gas, [amountMist]);
-        tx.transferObjects([splitCoin], currentAccount.address);
+        const totalMist = BigInt(Math.floor(collateralNum * 1e9));
+        const [splitCoin] = tx.splitCoins(tx.gas, [totalMist]);
+        await depositCoin(tx, naviPool.Sui, splitCoin, totalMist);
       }
 
       const result = await signAndExecute({ transaction: tx });
@@ -417,10 +527,11 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       setActivePositions((prev) => [newPosition, ...prev]);
       setActiveStrategy(null);
 
+      const feePercentStr = (feeRate * 100).toFixed(2);
       showNotification(
         'success',
         'Leveraged Multiply Position Opened',
-        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Collateral: ${collateralNum.toFixed(4)} ${activeStrategy.supplyToken} (~$${collateralUsd.toFixed(2)})\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Collateral: ${collateralNum.toFixed(4)} ${activeStrategy.supplyToken} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: ${feePercentStr}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -442,10 +553,31 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     setIsExecuting(true);
     try {
       const tx = new Transaction();
-      // Execution of unwind: split gas or repay debt call
-      const feeMist = BigInt(1000000); // minimal execution gas
-      const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
-      tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+      tx.setSender(currentAccount.address);
+
+      // 10% performance fee on net profits sent to Treasury
+      const netYield = Math.max(0, pos.pnlUsd);
+      const feeTaken = netYield * 0.10;
+      const perfFeeMist = BigInt(Math.floor((feeTaken / 0.85) * 1e9));
+      if (perfFeeMist > 0n && perfFeeMist < 50000000n) {
+        const [feeCoin] = tx.splitCoins(tx.gas, [perfFeeMist]);
+        tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+      }
+
+      // Genuine on-chain withdrawal from protocol
+      if (pos.supplyToken === 'SUI') {
+        const mist = BigInt(Math.floor(pos.collateralAmount * 1e9));
+        const [withdrawnCoin] = await withdrawCoin(tx, naviPool.Sui, mist);
+        tx.transferObjects([withdrawnCoin], currentAccount.address);
+      } else if (pos.supplyToken === 'USDC') {
+        const units = BigInt(Math.floor(pos.collateralAmount * 1e6));
+        const [withdrawnCoin] = await withdrawCoin(tx, naviPool.nUSDC, units);
+        tx.transferObjects([withdrawnCoin], currentAccount.address);
+      } else {
+        const mist = BigInt(Math.floor(pos.collateralAmount * 1e9));
+        const [withdrawnCoin] = await withdrawCoin(tx, naviPool.haSui, mist);
+        tx.transferObjects([withdrawnCoin], currentAccount.address);
+      }
 
       const result = await signAndExecute({ transaction: tx });
       const digest = (result as any)?.digest || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
@@ -453,8 +585,6 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       setActivePositions((prev) => prev.filter((p) => p.id !== pos.id));
       setManagingPosition(null);
 
-      const netYield = Math.max(0, pos.pnlUsd);
-      const feeTaken = netYield * 0.10; // 10% performance fee on net profits
       const userPayout = pos.collateralUsd + netYield - feeTaken;
 
       showNotification(
@@ -819,9 +949,9 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-gray-400 font-mono">
                 <span>Deposit Collateral:</span>
-                <span>Wallet Balance: {userBalances[activeStrategy.supplyToken] || '10.00'} {activeStrategy.supplyToken}</span>
+                <span>Wallet Balance: {getStrategyWalletBalance(activeStrategy.supplyToken)} {activeStrategy.supplyToken}</span>
               </div>
-              <div className="relative bg-[#090b10] border border-white/10 focus-within:border-volt/50 rounded-2xl p-3 transition-all">
+              <div className="relative bg-[#090b10] border border-white/10 focus-within:border-cyan-500/50 rounded-2xl p-3 transition-all">
                 <div className="flex items-center justify-between">
                   <input
                     type="number"
@@ -833,8 +963,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   />
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setInputCollateral((userBalances[activeStrategy.supplyToken] || '10.00'))}
-                      className="px-2 py-1 rounded bg-volt/10 text-volt text-[11px] font-bold hover:bg-volt/20 cursor-pointer"
+                      onClick={() => setInputCollateral(getStrategyWalletBalance(activeStrategy.supplyToken))}
+                      className="px-2 py-1 rounded bg-cyan-500/10 text-cyan-300 text-[11px] font-bold hover:bg-cyan-500/20 border border-cyan-500/20 cursor-pointer"
                     >
                       MAX
                     </button>

@@ -3323,6 +3323,8 @@ export default function App() {
               signAndExecute={signAndExecute}
               currentAccountAddress={currentAccount?.address}
               userBalances={userBalances}
+              effectiveFeeRate={effectiveFeeRate}
+              userTraderTier={userTraderTier}
               onNavigateToSwap={(from, to) => {
                 if (from) {
                   const f = POPULAR_TOKENS.find(t => t.symbol === from);

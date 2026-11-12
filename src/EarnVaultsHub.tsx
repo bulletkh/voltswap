@@ -33,11 +33,14 @@ import {
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
+import { MarginMultiplyHub } from './MarginMultiplyHub';
+import { getOwnedCoinObjects } from './coinHelper';
+import { VOLT_TREASURY_ADDRESS } from './constants';
 
 export type ProtocolFilter = 'all' | 'navi' | 'cetus' | 'haedal' | 'scallop' | 'walrus' | 'deepbook';
 
 // Volt Protocol Official Treasury & Integrator Address for B2B Kickbacks
-export const VOLT_TREASURY_ADDRESS = '0x7211d7a33c32b8a848fd5d87dc0630b7d40d3d324856a748aff454c2955cab12';
+export { VOLT_TREASURY_ADDRESS };
 
 export interface EcosystemVault {
   id: string;
@@ -271,6 +274,8 @@ interface EarnVaultsHubProps {
   signAndExecute?: (args: { transaction: Transaction }) => Promise<any>;
   currentAccountAddress?: string | null;
   userBalances?: Record<string, string>;
+  effectiveFeeRate?: number;
+  userTraderTier?: any;
   onNavigateToSwap: (fromToken: string, toToken: string) => void;
   showNotification: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string, actionLabel?: string, actionUrl?: string) => void;
 }
@@ -281,9 +286,14 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   signAndExecute,
   currentAccountAddress,
   userBalances = {},
+  effectiveFeeRate = 0.0025,
+  userTraderTier,
   onNavigateToSwap,
   showNotification
 }) => {
+  // View Mode: 7 Blue-Chip Vaults vs 1-Click Multiply Looping (Up to 9.8x)
+  const [viewMode, setViewMode] = useState<'vaults' | 'multiply'>('vaults');
+
   // Category Filter & Search
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'single' | 'lst' | 'dex'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -427,6 +437,83 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
     return Object.values(userPositions).reduce((acc, p) => acc + (p?.accruedYield || 0), 0);
   }, [userPositions]);
 
+  // Helper to resolve accurate wallet balance from GraphQL userBalances map
+  const getWalletBalance = (symbol: string) => {
+    if (!currentAccount?.address) return '0.00';
+    const s = symbol.toUpperCase();
+    let raw = '0';
+    let decimals = 9;
+
+    if (s === 'USDC') {
+      decimals = 6;
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k.toLowerCase().includes('::usdc::usdc') || k.toLowerCase().endsWith('::usdc')) {
+          raw = v;
+          break;
+        }
+      }
+    } else if (s === 'USDT') {
+      decimals = 6;
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k.toLowerCase().includes('::usdt::usdt') || k.toLowerCase().includes('0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c')) {
+          raw = v;
+          break;
+        }
+      }
+    } else if (s === 'DEEP' || s === 'DEEP-SUI') {
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k.toLowerCase().includes('::deep::deep')) {
+          raw = v;
+          decimals = 6;
+          break;
+        }
+      }
+      if (BigInt(raw || '0') <= 0n) {
+        decimals = 9;
+        for (const [k, v] of Object.entries(userBalances)) {
+          if (k === '0x2::sui::SUI' || k.toLowerCase().endsWith('::sui::sui')) {
+            raw = v;
+            break;
+          }
+        }
+      }
+    } else if (s === 'WAL' || s === 'WAL-SUI') {
+      decimals = 9;
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k.toLowerCase().includes('::wal::wal')) {
+          raw = v;
+          break;
+        }
+      }
+      if (BigInt(raw || '0') <= 0n) {
+        for (const [k, v] of Object.entries(userBalances)) {
+          if (k === '0x2::sui::SUI' || k.toLowerCase().endsWith('::sui::sui')) {
+            raw = v;
+            break;
+          }
+        }
+      }
+    } else {
+      // SUI or general SUI-paired vaults
+      decimals = 9;
+      for (const [k, v] of Object.entries(userBalances)) {
+        if (k === '0x2::sui::SUI' || k.toLowerCase().endsWith('::sui::sui')) {
+          raw = v;
+          break;
+        }
+      }
+    }
+
+    const rawBig = BigInt(raw || '0');
+    if (rawBig <= 0n) return '0.00';
+    const num = Number(rawBig) / Math.pow(10, decimals);
+    // For SUI, leave ~0.02 SUI buffer for gas fees
+    const effectiveNum = (decimals === 9 && num > 0.03) ? num - 0.02 : num;
+    const factor = Math.pow(10, decimals === 6 ? 2 : 4);
+    const floored = Math.floor(effectiveNum * factor) / factor;
+    return floored > 0 ? floored.toString() : '0.00';
+  };
+
   // Handle on-chain interaction
   const handleConfirmOnChain = async () => {
     if (!activeVault) return;
@@ -444,50 +531,142 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
     try {
       setIsExecuting(true);
       const tx = new Transaction();
+      tx.setSender(currentAccount.address);
 
-      if (activeVault.protocol === 'NAVI') {
-        if (activeVault.symbol.includes('SUI')) {
-          const amountMist = BigInt(Math.floor(amt * 1e9));
-          await depositCoin(tx, naviPool.Sui, tx.gas, amountMist);
-        } else if (activeVault.symbol === 'USDC') {
+      const feeRate = effectiveFeeRate ?? 0.0025;
+      const feeRateBps = BigInt(Math.max(1, Math.round(feeRate * 10000)));
+
+      if (modalMode === 'deposit') {
+        if (activeVault.symbol === 'USDC') {
+          const totalUnits = BigInt(Math.floor(amt * 1e6));
+          const feeUnits = (totalUnits * feeRateBps) / 10000n;
+          const netDepositUnits = totalUnits - feeUnits;
+
+          const coinObjects = await getOwnedCoinObjects(currentAccount.address, activeVault.coinType);
+          if (!coinObjects || coinObjects.length === 0) {
+            throw new Error('No USDC coins found in your wallet. Please swap or deposit USDC first.');
+          }
+          const totalBalance = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
+          if (totalBalance < totalUnits) {
+            throw new Error(`Insufficient USDC balance (${(Number(totalBalance) / 1e6).toFixed(2)} USDC available).`);
+          }
+
+          const [primaryCoin, ...otherCoins] = coinObjects.map(c => tx.object(c.objectId));
+          if (otherCoins.length > 0) {
+            tx.mergeCoins(primaryCoin, otherCoins);
+          }
+          if (feeUnits > 0n) {
+            const [feeCoin] = tx.splitCoins(primaryCoin, [feeUnits]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [depositCoinObj] = tx.splitCoins(primaryCoin, [netDepositUnits]);
+          await depositCoin(tx, naviPool.nUSDC, depositCoinObj, netDepositUnits);
+
+        } else if (activeVault.symbol === 'USDT') {
+          const totalUnits = BigInt(Math.floor(amt * 1e6));
+          const feeUnits = (totalUnits * feeRateBps) / 10000n;
+          const netDepositUnits = totalUnits - feeUnits;
+
+          const coinObjects = await getOwnedCoinObjects(currentAccount.address, activeVault.coinType);
+          if (!coinObjects || coinObjects.length === 0) {
+            throw new Error('No USDT coins found in your wallet. Please swap or deposit USDT first.');
+          }
+          const totalBalance = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
+          if (totalBalance < totalUnits) {
+            throw new Error(`Insufficient USDT balance (${(Number(totalBalance) / 1e6).toFixed(2)} USDT available).`);
+          }
+
+          const [primaryCoin, ...otherCoins] = coinObjects.map(c => tx.object(c.objectId));
+          if (otherCoins.length > 0) {
+            tx.mergeCoins(primaryCoin, otherCoins);
+          }
+          if (feeUnits > 0n) {
+            const [feeCoin] = tx.splitCoins(primaryCoin, [feeUnits]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [depositCoinObj] = tx.splitCoins(primaryCoin, [netDepositUnits]);
+          await depositCoin(tx, naviPool.USDT, depositCoinObj, netDepositUnits);
+
+        } else if (activeVault.protocol === 'Scallop') {
+          const totalMist = BigInt(Math.floor(amt * 1e9));
+          const feeMist = (totalMist * feeRateBps) / 10000n;
+          const netDepositMist = totalMist - feeMist;
+
+          if (feeMist > 0n) {
+            const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [splitCoin] = tx.splitCoins(tx.gas, [netDepositMist]);
+          const [sCoin] = tx.moveCall({
+            target: '0xefe8b36d5b2e43728cc323298626b83177803521d195cfb11e15b910e892fddf::mint::mint',
+            typeArguments: ['0x2::sui::SUI'],
+            arguments: [
+              tx.object('0x0787265a7d5d52b6f125a228308e9a4891b97a6e76cf0e35921869e8b6fa720e'),
+              tx.object('0xa757975255146dc9686aa823b7838724a3bc677b8ee26017096bc39a7b47935d'),
+              splitCoin,
+              tx.object('0x6'),
+            ],
+          });
+          tx.transferObjects([sCoin], currentAccount.address);
+
+        } else if (activeVault.protocol === 'Haedal') {
+          const totalMist = BigInt(Math.floor(amt * 1e9));
+          const feeMist = (totalMist * feeRateBps) / 10000n;
+          const netDepositMist = totalMist - feeMist;
+
+          if (feeMist > 0n) {
+            const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [splitCoin] = tx.splitCoins(tx.gas, [netDepositMist]);
+          const [haSuiCoin] = tx.moveCall({
+            target: '0x2c68443db9e8c813b194010c11040a3ce59f47e4eb97a2ec805371505dad7459::staking::request_stake',
+            typeArguments: [],
+            arguments: [
+              tx.object('0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d'),
+              splitCoin,
+              tx.pure.address('0x0000000000000000000000000000000000000000000000000000000000000000'),
+            ],
+          });
+          tx.transferObjects([haSuiCoin], currentAccount.address);
+
+        } else {
+          // NAVI SUI, Cetus SUI, DeepBook SUI, Walrus SUI
+          const totalMist = BigInt(Math.floor(amt * 1e9));
+          const feeMist = (totalMist * feeRateBps) / 10000n;
+          const netDepositMist = totalMist - feeMist;
+
+          if (feeMist > 0n) {
+            const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+            tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+          }
+          const [splitCoin] = tx.splitCoins(tx.gas, [netDepositMist]);
+          await depositCoin(tx, naviPool.Sui, splitCoin, netDepositMist);
+        }
+
+      } else {
+        // modalMode === 'withdraw'
+        if (activeVault.symbol === 'USDC') {
           const amountUnits = BigInt(Math.floor(amt * 1e6));
-          const [splitCoin] = tx.splitCoins(tx.gas, [amountUnits]);
-          await depositCoin(tx, naviPool.nUSDC, splitCoin, amountUnits);
+          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.nUSDC, amountUnits);
+          tx.transferObjects([withdrawnCoin], currentAccount.address);
+
         } else if (activeVault.symbol === 'USDT') {
           const amountUnits = BigInt(Math.floor(amt * 1e6));
-          const [splitCoin] = tx.splitCoins(tx.gas, [amountUnits]);
-          await depositCoin(tx, naviPool.USDT, splitCoin, amountUnits);
+          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.USDT, amountUnits);
+          tx.transferObjects([withdrawnCoin], currentAccount.address);
+
+        } else if (activeVault.protocol === 'Haedal') {
+          const amountMist = BigInt(Math.floor(amt * 1e9));
+          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.haSui, amountMist);
+          tx.transferObjects([withdrawnCoin], currentAccount.address);
+
+        } else {
+          // NAVI SUI, Scallop, Cetus, DeepBook, Walrus
+          const amountMist = BigInt(Math.floor(amt * 1e9));
+          const [withdrawnCoin] = await withdrawCoin(tx, naviPool.Sui, amountMist);
+          tx.transferObjects([withdrawnCoin], currentAccount.address);
         }
-      } else if (activeVault.protocol === 'Scallop') {
-        const amountMist = BigInt(Math.floor(amt * 1e9));
-        const [splitCoin] = tx.splitCoins(tx.gas, [amountMist]);
-        const [sCoin] = tx.moveCall({
-          target: '0xefe8b36d5b2e43728cc323298626b83177803521d195cfb11e15b910e892fddf::mint::mint',
-          typeArguments: ['0x2::sui::SUI'],
-          arguments: [
-            tx.object('0x0787265a7d5d52b6f125a228308e9a4891b97a6e76cf0e35921869e8b6fa720e'),
-            tx.object('0xa757975255146dc9686aa823b7838724a3bc677b8ee26017096bc39a7b47935d'),
-            splitCoin,
-            tx.object('0x6'),
-          ],
-        });
-        tx.transferObjects([sCoin], currentAccount.address);
-      } else if (activeVault.protocol === 'Haedal') {
-        const amountMist = BigInt(Math.floor(amt * 1e9));
-        const [splitCoin] = tx.splitCoins(tx.gas, [amountMist]);
-        const [haSuiCoin] = tx.moveCall({
-          target: '0x2c68443db9e8c813b194010c11040a3ce59f47e4eb97a2ec805371505dad7459::staking::request_stake',
-          typeArguments: [],
-          arguments: [
-            tx.object('0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d'),
-            splitCoin,
-            tx.pure.address('0x0000000000000000000000000000000000000000000000000000000000000000'),
-          ],
-        });
-        tx.transferObjects([haSuiCoin], currentAccount.address);
-      } else {
-        const amountMist = BigInt(Math.floor(amt * 1e9));
-        await depositCoin(tx, naviPool.Sui, tx.gas, amountMist);
       }
 
       const result = await signAndExecute({ transaction: tx });
@@ -514,10 +693,11 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         const ptsAwarded = Math.round(usdVal * activeVault.pointsMultiplier);
         setUserVoltPoints((prev) => prev + ptsAwarded);
 
+        const feePercentStr = (feeRate * 100).toFixed(2);
         showNotification(
           'success',
           'Volt Smart Vault Deposit Confirmed',
-          `Successfully deposited ${amt.toFixed(4)} ${activeVault.symbol} (~$${usdVal.toFixed(2)} USD) into ${activeVault.name}.\n\nYou received ${amt.toFixed(4)} ${activeVault.receiptToken} receipt tokens.\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+          `Successfully deposited ${amt.toFixed(4)} ${activeVault.symbol} (~$${usdVal.toFixed(2)} USD) into ${activeVault.name}.\n\n• Protocol Tier Fee: ${feePercentStr}%\n• Receipt Minted: ${amt.toFixed(4)} ${activeVault.receiptToken}\n• PTB Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
           'View on Suiscan',
           `https://suiscan.xyz/mainnet/tx/${digest}`
         );
@@ -540,7 +720,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         showNotification(
           'success',
           'Vault Redemption Confirmed',
-          `Successfully redeemed ${amt.toFixed(4)} ${activeVault.receiptToken} for ${amt.toFixed(4)} ${activeVault.symbol}.\nPrincipal returned 100%. Protocol 10% fee deducted only from net profit.\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+          `Successfully redeemed ${amt.toFixed(4)} ${activeVault.receiptToken} for ${amt.toFixed(4)} ${activeVault.symbol}.\n\nPrincipal returned directly to wallet.\n• PTB Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
           'View on Suiscan',
           `https://suiscan.xyz/mainnet/tx/${digest}`
         );
@@ -554,14 +734,6 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
     } finally {
       setIsExecuting(false);
     }
-  };
-
-  const getWalletBalance = (symbol: string) => {
-    if (!currentAccount?.address) return '0.00';
-    if (symbol.includes('SUI')) return userBalances['SUI'] || '0.00';
-    if (symbol === 'USDC') return userBalances['USDC'] || '0.00';
-    if (symbol === 'USDT') return userBalances['USDT'] || '0.00';
-    return userBalances[symbol] || '0.00';
   };
 
   return (
@@ -659,15 +831,51 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         </div>
       </div>
 
-      {/* 2. SECTION BADGE / TAB */}
-      <div className="flex items-center p-1 bg-[#0b0e17] border border-white/10 rounded-2xl w-fit">
-        <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black bg-volt text-black shadow-volt-glow">
-          <Coins className="w-4 h-4" />
-          <span>Pools & Vaults</span>
-        </div>
+      {/* 2. MODE SELECTOR */}
+      <div className="flex items-center p-1.5 bg-[#0b0e17] border border-white/10 rounded-2xl w-full sm:w-auto self-start gap-1.5 shadow-lg">
+        <button
+          onClick={() => setViewMode('vaults')}
+          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === 'vaults'
+              ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+              : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Coins className="w-4 h-4 text-cyan-400" />
+          <span>7 Blue-Chip Pools & Vaults</span>
+        </button>
+
+        <button
+          onClick={() => setViewMode('multiply')}
+          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === 'multiply'
+              ? 'bg-gradient-to-r from-cyan-500/20 via-sky-500/20 to-blue-500/20 text-cyan-300 border border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.2)]'
+              : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400/20" />
+          <span>1-Click Multiply Looping</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-cyan-400/15 text-cyan-300 border border-cyan-500/30">
+            Up to 9.8x
+          </span>
+        </button>
       </div>
 
-      {/* 3. SINGLE CLEAN FILTER & SEARCH BAR (NO CLUTTER) */}
+      {viewMode === 'multiply' ? (
+        <MarginMultiplyHub
+          currentAccount={currentAccount}
+          suiClient={suiClient}
+          signAndExecute={signAndExecute}
+          currentAccountAddress={currentAccountAddress}
+          userBalances={userBalances}
+          effectiveFeeRate={effectiveFeeRate}
+          userTraderTier={userTraderTier}
+          onNavigateToSwap={onNavigateToSwap}
+          showNotification={showNotification}
+        />
+      ) : (
+        <>
+          {/* 3. SINGLE CLEAN FILTER & SEARCH BAR (NO CLUTTER) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-[#0b0e17] border border-white/10">
         {/* Category Filter Pills */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -1030,6 +1238,8 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
               })
             )}
           </div>
+        </>
+      )}
 
       {/* 5. MODAL: VOLT SMART VAULT DEPOSIT & REDEEM */}
       {activeVault && (
