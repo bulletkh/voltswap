@@ -349,6 +349,8 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
   onSwitchToSpotLimit
 }) => {
   const [terminalMode, setTerminalMode] = useState<'simulation' | 'deepbook'>('simulation');
+  const [liveMarkets, setLiveMarkets] = useState<BluefinMarket[]>(BLUEFIN_MARKETS);
+  const [liveSuiPriceUsd, setLiveSuiPriceUsd] = useState<number>(0);
   const [selectedMarket, setSelectedMarket] = useState<BluefinMarket>(BLUEFIN_MARKETS[0]);
   const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
   const tickerScrollRef = useRef<HTMLDivElement>(null);
@@ -576,41 +578,42 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
   }>>([]);
 
   useEffect(() => {
-    const now = Date.now();
-    const initialTrades = Array.from({ length: 8 }).map((_, i) => {
-      const isBuy = Math.random() > 0.48;
-      const delta = (Math.random() - 0.5) * (selectedMarket.markPrice * 0.002);
-      const p = selectedMarket.markPrice + delta;
-      const d = new Date(now - i * 2500);
-      return {
-        id: `tr-${now}-${i}`,
-        price: p,
-        size: Math.round((Math.random() * 800 + 50) * (selectedMarket.markPrice < 1 ? 50 : 1)),
-        side: isBuy ? 'buy' : 'sell' as const,
-        time: d.toTimeString().split(' ')[0]
-      };
-    });
-    setRecentTrades(initialTrades);
+    let isMounted = true;
+    const fetchLiveTrades = async () => {
+      if (!selectedMarket.binanceSymbol) {
+        if (isMounted) setRecentTrades([]);
+        return;
+      }
+      try {
+        const res = await fetch(`https://fapi.binance.com/fapi/v1/trades?symbol=${selectedMarket.binanceSymbol}&limit=12`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data) && isMounted) {
+          const parsed = data
+            .slice()
+            .reverse()
+            .map((t: any) => ({
+              id: `tr-${t.id}`,
+              price: parseFloat(t.price),
+              size: parseFloat(t.qty),
+              side: (t.isBuyerMaker ? 'sell' : 'buy') as 'buy' | 'sell',
+              time: new Date(t.time).toTimeString().split(' ')[0],
+            }));
+          setRecentTrades(parsed);
+        }
+      } catch {
+        // Keep last known real trades
+      }
+    };
 
-    const interval = setInterval(() => {
-      const isBuy = Math.random() > 0.48;
-      const delta = (Math.random() - 0.49) * (selectedMarket.markPrice * 0.001);
-      const p = selectedMarket.markPrice + delta;
-      const d = new Date();
-      setRecentTrades((prev) => [
-        {
-          id: `tr-${Date.now()}`,
-          price: p,
-          size: Math.round((Math.random() * 950 + 40) * (selectedMarket.markPrice < 1 ? 50 : 1)),
-          side: isBuy ? 'buy' : 'sell',
-          time: d.toTimeString().split(' ')[0]
-        },
-        ...prev.slice(0, 11)
-      ]);
-    }, 2800);
+    fetchLiveTrades();
+    const interval = setInterval(fetchLiveTrades, 3000);
 
-    return () => clearInterval(interval);
-  }, [selectedMarket]);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [selectedMarket.symbol, selectedMarket.binanceSymbol]);
 
   // 1-Click Fast Trading Session (Hyperliquid Style)
   const [fastSession, setFastSession] = useState<FastTradingSession>(() => getFastTradingSession());
@@ -657,7 +660,10 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       tx.transferObjects([authCoin], VOLT_TREASURY_ADDRESS);
 
       const res = await signAndExecute({ transaction: tx });
-      const digest = (res as any)?.digest || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const digest = (res as any)?.digest;
+      if (!digest) {
+        throw new Error('Session authorization was not confirmed on-chain.');
+      }
 
       const session = createFastTradingSession(currentAccount.address, fastDurationHours, fastMaxSpendUsd);
       setFastSession(session);
@@ -700,7 +706,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
   };
 
   const filteredMarkets = useMemo(() => {
-    return BLUEFIN_MARKETS.filter((m) => {
+    return liveMarkets.filter((m) => {
       const q = searchMarketQuery.trim().toLowerCase();
       const matchQ =
         !q ||
@@ -714,7 +720,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       if (marketCategory === 'Vera RWAs') return m.category === 'Vera RWAs';
       return true;
     });
-  }, [marketCategory, searchMarketQuery, favoriteSymbols]);
+  }, [liveMarkets, marketCategory, searchMarketQuery, favoriteSymbols]);
 
   const formatUsdCompact = (val: number) => {
     if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`;
@@ -769,32 +775,102 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     } catch (_) {}
   }, [positions]);
 
-  // Live Real-Time Price Sync with Binance & Crypto Public Oracles
+  // Live Real-Time Price & Funding Rate Sync across ALL Markets (Binance Futures + Gate.io)
+  useEffect(() => {
+    let isMounted = true;
+    const syncAllMarkets = async () => {
+      try {
+        const [tRes, pRes] = await Promise.all([
+          fetch('https://fapi.binance.com/fapi/v1/ticker/24hr').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch('https://fapi.binance.com/fapi/v1/premiumIndex').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        ]);
+        if (!isMounted) return;
+
+        const tickerMap = new Map<string, any>();
+        if (Array.isArray(tRes)) {
+          for (const item of tRes) tickerMap.set(item.symbol, item);
+        }
+        const premMap = new Map<string, any>();
+        if (Array.isArray(pRes)) {
+          for (const item of pRes) premMap.set(item.symbol, item);
+        }
+
+        const suiPrem = premMap.get('SUIUSDT');
+        const suiTick = tickerMap.get('SUIUSDT');
+        const suiPx = parseFloat(suiPrem?.markPrice || suiTick?.lastPrice || '0');
+        if (suiPx > 0) setLiveSuiPriceUsd(suiPx);
+
+        setLiveMarkets((prev) =>
+          prev.map((m) => {
+            if (!m.binanceSymbol) return m;
+            const t = tickerMap.get(m.binanceSymbol);
+            const p = premMap.get(m.binanceSymbol);
+            if (!t && !p) return m;
+            const markPrice = parseFloat(p?.markPrice || t?.lastPrice || String(m.markPrice));
+            const indexPrice = parseFloat(p?.indexPrice || String(markPrice));
+            const fundingRate = p?.lastFundingRate ? parseFloat(p.lastFundingRate) * 100 : m.fundingRate;
+            const nextFundingHours = p?.nextFundingTime
+              ? Math.max(0, (Number(p.nextFundingTime) - Date.now()) / 3600000)
+              : m.nextFundingHours;
+            return {
+              ...m,
+              markPrice: Number.isFinite(markPrice) && markPrice > 0 ? markPrice : m.markPrice,
+              indexPrice: Number.isFinite(indexPrice) && indexPrice > 0 ? indexPrice : m.indexPrice,
+              fundingRate: Number.isFinite(fundingRate) ? parseFloat(fundingRate.toFixed(4)) : m.fundingRate,
+              nextFundingHours: Number.isFinite(nextFundingHours) ? parseFloat(nextFundingHours.toFixed(1)) : m.nextFundingHours,
+              change24h: t?.priceChangePercent ? parseFloat(parseFloat(t.priceChangePercent).toFixed(2)) : m.change24h,
+              high24h: t?.highPrice ? parseFloat(t.highPrice) : m.high24h,
+              low24h: t?.lowPrice ? parseFloat(t.lowPrice) : m.low24h,
+              volume24hUsd: t?.quoteVolume ? parseFloat(t.quoteVolume) : m.volume24hUsd,
+            };
+          })
+        );
+      } catch {
+        // Keep last known live market data
+      }
+    };
+
+    syncAllMarkets();
+    const timer = setInterval(syncAllMarkets, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  // Fast 3s Sync for Currently Selected Market
   useEffect(() => {
     let isMounted = true;
     const fetchLivePrice = async () => {
       try {
         if (selectedMarket.binanceSymbol) {
-          const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${selectedMarket.binanceSymbol}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.lastPrice && isMounted) {
-              const livePrice = parseFloat(data.lastPrice);
-              const changePct = parseFloat(data.priceChangePercent);
-              const high = parseFloat(data.highPrice);
-              const low = parseFloat(data.lowPrice);
-              const vol = parseFloat(data.quoteVolume);
+          const [tRes, pRes] = await Promise.all([
+            fetch(`https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${selectedMarket.binanceSymbol}`),
+            fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${selectedMarket.binanceSymbol}`),
+          ]);
+          const data = tRes.ok ? await tRes.json() : null;
+          const prem = pRes.ok ? await pRes.json() : null;
+          if (isMounted && (data?.lastPrice || prem?.markPrice)) {
+            const livePrice = parseFloat(prem?.markPrice || data?.lastPrice);
+            const idxPrice = parseFloat(prem?.indexPrice || String(livePrice));
+            const fundingPct = prem?.lastFundingRate ? parseFloat((parseFloat(prem.lastFundingRate) * 100).toFixed(4)) : undefined;
+            const nextHrs = prem?.nextFundingTime ? parseFloat(Math.max(0, (Number(prem.nextFundingTime) - Date.now()) / 3600000).toFixed(1)) : undefined;
 
-              setSelectedMarket((prev) => ({
-                ...prev,
-                markPrice: livePrice,
-                indexPrice: livePrice,
-                change24h: changePct,
-                high24h: high,
-                low24h: low,
-                volume24hUsd: vol
-              }));
+            if (selectedMarket.symbol === 'SUI-PERP' && livePrice > 0) {
+              setLiveSuiPriceUsd(livePrice);
             }
+
+            setSelectedMarket((prev) => ({
+              ...prev,
+              markPrice: livePrice,
+              indexPrice: idxPrice,
+              fundingRate: fundingPct ?? prev.fundingRate,
+              nextFundingHours: nextHrs ?? prev.nextFundingHours,
+              change24h: data?.priceChangePercent ? parseFloat(parseFloat(data.priceChangePercent).toFixed(2)) : prev.change24h,
+              high24h: data?.highPrice ? parseFloat(data.highPrice) : prev.high24h,
+              low24h: data?.lowPrice ? parseFloat(data.lowPrice) : prev.low24h,
+              volume24hUsd: data?.quoteVolume ? parseFloat(data.quoteVolume) : prev.volume24hUsd,
+            }));
           }
         } else if (selectedMarket.symbol.includes('DEEP')) {
           const res = await fetch('https://api.gateio.ws/api/v4/spot/tickers?currency_pair=DEEP_USDT');
@@ -812,15 +888,8 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
             }
           }
         }
-      } catch (_) {
-        // graceful micro-tick fallback if network throttles
-        const deltaPct = (Math.random() - 0.49) * 0.001;
-        if (isMounted) {
-          setSelectedMarket((prev) => ({
-            ...prev,
-            markPrice: Number((prev.markPrice * (1 + deltaPct)).toFixed(prev.markPrice < 1 ? 4 : 2))
-          }));
-        }
+      } catch {
+        // Keep last known real price without synthetic Math.random ticks
       }
     };
 
@@ -832,12 +901,15 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     };
   }, [selectedMarket.symbol, selectedMarket.binanceSymbol]);
 
-  // Update PnL of active positions based on real live market prices
+  // Update PnL of ALL active positions based on real live market prices
   useEffect(() => {
     setPositions((prev) => {
       if (!prev.length) return prev;
       return prev.map((pos) => {
-        const currentPrice = pos.marketSymbol === selectedMarket.symbol ? selectedMarket.markPrice : pos.markPrice;
+        const mkt = liveMarkets.find((m) => m.symbol === pos.marketSymbol);
+        const currentPrice = pos.marketSymbol === selectedMarket.symbol
+          ? selectedMarket.markPrice
+          : (mkt?.markPrice || pos.markPrice);
         const priceDiff = pos.side === 'long' ? (currentPrice - pos.entryPrice) : (pos.entryPrice - currentPrice);
         const pnlUsd = (priceDiff / pos.entryPrice) * pos.sizeUsd;
         const roe = (pnlUsd / pos.marginCollateralUsd) * 100;
@@ -849,12 +921,11 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
         };
       });
     });
-  }, [selectedMarket.markPrice, selectedMarket.symbol]);
+  }, [selectedMarket.markPrice, selectedMarket.symbol, liveMarkets]);
 
   // Collateral & Size Calculations (supports both SUI and USDC collateral)
   const collateralAmount = parseFloat(collateralInput) || 0;
-  // Dynamic SUI price from selectedMarket if SUI, or fallback
-  const suiPriceUsd = selectedMarket.symbol === 'SUI-PERP' ? selectedMarket.markPrice : 0.8378;
+  const suiPriceUsd = selectedMarket.symbol === 'SUI-PERP' ? selectedMarket.markPrice : (liveSuiPriceUsd || 0.8);
   const collateralValueUsd = collateralAsset === 'SUI' ? (collateralAmount * suiPriceUsd) : collateralAmount;
   const positionSizeUsd = collateralValueUsd * leverage;
   const positionSizeContracts = selectedMarket.markPrice > 0 ? (positionSizeUsd / selectedMarket.markPrice) : 0;
@@ -885,7 +956,16 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     }
 
     if (!currentAccount?.address || !signAndExecute) {
-      showNotification('warning', 'Connect Wallet', 'Please connect your Sui wallet to trade on Bluefin.');
+      showNotification('warning', 'Connect Wallet', 'Please connect your Sui wallet to trade Perps.');
+      return;
+    }
+
+    if (collateralAmount > availableCollateralBal) {
+      showNotification(
+        'warning',
+        'Insufficient Balance',
+        `You have ${availableCollateralBal.toFixed(4)} ${collateralAsset} available in your wallet.`
+      );
       return;
     }
 
@@ -893,31 +973,26 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
 
     setIsSubmitting(true);
     try {
-      let digest: string;
+      let digest = '';
       if (isFast) {
-        // 1-Click Fast Trading: Instant execution via authorized session key without popup!
+        // 1-Click Fast Trading: Instant session-key execution without popup
         recordFastTrade(collateralValueUsd);
         setFastSession(getFastTradingSession());
-        digest = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
       } else {
         const tx = new Transaction();
-        
-        // Programmable Transaction Block executing margin commitment on Sui
-        if (collateralAsset === 'SUI') {
-          const amountMist = BigInt(Math.floor(collateralAmount * 1e9));
-          const [collateralCoin] = tx.splitCoins(tx.gas, [amountMist]);
-          tx.transferObjects([collateralCoin], currentAccount.address);
-        } else {
-          const [collateralCoin] = tx.splitCoins(tx.gas, [BigInt(1000000)]);
-          tx.transferObjects([collateralCoin], currentAccount.address);
-        }
+        tx.setSender(currentAccount.address);
 
-        // Referral integrator routing to Volt Treasury
-        const [refCoin] = tx.splitCoins(tx.gas, [BigInt(100000)]);
+        // Route real 0.05% Perps protocol fee in SUI MIST to Volt Treasury
+        const feeSui = suiPriceUsd > 0 ? tradingFeeUsd / suiPriceUsd : 0.0001;
+        const feeMist = BigInt(Math.max(10000, Math.floor(feeSui * 1e9)));
+        const [refCoin] = tx.splitCoins(tx.gas, [feeMist]);
         tx.transferObjects([refCoin], VOLT_TREASURY_ADDRESS);
 
         const res = await signAndExecute({ transaction: tx });
-        digest = (res as any)?.digest || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        digest = (res as any)?.digest || '';
+        if (!digest) {
+          throw new Error('Transaction was not confirmed on-chain (missing digest).');
+        }
       }
 
       const entryPrice = orderType === 'limit' && parseFloat(limitPriceInput) > 0
@@ -950,31 +1025,28 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       setTakeProfitInput('');
       setStopLossInput('');
 
-      // Record on-chain Perps trade into Volt Treasury Ledger & Telegram alerts
-      try {
-        const perpsRecord = {
-          address: currentAccount?.address || '0x7ef65a3b007b79e3b8d9a29f2d5e8584b589186b3a9483b7519c53088c317b93',
-          digest: digest,
-          fromToken: collateralAsset,
-          toToken: selectedMarket.symbol,
-          fromAmount: collateralAmount.toString(),
-          volumeUsd: positionSizeUsd,
-          feeRate: 0.0005,
-          swapMode: `Perps ${leverage}x ${orderSide.toUpperCase()}`,
-          timestamp: Date.now()
-        };
-
-        // Post to API
-        fetch('/api/record-swap', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Volt-Auth': 'volt_protocol_mainnet_proof_2026_sui' },
-          body: JSON.stringify({
-            ...perpsRecord,
-            voltAuth: 'volt_protocol_mainnet_proof_2026_sui'
-          })
-        }).catch(() => {});
-      } catch (recErr) {
-        console.warn('Failed to record Perps trade:', recErr);
+      // Record Perps trade into Volt Treasury Ledger
+      if (digest) {
+        try {
+          fetch('/api/record-swap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Volt-Auth': 'volt_protocol_mainnet_proof_2026_sui' },
+            body: JSON.stringify({
+              address: currentAccount.address,
+              digest: digest,
+              fromToken: collateralAsset,
+              toToken: selectedMarket.symbol,
+              fromAmount: collateralAmount.toString(),
+              volumeUsd: positionSizeUsd,
+              feeRate: 0.0005,
+              swapMode: `Perps ${leverage}x ${orderSide.toUpperCase()}`,
+              timestamp: Date.now(),
+              voltAuth: 'volt_protocol_mainnet_proof_2026_sui'
+            })
+          }).catch(() => {});
+        } catch (recErr) {
+          console.warn('Failed to record Perps trade:', recErr);
+        }
       }
 
       playOrderSubmittedSound();
@@ -982,26 +1054,26 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
         'success',
         isFast ? `⚡ 1-Click: ${leverage}x ${orderSide.toUpperCase()} ${selectedMarket.symbol}` : `${leverage}x ${orderSide.toUpperCase()} ${selectedMarket.symbol} Opened`,
         isFast
-          ? `Instant 1-Click trade executed on Bluefin CLOB (0ms popup delay)!\n• Size: ~$${positionSizeUsd.toFixed(2)} (${positionSizeContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Margin: ${collateralAmount.toFixed(2)} ${collateralAsset}\n• Entry Price: $${entryPrice.toFixed(4)}\n• Liquidation: $${estimatedLiquidationPrice.toFixed(4)}\n• Session Quota remaining: $${Math.max(0, fastSession.maxSpendUsd - fastSession.spentUsd - collateralValueUsd).toFixed(0)}`
-          : `Successfully opened Bluefin perpetual margin position!\n• Position Size: ~$${positionSizeUsd.toFixed(2)} (${positionSizeContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Collateral: ${collateralAmount.toFixed(2)} ${collateralAsset} (~$${collateralValueUsd.toFixed(2)})\n• Entry Price: $${entryPrice.toFixed(4)}\n• Liquidation Price: $${estimatedLiquidationPrice.toFixed(4)}\n• Protocol Fee: 0.05% routed to Volt Treasury\n\nExecuted on Sui CLOB.`,
-        'View on Suiscan',
-        `https://suiscan.xyz/mainnet/tx/${digest}`,
+          ? `Instant 1-Click trade executed in active session!\n• Size: ~$${positionSizeUsd.toFixed(2)} (${positionSizeContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Margin: ${collateralAmount.toFixed(2)} ${collateralAsset}\n• Entry Price: $${entryPrice.toFixed(4)}\n• Liquidation: $${estimatedLiquidationPrice.toFixed(4)}\n• Session Quota remaining: $${Math.max(0, fastSession.maxSpendUsd - fastSession.spentUsd - collateralValueUsd).toFixed(0)}`
+          : `Perpetual margin position opened!\n• Position Size: ~$${positionSizeUsd.toFixed(2)} (${positionSizeContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Collateral: ${collateralAmount.toFixed(2)} ${collateralAsset} (~$${collateralValueUsd.toFixed(2)})\n• Entry Price: $${entryPrice.toFixed(4)}\n• Liquidation Price: $${estimatedLiquidationPrice.toFixed(4)}\n• Protocol Fee (0.05%): $${tradingFeeUsd.toFixed(4)} routed to Volt Treasury\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        digest ? 'View on Suiscan' : undefined,
+        digest ? `https://suiscan.xyz/mainnet/tx/${digest}` : undefined,
         {
           fromToken: collateralAsset,
           toToken: selectedMarket.symbol,
           fromAmount: collateralAmount.toString(),
           toAmount: positionSizeContracts.toFixed(3),
           volumeUsd: positionSizeUsd,
-          feeSavedUsd: positionSizeUsd * 0.0005,
+          feeSavedUsd: tradingFeeUsd,
           digest: digest,
           timestamp: Date.now(),
           orderType: 'PERPS'
         }
       );
     } catch (err: any) {
-      console.error('Bluefin order error:', err);
+      console.error('Perps order error:', err);
       playAlertSound();
-      showNotification('error', 'Order Rejected', err.message || 'Failed to submit order to Bluefin clearinghouse.');
+      showNotification('error', 'Order Rejected', err.message || 'Failed to submit Perps order.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1018,18 +1090,20 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
 
     setIsSubmitting(true);
     try {
-      let digest: string;
-      if (isFast) {
-        digest = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-      } else {
+      let digest = '';
+      if (!isFast) {
         const tx = new Transaction();
-        // Split execution gas and return margin
-        const feeMist = BigInt(1000000);
+        tx.setSender(currentAccount.address);
+        const closeFeeSui = suiPriceUsd > 0 ? (pos.sizeUsd * 0.0005) / suiPriceUsd : 0.0001;
+        const feeMist = BigInt(Math.max(10000, Math.floor(closeFeeSui * 1e9)));
         const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
         tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
 
         const res = await signAndExecute({ transaction: tx });
-        digest = (res as any)?.digest || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        digest = (res as any)?.digest || '';
+        if (!digest) {
+          throw new Error('Close transaction was not confirmed on-chain.');
+        }
       }
 
       setPositions((prev) => prev.filter((p) => p.id !== pos.id));
@@ -1046,9 +1120,9 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       showNotification(
         'success',
         isFast ? `⚡ 1-Click Closed: ${pos.leverage}x ${pos.side.toUpperCase()} ${pos.marketSymbol}` : `Closed ${pos.leverage}x ${pos.side.toUpperCase()} ${pos.marketSymbol}`,
-        `Position closed at Market price $${pos.markPrice.toFixed(4)}.\n• Realized PnL: ${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} (${pos.roePct.toFixed(2)}% ROE)\n• Returned Margin: ~$${returnedCollateral.toFixed(2)} USDC\n\n${isFast ? '⚡ 0ms Fast Execution' : `Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`}`,
-        'View on Suiscan',
-        `https://suiscan.xyz/mainnet/tx/${digest}`,
+        `Position closed at Market price $${pos.markPrice.toFixed(4)}.\n• Realized PnL: ${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} (${pos.roePct.toFixed(2)}% ROE)\n• Returned Margin: ~$${returnedCollateral.toFixed(2)} USDC\n\n${isFast ? '⚡ 0ms Fast Session Execution' : `Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`}`,
+        digest ? 'View on Suiscan' : undefined,
+        digest ? `https://suiscan.xyz/mainnet/tx/${digest}` : undefined,
         {
           fromToken: pos.side.toUpperCase() === 'LONG' ? pos.marketSymbol : 'USDC',
           toToken: pos.side.toUpperCase() === 'LONG' ? 'USDC' : pos.marketSymbol,
@@ -1150,7 +1224,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
           ref={tickerScrollRef}
           className="flex-1 flex items-center gap-2 overflow-x-auto py-1 px-1 scroll-smooth no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         >
-          {BLUEFIN_MARKETS.map((m) => (
+          {liveMarkets.map((m) => (
             <button
               key={m.symbol}
               onClick={() => {
