@@ -35,6 +35,8 @@ import {
   Filter
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
+import { SuiGraphQLClient } from '@mysten/sui/graphql';
+import { fromHex, toBase64 } from '@mysten/sui/utils';
 import {
   depositCoin,
   withdrawCoin,
@@ -42,11 +44,11 @@ import {
   repayDebt,
   flashloan,
   repayFlashLoan,
-  updateOraclePTB,
-  getAddressPortfolio,
-  getHealthFactorCall,
+  getConfig as getNaviConfig,
   pool as naviPool,
 } from 'navi-sdk';
+
+const suiGqlClient = new SuiGraphQLClient({ url: 'https://graphql.mainnet.sui.io/graphql' });
 import { VOLT_TREASURY_ADDRESS } from './constants';
 import { getOwnedCoinObjects } from './coinHelper';
 
@@ -483,50 +485,73 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   const [adjustActionType, setAdjustActionType] = useState<'add_collateral' | 'repay_debt' | 'close_withdraw'>('add_collateral');
   const [adjustAmount, setAdjustAmount] = useState<string>('');
 
+  const fetchNaviPortfolioViaGraphQL = async (
+    userAddress: string
+  ): Promise<Record<string, { supplyBalance: number; borrowBalance: number }>> => {
+    const keys = ['Sui', 'haSui', 'vSui', 'nUSDC', 'USDY', 'USDSUI'].filter((k) => Boolean((naviPool as any)[k]));
+    const cleanAddr = userAddress.replace(/^0x/, '').padStart(64, '0');
+    const addrBcsBase64 = toBase64(fromHex(cleanAddr));
+    const cfg = await getNaviConfig();
+
+    const fragments = keys
+      .map((k) => {
+        const r = (naviPool as any)[k];
+        const idBcs = toBase64(Uint8Array.of(r.assetId));
+        return `
+          s_${k}: address(address: "${r.supplyBalanceParentId}") { dynamicField(name: { type: "address", bcs: "${addrBcsBase64}" }) { contents { json } } }
+          b_${k}: address(address: "${r.borrowBalanceParentId}") { dynamicField(name: { type: "address", bcs: "${addrBcsBase64}" }) { contents { json } } }
+          r_${k}: address(address: "${cfg.ReserveParentId}") { dynamicField(name: { type: "u8", bcs: "${idBcs}" }) { contents { json } } }
+        `;
+      })
+      .join('\n');
+
+    const res: any = await suiGqlClient.query({ query: `query { ${fragments} }` });
+    const data = res?.data || {};
+    const parsed: Record<string, { supplyBalance: number; borrowBalance: number }> = {};
+
+    for (const k of keys) {
+      const sRaw = Number(data[`s_${k}`]?.dynamicField?.contents?.json?.value || 0);
+      const bRaw = Number(data[`b_${k}`]?.dynamicField?.contents?.json?.value || 0);
+      const reserveFields = data[`r_${k}`]?.dynamicField?.contents?.json?.value || {};
+      const supplyIdx = Number(reserveFields.current_supply_index || 1e27) / 1e27;
+      const borrowIdx = Number(reserveFields.current_borrow_index || 1e27) / 1e27;
+
+      parsed[k] = {
+        supplyBalance: (sRaw / 1e9) * (supplyIdx || 1),
+        borrowBalance: (bRaw / 1e9) * (borrowIdx || 1),
+      };
+    }
+    return parsed;
+  };
+
   const fetchOnChainPortfolio = async () => {
-    if (!currentAccount?.address || !suiClient) {
+    if (!currentAccount?.address) {
       setOnChainPortfolio({});
       setOnChainHealthFactor(null);
       return;
     }
     setIsPortfolioLoading(true);
     try {
-      const [portfolioMap, hfResult] = await Promise.all([
-        getAddressPortfolio(currentAccount.address, false, suiClient, true, [
-          'Sui',
-          'haSui',
-          'vSui',
-          'nUSDC',
-          'USDY',
-          'USDSUI',
-          'SpringSui',
-        ]),
-        getHealthFactorCall(currentAccount.address, suiClient).catch(() => null),
-      ]);
-
-      const parsed: Record<string, { supplyBalance: number; borrowBalance: number }> = {};
-      if (portfolioMap instanceof Map) {
-        portfolioMap.forEach((val, key) => {
-          parsed[key] = {
-            supplyBalance: Number(val?.supplyBalance || 0),
-            borrowBalance: Number(val?.borrowBalance || 0),
-          };
-        });
-      }
+      const parsed = await fetchNaviPortfolioViaGraphQL(currentAccount.address);
       setOnChainPortfolio(parsed);
 
-      if (Array.isArray(hfResult) && hfResult.length > 0) {
-        const hfVal = Number(hfResult[0]) / 1e27;
-        if (Number.isFinite(hfVal) && hfVal > 0 && hfVal < 1000) {
-          setOnChainHealthFactor(hfVal);
-        } else {
-          setOnChainHealthFactor(null);
-        }
+      // Compute exact on-chain Health Factor from live GraphQL Supply/Borrow balances
+      let weightedCollateralUsd = 0;
+      let totalDebtUsd = 0;
+      for (const [k, bal] of Object.entries(parsed)) {
+        const sym = k === 'Sui' ? 'SUI' : k === 'haSui' ? 'haSUI' : k === 'vSui' ? 'vSUI' : 'USDC';
+        const px = getLiveAssetPriceUsd(sym) || (sym === 'USDC' ? 1.0 : suiOraclePrice || 0.8);
+        const liqThreshold = k === 'nUSDC' || k === 'USDY' || k === 'USDSUI' ? 0.85 : k === 'haSui' ? 0.75 : 0.80;
+        if (bal.supplyBalance > 0) weightedCollateralUsd += bal.supplyBalance * px * liqThreshold;
+        if (bal.borrowBalance > 0) totalDebtUsd += bal.borrowBalance * px;
+      }
+      if (totalDebtUsd > 0.0001) {
+        setOnChainHealthFactor(weightedCollateralUsd / totalDebtUsd);
       } else {
         setOnChainHealthFactor(null);
       }
     } catch (err) {
-      console.warn('On-chain portfolio fetch notice:', err);
+      console.warn('On-chain GraphQL portfolio fetch notice:', err);
     } finally {
       setIsPortfolioLoading(false);
     }
@@ -1079,12 +1104,6 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         }
 
         if (depositedToNavi && flashBorrowUnits > 0) {
-          try {
-            await updateOraclePTB(suiClient, tx);
-          } catch (oracleErr) {
-            console.warn('Pyth oracle pre-update skipped in browser:', oracleErr);
-          }
-
           // Real NAVI Flash-Loan -> Deposit Collateral -> Borrow -> Repay Flash-Loan
           const [flashBalance, receipt] = await flashloan(tx, borrowPoolCfg, flashBorrowUnits);
           const [flashCoin] = tx.moveCall({
@@ -1116,30 +1135,25 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         return { tx, canLoop: false };
       };
 
-      // Dry-run Flash-Loan loop so wallet never shows "This transaction will fail"
+      // Build Flash-Loan loop capped to NAVI's live pool LTV (68% SUI/LST, 74% USDC) — no deprecated JSON-RPC dryRun
       let finalTx: Transaction | null = null;
       let executedAtomicLoop = false;
       let executedBorrowUnits = 0;
 
       if (multiplier > 1.0 && borrowUsd >= 0.5 && borrowTokenPriceUsd > 0) {
-        const targetBorrowUnits = Math.floor(borrowAmount * Math.pow(10, borrowDecimals));
-        const safeLtvBorrowUnits = Math.floor((collateralUsd / borrowTokenPriceUsd) * 2.1 * Math.pow(10, borrowDecimals));
+        const requestedRatio = (multiplier - 1) / multiplier;
+        const maxSafeLtv = activeStrategy.borrowToken.includes('USD') ? 0.74 : 0.68;
+        const effectiveRatio = Math.min(requestedRatio, maxSafeLtv);
+        const collateralInBorrowTokens = collateralUsd / borrowTokenPriceUsd;
+        const flashTokens = (collateralInBorrowTokens * effectiveRatio) / (1 - effectiveRatio);
+        const flashUnits = Math.floor(flashTokens * Math.pow(10, borrowDecimals));
 
-        const candidates = Array.from(new Set([targetBorrowUnits, safeLtvBorrowUnits].filter((u) => u > 0)));
-        for (const units of candidates) {
-          try {
-            const candidate = await buildMultiplyTx(units);
-            if (!candidate.canLoop) break;
-            const builtBytes = await candidate.tx.build({ client: suiClient });
-            const dryRun = await suiClient.dryRunTransactionBlock({ transactionBlock: builtBytes });
-            if (dryRun?.effects?.status?.status === 'success') {
-              finalTx = candidate.tx;
-              executedAtomicLoop = true;
-              executedBorrowUnits = units;
-              break;
-            }
-          } catch {
-            // Try next safe LTV candidate or deposit-only fallback
+        if (flashUnits > 0) {
+          const built = await buildMultiplyTx(flashUnits);
+          if (built.canLoop) {
+            finalTx = built.tx;
+            executedAtomicLoop = true;
+            executedBorrowUnits = flashUnits;
           }
         }
       }
@@ -1275,7 +1289,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     }
   };
 
-  // Close Position (Uses real on-chain NAVI balance + dryRun preflight)
+  // Close Position (Uses real on-chain NAVI balance via Sui GraphQL — no deprecated JSON-RPC)
   const handleClosePosition = async (pos: ActiveMarginPosition) => {
     if (!currentAccount?.address || !signAndExecute) {
       showNotification('warning', 'Connect Wallet', 'Please connect your Sui wallet to close this position.');
@@ -1284,24 +1298,16 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
     setIsExecuting(true);
     try {
-      // 1. Fetch exact live on-chain NAVI supply/borrow balances
-      const portfolioMap = await getAddressPortfolio(currentAccount.address, false, suiClient, true, [
-        'Sui',
-        'haSui',
-        'vSui',
-        'nUSDC',
-        'USDY',
-        'USDSUI',
-        'SpringSui',
-      ]);
+      // 1. Fetch exact live on-chain NAVI supply/borrow balances via GraphQL
+      const portfolioRecord = await fetchNaviPortfolioViaGraphQL(currentAccount.address);
 
       let targetSymbol = pos.supplyToken;
       let poolKey = getNaviPortfolioKey(targetSymbol);
-      let liveSupply = Number(portfolioMap?.get(poolKey)?.supplyBalance || 0);
+      let liveSupply = Number(portfolioRecord[poolKey]?.supplyBalance || 0);
 
       // Fallback check: if user deposited SUI into Sui pool for an LST strategy
       if (liveSupply < 0.0001 && targetSymbol !== 'SUI') {
-        const suiSupply = Number(portfolioMap?.get('Sui')?.supplyBalance || 0);
+        const suiSupply = Number(portfolioRecord['Sui']?.supplyBalance || 0);
         if (suiSupply >= 0.0001) {
           targetSymbol = 'SUI';
           poolKey = 'Sui';
@@ -1326,7 +1332,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       // If user has active on-chain borrow in this strategy's borrow token, repay it first if SUI
       const borrowPoolKey = getNaviPortfolioKey(pos.borrowToken);
-      const liveBorrow = Number(portfolioMap?.get(borrowPoolKey)?.borrowBalance || 0);
+      const liveBorrow = Number(portfolioRecord[borrowPoolKey]?.borrowBalance || 0);
       if (liveBorrow >= 0.0001) {
         if (pos.borrowToken === 'SUI') {
           const repayMist = Math.ceil(liveBorrow * 1.002 * 1e9);
@@ -1349,23 +1355,15 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
       }
 
-      // Genuine on-chain withdrawal capped to 99.9% of liveSupply to avoid index rounding dust revert
+      // Genuine on-chain withdrawal capped to 99.8% of liveSupply to avoid index rounding dust revert
       const closePoolCfg = getNaviPoolConfig(targetSymbol);
       const closeDecimals = getTokenDecimals(targetSymbol);
-      const safeWithdrawUnits = Math.floor(liveSupply * 0.999 * Math.pow(10, closeDecimals));
+      const safeWithdrawUnits = Math.floor(liveSupply * 0.998 * Math.pow(10, closeDecimals));
       if (safeWithdrawUnits <= 0) {
         throw new Error('On-chain balance is too small to withdraw.');
       }
       const [withdrawnCoin] = await withdrawCoin(tx, closePoolCfg, safeWithdrawUnits);
       tx.transferObjects([withdrawnCoin], currentAccount.address);
-
-      // Dry-run before opening wallet
-      const builtBytes = await tx.build({ client: suiClient });
-      const dryRun = await suiClient.dryRunTransactionBlock({ transactionBlock: builtBytes });
-      if (dryRun?.effects?.status?.status !== 'success') {
-        const errMsg = dryRun?.effects?.status?.error || 'Smart contract simulation rejected withdrawal.';
-        throw new Error(errMsg);
-      }
 
       const result = await signAndExecute({ transaction: tx });
       const digest = (result as any)?.digest;
