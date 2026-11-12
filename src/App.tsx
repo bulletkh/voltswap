@@ -115,8 +115,10 @@ export default function App() {
     setSoundMuted(next);
     if (!next) playClickSound();
   };
-  const [swapMode, setSwapMode] = useState<'market' | 'limit' | 'dca'>('market');
+  const [swapMode, setSwapMode] = useState<'market' | 'limit' | 'grid'>('market');
   const [limitPrice, setLimitPrice] = useState<string>('');
+  const [gridSteps, setGridSteps] = useState<number>(4);
+  const [gridSpanPct, setGridSpanPct] = useState<number>(10);
   const [dcaInterval, setDcaInterval] = useState<'1h' | '4h' | '24h' | '7d'>('4h');
   const [dcaOrdersCount, setDcaOrdersCount] = useState<string>('5');
   const [marginLeverage, setMarginLeverage] = useState<number>(3);
@@ -332,7 +334,7 @@ export default function App() {
   // Open Orders & DCA automations list
   const [openOrders, setOpenOrders] = useState<Array<{
     id: string;
-    type: 'LIMIT' | 'DCA';
+    type: 'LIMIT' | 'DCA' | 'GRID';
     pair: string;
     side: 'BUY' | 'SELL';
     price?: string;
@@ -342,6 +344,8 @@ export default function App() {
     status: string;
     dcaSchedule?: string;
     digest?: string;
+    gridLevel?: number;
+    gridTotal?: number;
     takeProfitPrice?: string;
     stopLossPrice?: string;
   }>>(() => {
@@ -652,14 +656,14 @@ export default function App() {
           let isFilled = false;
           let fillReason = '';
 
-          if (ord.type === 'LIMIT') {
+          if (ord.type === 'LIMIT' || ord.type === 'GRID') {
             if (targetLimit > 0) {
               if (ord.side === 'SELL' && currentRate >= targetLimit) {
                 isFilled = true;
-                fillReason = `DeepBook v3 Price Target Matched at $${currentRate.toFixed(4)} USD`;
+                fillReason = `${ord.type === 'GRID' ? 'DeepBook v3 Grid Level' : 'DeepBook v3 Price Target'} Matched at $${currentRate.toFixed(4)} USD`;
               } else if (ord.side === 'BUY' && currentRate <= targetLimit) {
                 isFilled = true;
-                fillReason = `DeepBook v3 Price Target Matched at $${currentRate.toFixed(4)} USD`;
+                fillReason = `${ord.type === 'GRID' ? 'DeepBook v3 Grid Level' : 'DeepBook v3 Price Target'} Matched at $${currentRate.toFixed(4)} USD`;
               }
             }
           }
@@ -1073,6 +1077,35 @@ export default function App() {
     return out < 0.01 ? out.toFixed(6) : out.toFixed(4);
   }, [fromAmount, effectiveLimitRate]);
 
+  // Grid DCA preview calculation
+  const gridLevelsPreview = useMemo(() => {
+    const amt = parseAmount(fromAmount);
+    if (amt <= 0) return [];
+    const isFromSui = fromToken.symbol === 'SUI' || fromToken.address === '0x2::sui::SUI' || fromToken.address.endsWith('::sui::SUI');
+    const rate = currentPairRate > 0 ? currentPairRate : 0.84;
+    const levels = [];
+    const feeRate = 0.0015; // 0.15% Volt Protocol fee
+    const netAmt = amt * (1 - feeRate);
+    const stepAmt = netAmt / gridSteps;
+
+    for (let i = 0; i < gridSteps; i++) {
+      const fraction = gridSteps > 1 ? i / (gridSteps - 1) : 0;
+      // Selling SUI -> spread upwards (taking profit). Buying SUI with USDC -> spread downwards (buying dip)
+      const priceChangePct = isFromSui ? (gridSpanPct * fraction) : (-gridSpanPct * fraction);
+      const targetPrice = rate * (1 + priceChangePct / 100);
+      const targetOut = isFromSui ? stepAmt * targetPrice : (targetPrice > 0 ? stepAmt / targetPrice : 0);
+
+      levels.push({
+        level: i + 1,
+        targetPrice,
+        stepAmt,
+        targetOut,
+        priceChangePct
+      });
+    }
+    return levels;
+  }, [fromAmount, fromToken, currentPairRate, gridSteps, gridSpanPct]);
+
   const rawToAmount = realQuoteOutput || (parseAmount(fromAmount) > 0 ? ((parseAmount(fromAmount) * fromPrice) / toPrice).toFixed(4) : '0.00');
 
   const handleSwapTokens = () => {
@@ -1297,16 +1330,28 @@ export default function App() {
           managerRef = newManager;
         }
 
+        const rawTotalIn = BigInt(rawIn);
+        const feeRateBps = 15n; // 0.15% Volt Protocol fee routed to Treasury
+        const feeRaw = (rawTotalIn * feeRateBps) / 10000n;
+        const netIn = rawTotalIn - feeRaw;
+
         let inputCoinObj: any;
         if (isFromSui) {
-          const [splitCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(rawIn)]);
+          if (feeRaw > 0n) {
+            const [feeCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(feeRaw.toString())]);
+            txb.transferObjects([feeCoin], txb.pure.address(VOLT_TREASURY_ADDRESS));
+          }
+          const [splitCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(netIn.toString())]);
           inputCoinObj = splitCoin;
         } else {
-          const rawNeeded = BigInt(rawIn);
           const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
           const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
           if (otherCoins.length > 0) txb.mergeCoins(primaryCoin, otherCoins);
-          const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(rawNeeded.toString())]);
+          if (feeRaw > 0n) {
+            const [feeCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(feeRaw.toString())]);
+            txb.transferObjects([feeCoin], txb.pure.address(VOLT_TREASURY_ADDRESS));
+          }
+          const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(netIn.toString())]);
           inputCoinObj = splitCoin;
         }
 
@@ -1326,7 +1371,7 @@ export default function App() {
         // 3. Place real Limit Order on DeepBook v3 Orderbook
         // Conversion: floatScalar (1e9) * quoteScalar (1e6) / baseScalar (1e9) = 1e6
         const priceScaled = BigInt(Math.max(1, Math.round(effectiveRate * 1000000)));
-        const qtyScaled = BigInt(rawIn);
+        const qtyScaled = netIn;
         const clientOrderId = BigInt(Date.now());
         const expirationMs = BigInt(Date.now() + 30 * 24 * 3600 * 1000); // 30 days
 
@@ -1435,25 +1480,23 @@ export default function App() {
       return;
     }
 
-    // MODE 2: DCA AUTOMATION STREAM (100% On-Chain PTB Execution)
-    if (swapMode === 'dca') {
+    // MODE 2: ON-CHAIN DEEPBOOK V3 GRID DCA (Atomic 1-Click PTB Batch)
+    if (swapMode === 'grid') {
       const amt = parseAmount(fromAmount);
       if (amt <= 0) {
-        showNotification('warning', 'Invalid Amount', 'Please enter a total amount to allocate for DCA.');
+        showNotification('warning', 'Invalid Amount', 'Please enter a total budget for Grid DCA.');
         return;
       }
-      const rounds = parseInt(dcaOrdersCount) || 3;
-      const perRoundNum = amt / rounds;
-      const perRound = perRoundNum.toFixed(4);
+
       const isFromSui = fromToken.symbol === 'SUI' || fromToken.address === '0x2::sui::SUI' || fromToken.address.endsWith('::sui::SUI');
       const isToSui = toToken.symbol === 'SUI' || toToken.address === '0x2::sui::SUI' || toToken.address.endsWith('::sui::SUI');
-      const rawFirstRound = Math.floor(perRoundNum * Math.pow(10, fromToken.decimals)).toString();
+      const rawTotalIn = BigInt(Math.floor(amt * Math.pow(10, fromToken.decimals)));
 
-      // Check balance for first tranche
+      // Balance check
       if (isFromSui) {
         const availableSui = BigInt(currentTokenBalanceRaw || '0');
-        if (BigInt(rawFirstRound) > availableSui) {
-          showNotification('error', 'Insufficient SUI Balance', 'Entered DCA amount exceeds your available SUI balance.');
+        if (rawTotalIn > availableSui) {
+          showNotification('error', 'Insufficient SUI Balance', 'Entered budget exceeds your available SUI balance.');
           return;
         }
       }
@@ -1466,93 +1509,149 @@ export default function App() {
         const txb = new Transaction();
         txb.setSender(currentAccount.address);
 
-        // Fetch quote for 1st DCA tranche
-        const rawAmountIn = new BN(rawFirstRound);
-        let activeRouter = await cetusClient.findRouters({
-          from: fromToken.address,
-          target: toToken.address,
-          amount: rawAmountIn,
-          byAmountIn: true
-        });
+        // 1. Deduct Protocol Fee (0.15%) directly to VOLT_TREASURY_ADDRESS
+        const feeRateBps = 15n;
+        const feeRaw = (rawTotalIn * feeRateBps) / 10000n;
+        const netSpendableRaw = rawTotalIn - feeRaw;
 
-        let targetDigest = '';
-
-        if (activeRouter && activeRouter.amountOut && Number(activeRouter.amountOut) > 0) {
-          let inputCoinObj: any;
-          if (isFromSui) {
-            const [splitCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(rawFirstRound)]);
-            inputCoinObj = splitCoin;
-          } else {
-            const rawNeeded = BigInt(rawFirstRound);
-            const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
-            const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
-            if (otherCoins.length > 0) txb.mergeCoins(primaryCoin, otherCoins);
-            const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(rawNeeded.toString())]);
-            inputCoinObj = splitCoin;
+        let inputCoinObj: any;
+        if (isFromSui) {
+          if (feeRaw > 0n) {
+            const [feeCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(feeRaw.toString())]);
+            txb.transferObjects([feeCoin], txb.pure.address(VOLT_TREASURY_ADDRESS));
           }
-
-          const targetCoin = await cetusClient.routerSwap({
-            router: activeRouter,
-            inputCoin: inputCoinObj,
-            slippage: 0.005,
-            txb
-          });
-
-          if (isToSui) {
-            txb.mergeCoins(txb.gas, [targetCoin]);
-          } else {
-            txb.transferObjects([targetCoin], txb.pure.address(currentAccount.address));
-          }
-
-          const res = await signAndExecute({ transaction: txb });
-          targetDigest = res.digest;
+          const [splitCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(netSpendableRaw.toString())]);
+          inputCoinObj = splitCoin;
         } else {
-          // Commit stream registration on-chain
-          if (isFromSui) {
-            const [coin] = txb.splitCoins(txb.gas, [txb.pure.u64(rawFirstRound)]);
-            txb.transferObjects([coin], txb.pure.address(currentAccount.address));
+          const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
+          const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
+          if (otherCoins.length > 0) txb.mergeCoins(primaryCoin, otherCoins);
+          if (feeRaw > 0n) {
+            const [feeCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(feeRaw.toString())]);
+            txb.transferObjects([feeCoin], txb.pure.address(VOLT_TREASURY_ADDRESS));
           }
-          const res = await signAndExecute({ transaction: txb });
-          targetDigest = res.digest;
+          const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(netSpendableRaw.toString())]);
+          inputCoinObj = splitCoin;
         }
 
-        setSwapTxDigest(targetDigest);
+        // 2. Deposit Net Funds into DeepBook BalanceManager
+        const DEEPBOOK_PACKAGE_ID = '0xbca0cefe720330e7bb4f2283438b68de6a0e656688db4ac90d61e71fe6151fe8';
+        const SUI_USDC_POOL_ID = '0xe05dafb5133bcffb8d59f4e12465dc0e9faeaa05e3e342a08fe135800e3e4407';
+        const CLOCK_ID = '0x0000000000000000000000000000000000000000000000000000000000000006';
+        const SUI_TYPE = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI';
+        const USDC_TYPE = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC';
+
+        const savedManagerId = localStorage.getItem(`volt_deepbook_balance_manager_${currentAccount.address}`);
+        let managerRef: any;
+
+        if (savedManagerId) {
+          managerRef = txb.object(savedManagerId);
+        } else {
+          const [newManager] = txb.moveCall({
+            target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::new`
+          });
+          managerRef = newManager;
+        }
+
+        txb.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+          arguments: [managerRef, inputCoinObj],
+          typeArguments: [isFromSui ? SUI_TYPE : USDC_TYPE]
+        });
+
+        // 3. Place Each Grid Limit Order on DeepBook v3
+        const stepRaw = netSpendableRaw / BigInt(gridSteps);
+        const rate = currentPairRate > 0 ? currentPairRate : 0.84;
+        const expirationMs = BigInt(Date.now() + 30 * 24 * 3600 * 1000); // 30 days
+        const newOrdersForState: any[] = [];
+
+        for (let i = 0; i < gridSteps; i++) {
+          const fraction = gridSteps > 1 ? i / (gridSteps - 1) : 0;
+          const priceChangePct = isFromSui ? (gridSpanPct * fraction) : (-gridSpanPct * fraction);
+          const targetPrice = rate * (1 + priceChangePct / 100);
+          const priceScaled = BigInt(Math.max(1, Math.round(targetPrice * 1000000)));
+          const qtyScaled = stepRaw;
+          const clientOrderId = BigInt(Date.now() + i);
+
+          const [proof] = txb.moveCall({
+            target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
+            arguments: [managerRef]
+          });
+
+          txb.moveCall({
+            target: `${DEEPBOOK_PACKAGE_ID}::pool::place_limit_order`,
+            arguments: [
+              txb.object(SUI_USDC_POOL_ID),
+              managerRef,
+              proof,
+              txb.pure.u64(clientOrderId),
+              txb.pure.u8(0), // OrderType.NO_RESTRICTION
+              txb.pure.u8(0), // SelfMatchingOptions.SELF_MATCHING_ALLOWED
+              txb.pure.u64(priceScaled),
+              txb.pure.u64(qtyScaled),
+              txb.pure.bool(!isFromSui), // isBid
+              txb.pure.bool(false),
+              txb.pure.u64(expirationMs),
+              txb.object(CLOCK_ID)
+            ],
+            typeArguments: [SUI_TYPE, USDC_TYPE]
+          });
+        }
+
+        if (!savedManagerId) {
+          txb.moveCall({
+            target: '0x2::transfer::public_share_object',
+            arguments: [managerRef],
+            typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`]
+          });
+        }
+
+        const res = await signAndExecute({ transaction: txb });
+
+        if (!savedManagerId && res?.effects?.created) {
+          const createdShared = res.effects.created.find((c: any) => c.owner && typeof c.owner === 'object' && 'Shared' in c.owner);
+          if (createdShared?.reference?.objectId) {
+            localStorage.setItem(`volt_deepbook_balance_manager_${currentAccount.address}`, createdShared.reference.objectId);
+          }
+        }
+
+        setSwapTxDigest(res.digest);
         setIsSwapping(false);
 
-        const newDca = {
-          id: 'dca_' + Date.now(),
-          type: 'DCA' as const,
-          pair: `${fromToken.symbol} ➔ ${toToken.symbol}`,
-          side: 'BUY' as const,
-          amountIn: `${fromAmount} ${fromToken.symbol}`,
-          amountOut: `${perRound} ${fromToken.symbol} / ${dcaInterval}`,
-          timestamp: Date.now(),
-          status: `Active (Tranche 1/${rounds} Filled)`,
-          dcaSchedule: `${rounds} rounds · 1 confirmed`,
-          digest: targetDigest
-        };
-        setOpenOrders((prev) => [newDca, ...prev]);
+        // Add all grid orders to openOrders
+        const now = Date.now();
+        const stepNum = Number(stepRaw) / Math.pow(10, fromToken.decimals);
+        for (let i = 0; i < gridSteps; i++) {
+          const fraction = gridSteps > 1 ? i / (gridSteps - 1) : 0;
+          const priceChangePct = isFromSui ? (gridSpanPct * fraction) : (-gridSpanPct * fraction);
+          const targetPrice = rate * (1 + priceChangePct / 100);
+          const outNum = isFromSui ? stepNum * targetPrice : (targetPrice > 0 ? stepNum / targetPrice : 0);
 
-        const dcaTradePayload: PnlTradeData = {
-          fromToken: fromToken.symbol,
-          toToken: toToken.symbol,
-          fromAmount: perRound,
-          toAmount: ((perRoundNum * currentPairRate) || perRoundNum).toFixed(4),
-          volumeUsd: (perRoundNum * fromPrice) || (perRoundNum * 0.85),
-          feeSavedUsd: ((perRoundNum * fromPrice) || (perRoundNum * 0.85)) * 0.002,
-          digest: targetDigest,
-          timestamp: Date.now(),
-          orderType: 'DCA'
-        };
-        setLastExecutedTrade(dcaTradePayload);
+          newOrdersForState.push({
+            id: `grid_${now}_${i}`,
+            type: 'GRID' as const,
+            pair: `${fromToken.symbol} ➔ ${toToken.symbol}`,
+            side: isFromSui ? ('SELL' as const) : ('BUY' as const),
+            price: targetPrice.toFixed(4),
+            amountIn: `${stepNum.toFixed(4)} ${fromToken.symbol}`,
+            amountOut: `${outNum.toFixed(4)} ${toToken.symbol}`,
+            timestamp: now,
+            status: `Active (Level ${i + 1}/${gridSteps})`,
+            digest: res.digest,
+            gridLevel: i + 1,
+            gridTotal: gridSteps
+          });
+        }
 
+        setOpenOrders((prev) => [...newOrdersForState, ...prev]);
+
+        playCashProfitSound();
         showNotification(
           'success',
-          'DCA Automation Initiated & Tranche 1 Confirmed On-Chain!',
-          `Dollar-Cost Averaging stream is active on Sui:\n• Total Allocated: ${fromAmount} ${fromToken.symbol}\n• Tranche 1/${rounds}: ${perRound} ${fromToken.symbol} swapped\n• Next execution: Every ${dcaInterval}\n\nSigned & confirmed via Sui PTB.`,
+          `Deployed ${gridSteps}x On-Chain Grid Orders!`,
+          `Successfully placed ${gridSteps} DeepBook v3 Limit Orders in a single PTB:\n• Protocol Fee: 0.15% sent to Treasury\n• Maker Fee: 0.00% (Zero Slippage)\n• Grid Spread: ${gridSpanPct}%\n\nAll orders are live in DeepBook v3 orderbook.`,
           'View on SuiScan',
-          `https://suiscan.xyz/mainnet/tx/${targetDigest}`,
-          dcaTradePayload
+          `https://suiscan.xyz/mainnet/tx/${res.digest}`
         );
 
         fetch('/api/record-swap', {
@@ -1560,16 +1659,15 @@ export default function App() {
           headers: { 'Content-Type': 'application/json', 'X-Volt-Auth': 'volt_protocol_mainnet_proof_2026_sui' },
           body: JSON.stringify({
             address: currentAccount.address,
-            digest: targetDigest,
+            digest: res.digest,
             fromToken: fromToken.symbol,
             toToken: toToken.symbol,
-            fromAmount: perRound,
-            volumeUsd: (perRoundNum * fromPrice) || (perRoundNum * 0.85),
-            swapMode: `DCA 1/${rounds}`,
-            feeRate: effectiveFeeRate,
+            fromAmount: fromAmount,
+            volumeUsd: amt * fromPrice,
+            swapMode: `Grid DCA ${gridSteps}x (DeepBook v3)`,
+            feeRate: 0.0015,
             tierName: userTraderTier.name,
             tierEmoji: userTraderTier.badgeEmoji,
-            tierId: userTraderTier.id,
             discountPct: userTraderTier.discountPct,
             referrer: activeRefCode,
             voltAuth: 'volt_protocol_mainnet_proof_2026_sui'
@@ -1577,8 +1675,8 @@ export default function App() {
         }).catch(() => {});
 
       } catch (err: any) {
-        console.error('DCA error:', err);
-        setSwapError(err.message || 'DCA transaction was rejected or failed on Sui.');
+        console.error('Grid DCA error:', err);
+        setSwapError(err.message || 'Grid DCA transaction rejected or failed.');
         setIsSwapping(false);
       }
       return;
@@ -2017,11 +2115,12 @@ export default function App() {
 
               {/* Swap Card */}
               <div className="bg-[#0b0e17]/95 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.6)] relative overflow-hidden">
-                {/* 2-Mode Institutional Switcher: Market | Limit (100% On-Chain) */}
-                <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#06080e] border border-white/[0.06] rounded-2xl mb-4">
+                {/* 3-Mode Institutional Switcher: Market | Limit | Grid DCA (100% On-Chain) */}
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#06080e] border border-white/[0.06] rounded-2xl mb-4">
                   {[
                     { id: 'market', label: 'Market', icon: Zap },
-                    { id: 'limit', label: 'Limit', icon: Target }
+                    { id: 'limit', label: 'Limit', icon: Target },
+                    { id: 'grid', label: 'Grid DCA', icon: Layers }
                   ].map((m) => {
                     const Icon = m.icon;
                     const isActive = swapMode === m.id;
@@ -2031,8 +2130,9 @@ export default function App() {
                         onClick={() => {
                           setSwapMode(m.id as any);
                           setSelectedDipDeal(null);
+                          playClickSound();
                         }}
-                        className={`py-2 px-1.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                           isActive
                             ? 'bg-[#181d2a] text-white border border-white/15 shadow-sm'
                             : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
@@ -2050,6 +2150,7 @@ export default function App() {
                     <span className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
                       {swapMode === 'market' && 'Swap'}
                       {swapMode === 'limit' && 'DeepBook Limit Order'}
+                      {swapMode === 'grid' && 'DeepBook Grid DCA'}
                     </span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 font-bold">
                       {swapMode === 'market' ? 'Cetus + DeepBook v3' : 'DeepBook v3 CLOB'}
@@ -2234,7 +2335,7 @@ export default function App() {
                     <input
                       type="text"
                       readOnly
-                      value={isFetchingQuote && swapMode !== 'limit' ? '...' : (swapMode === 'limit' ? limitEstimatedOutput : rawToAmount)}
+                      value={isFetchingQuote && swapMode !== 'limit' && swapMode !== 'grid' ? '...' : (swapMode === 'limit' ? limitEstimatedOutput : (swapMode === 'grid' ? (gridLevelsPreview.length > 0 ? gridLevelsPreview.reduce((acc, l) => acc + l.targetOut, 0).toFixed(4) : '0.00') : rawToAmount))}
                       placeholder="0.0"
                       className="bg-transparent text-3xl sm:text-4xl font-mono font-extrabold bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent outline-none w-full placeholder:text-gray-700 tracking-tight"
                     />
@@ -2262,10 +2363,14 @@ export default function App() {
 
                   <div className="flex items-center justify-between mt-3 pt-1 border-t border-white/[0.04]">
                     <div className="text-xs text-gray-500 font-mono">
-                      ≈ ${(parseFloat(swapMode === 'limit' ? limitEstimatedOutput : (rawToAmount || '0')) * toPrice).toFixed(2)} USD
+                      ≈ ${(parseFloat(swapMode === 'limit' ? limitEstimatedOutput : (swapMode === 'grid' ? (gridLevelsPreview.length > 0 ? gridLevelsPreview.reduce((acc, l) => acc + l.targetOut, 0).toFixed(4) : '0') : (rawToAmount || '0'))) * toPrice).toFixed(2)} USD
                     </div>
                     <div className="text-[10px] font-mono text-gray-400">
-                      Impact: <span className="text-emerald-400 font-medium">&lt;0.01%</span>
+                      {swapMode === 'grid' ? (
+                        <span>DeepBook v3 <span className="text-cyan-400 font-semibold">{gridSteps} Grid Orders</span></span>
+                      ) : (
+                        <span>Impact: <span className="text-emerald-400 font-medium">&lt;0.01%</span></span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2321,6 +2426,123 @@ export default function App() {
                     <div className="text-[11px] text-gray-400 flex items-center justify-between">
                       <span>Executes on DeepBook v3 with zero slippage.</span>
                       <span className="text-cyan-400 font-bold font-mono">Maker Fee: 0.00%</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE SPECIFIC CONTROLS: GRID DCA */}
+                {swapMode === 'grid' && (
+                  <div className="mt-4 p-4 rounded-2xl bg-gradient-to-b from-[#0e1628] to-[#080d19] border border-cyan-500/30 space-y-3.5 text-xs shadow-lg">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-cyan-300 flex items-center gap-1.5 text-xs">
+                        <Layers className="w-4 h-4 text-cyan-400" /> DeepBook v3 Grid DCA (100% On-Chain)
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-semibold">
+                        ● 1-Click PTB Atomic Batch
+                      </span>
+                    </div>
+
+                    {/* Selectors: Steps & Span */}
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      {/* Grid Levels */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-gray-400">Order Levels</label>
+                        <div className="flex gap-1">
+                          {[3, 4, 5].map((steps) => (
+                            <button
+                              key={steps}
+                              type="button"
+                              onClick={() => {
+                                setGridSteps(steps);
+                                playClickSound();
+                              }}
+                              className={`flex-1 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                                gridSteps === steps
+                                  ? 'bg-cyan-500 text-slate-950 shadow-md font-extrabold'
+                                  : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5'
+                              }`}
+                            >
+                              {steps} Orders
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Price Range Span */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-gray-400">Price Spread</label>
+                        <div className="flex gap-1">
+                          {[5, 10, 15, 20].map((span) => (
+                            <button
+                              key={span}
+                              type="button"
+                              onClick={() => {
+                                setGridSpanPct(span);
+                                playClickSound();
+                              }}
+                              className={`flex-1 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                                gridSpanPct === span
+                                  ? 'bg-cyan-500 text-slate-950 shadow-md font-extrabold'
+                                  : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/5'
+                              }`}
+                            >
+                              {span}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ladder / Grid Preview Table */}
+                    <div className="rounded-xl bg-[#06080f] border border-white/10 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] font-mono text-gray-400 pb-1 border-b border-white/5">
+                        <span># Level</span>
+                        <span>Target Price</span>
+                        <span>Order Size</span>
+                        <span>Estimated Receive</span>
+                      </div>
+                      {gridLevelsPreview.length > 0 ? (
+                        gridLevelsPreview.map((lvl) => (
+                          <div key={lvl.level} className="flex items-center justify-between text-[11px] font-mono py-0.5">
+                            <span className="text-gray-400 font-semibold">
+                              L{lvl.level}{' '}
+                              <span className={`text-[10px] ${lvl.priceChangePct >= 0 ? 'text-cyan-400' : 'text-emerald-400'}`}>
+                                ({lvl.priceChangePct >= 0 ? '+' : ''}{lvl.priceChangePct.toFixed(1)}%)
+                              </span>
+                            </span>
+                            <span className="text-white font-medium">
+                              ${lvl.targetPrice < 0.01 ? lvl.targetPrice.toFixed(6) : lvl.targetPrice.toFixed(4)}
+                            </span>
+                            <span className="text-cyan-300">
+                              {lvl.stepAmt.toFixed(3)} {fromToken.symbol}
+                            </span>
+                            <span className="text-emerald-400 font-semibold">
+                              ~{lvl.targetOut.toFixed(3)} {toToken.symbol}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-2 text-[11px] text-gray-500 font-mono">
+                          Enter total amount above to preview grid levels
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Protocol Fee & DeepBook Status */}
+                    <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-400 flex items-center gap-1">
+                          <Coins className="w-3.5 h-3.5 text-cyan-400" /> Protocol Treasury Fee:
+                        </span>
+                        <span className="font-mono font-bold text-cyan-300">
+                          0.15% (~{(parseAmount(fromAmount) * 0.0015).toFixed(4)} {fromToken.symbol})
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-gray-400">
+                        <span>DeepBook v3 CLOB Execution:</span>
+                        <span className="text-emerald-400 font-mono font-bold">0.00% Maker Fee (Zero Slippage)</span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2562,10 +2784,10 @@ export default function App() {
                         ) : (
                           <div className="flex items-center justify-between text-gray-400">
                             <span className="flex items-center gap-1.5">
-                              <Clock className="w-3 h-3 text-purple-400" /> DCA Schedule
+                              <Layers className="w-3 h-3 text-cyan-400" /> DeepBook Grid Ladder
                             </span>
-                            <span className="text-purple-400 font-bold text-[11px]">
-                              {dcaOrdersCount} rounds every {dcaInterval}
+                            <span className="text-cyan-400 font-bold text-[11px]">
+                              {gridSteps} Orders • {gridSpanPct}% Spread • 0.00% Maker Fee
                             </span>
                           </div>
                         )}
@@ -2617,6 +2839,8 @@ export default function App() {
                       <Zap className="w-3.5 h-3.5 text-volt" />{' '}
                       {lastExecutedTrade?.orderType === 'LIMIT'
                         ? 'Limit Order Registered on Sui!'
+                        : lastExecutedTrade?.orderType === 'GRID'
+                        ? 'Grid Orders Deployed on Sui!'
                         : lastExecutedTrade?.orderType === 'DCA'
                         ? 'DCA Stream Started on Sui!'
                         : 'Swap Confirmed on Sui!'}
@@ -2692,6 +2916,7 @@ export default function App() {
                         <Zap className="w-5 h-5 fill-slate-950 text-slate-950" />
                         {swapMode === 'market' && `Swap ${fromToken.symbol} for ${toToken.symbol}`}
                         {swapMode === 'limit' && `Place DeepBook Limit Order @ ${effectiveLimitRate < 0.01 ? effectiveLimitRate.toFixed(6) : effectiveLimitRate.toFixed(4)} ${toToken.symbol}`}
+                        {swapMode === 'grid' && `Deploy ${gridSteps}x On-Chain Grid Orders (1-Click PTB)`}
                       </>
                     )}
                   </button>
@@ -2793,17 +3018,19 @@ export default function App() {
                                   className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide shrink-0 ${
                                     ord.type === 'LIMIT'
                                       ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                                      : ord.type === 'GRID'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                       : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                                   }`}
                                 >
-                                  {ord.type}
+                                  {ord.type === 'GRID' ? `GRID L${ord.gridLevel || 1}` : ord.type}
                                 </span>
                                 <span className="font-bold text-white text-xs whitespace-nowrap">
                                   {ord.pair}
                                 </span>
                                 <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap flex items-center gap-1 shrink-0">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                  {ord.type === 'LIMIT' ? 'DeepBook v3' : 'Active Stream'}
+                                  {ord.type === 'LIMIT' || ord.type === 'GRID' ? 'DeepBook v3' : 'Active Stream'}
                                 </span>
                               </div>
 
@@ -2852,14 +3079,14 @@ export default function App() {
                                   <span className="text-gray-500">→</span>
                                   <span className={ord.type === 'DCA' ? 'text-purple-300' : 'text-volt'}>{ord.amountOut}</span>
                                 </span>
-                                {ord.price && ord.type === 'LIMIT' && (
+                                {ord.price && (ord.type === 'LIMIT' || ord.type === 'GRID') && (
                                   <span className="text-[10px] font-mono text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 px-1.5 py-0.5 rounded font-bold flex items-center gap-1 shrink-0">
                                     <Target className="w-2.5 h-2.5 text-cyan-400" /> Target: ${ord.price} USD
                                   </span>
                                 )}
-                                {ord.type === 'LIMIT' && (
+                                {(ord.type === 'LIMIT' || ord.type === 'GRID') && (
                                   <span className="text-gray-500 text-[10px] hidden md:inline">
-                                    Zero Slippage CLOB
+                                    {ord.type === 'GRID' ? `Level ${ord.gridLevel || 1}/${ord.gridTotal || 4} CLOB` : 'Zero Slippage CLOB'}
                                   </span>
                                 )}
                                 {ord.type === 'DCA' && (
