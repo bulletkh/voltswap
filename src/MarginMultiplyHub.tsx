@@ -543,6 +543,11 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     });
   }, [liveRates]);
 
+  // Top 3 Yield Leaders (Dynamically sorted strictly by highest Max APR)
+  const top3Strategies = useMemo(() => {
+    return [...dynamicStrategies].sort((a, b) => b.maxApr - a.maxApr).slice(0, 3);
+  }, [dynamicStrategies]);
+
   // Active Positions Store
   const [activePositions, setActivePositions] = useState<ActiveMarginPosition[]>(() => {
     try {
@@ -1357,11 +1362,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       {/* 1. Header with Education Link */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-5">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-2">
-            <span>Multiply</span>
-            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
-              Up to 15x
-            </span>
+          <h1 className="text-3xl font-black text-white tracking-tight">
+            Multiply
           </h1>
           <p className="text-xs text-gray-400 mt-1 max-w-2xl font-mono">
             Effortlessly earn yields with automated compounding loops, powered by Current & Suilend Engine on Sui.
@@ -1391,70 +1393,36 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         </div>
       </div>
 
-      {/* 2. Top 3 Featured Hero Cards (Current Style with Live Rates) */}
+      {/* 2. Top 3 Yield Leaders (Dynamically Sorted by Highest APR) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {/* Card 1: aUSN / USDC */}
-        <div
-          onClick={() => handleOpenStrategyDetail(dynamicStrategies[4] || MULTIPLY_STRATEGIES[4])}
-          className="group cursor-pointer bg-[#0c101a] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5 flex items-center justify-between"
-        >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span className="text-2xl font-black text-amber-400 font-mono">
-                {(dynamicStrategies[4]?.maxApr || 15.0).toFixed(1)}%
-              </span>
-              <span className="text-[10px] font-mono uppercase text-gray-400">Max APR</span>
+        {top3Strategies.map((strat, index) => {
+          const colorClass = index === 0 ? 'text-emerald-400' : index === 1 ? 'text-cyan-300' : 'text-amber-400';
+          const iconColorClass = index === 0 ? 'text-emerald-400' : index === 1 ? 'text-cyan-400' : 'text-amber-400';
+          return (
+            <div
+              key={strat.id}
+              onClick={() => handleOpenStrategyDetail(strat)}
+              className="group cursor-pointer bg-[#0c101a] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5 flex items-center justify-between"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Sparkles className={`w-4 h-4 ${iconColorClass}`} />
+                  <span className={`text-2xl font-black font-mono ${colorClass}`}>
+                    {strat.maxApr.toFixed(1)}%
+                  </span>
+                  <span className="text-[10px] font-mono uppercase text-gray-400">Max APR</span>
+                </div>
+                <div className="text-xs text-gray-300 font-medium">
+                  {strat.supplyToken} / {strat.borrowToken} • {strat.maxMultiplier}x {strat.strategyType}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <TokenBadge symbol={strat.supplyToken} logoUrl={strat.supplyTokenLogo} size="w-8 h-8" />
+                <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+              </div>
             </div>
-            <div className="text-xs text-gray-300 font-medium">aUSN / USDC • 15.0x RWA Loop</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <TokenBadge symbol="aUSN" logoUrl="/tokens/usdc.svg" size="w-8 h-8" />
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-          </div>
-        </div>
-
-        {/* Card 2: USDsui / USDC */}
-        <div
-          onClick={() => handleOpenStrategyDetail(dynamicStrategies[1] || MULTIPLY_STRATEGIES[1])}
-          className="group cursor-pointer bg-[#0c101a] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5 flex items-center justify-between"
-        >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-cyan-400" />
-              <span className="text-2xl font-black text-cyan-300 font-mono">
-                {(dynamicStrategies[1]?.maxApr || 12.4).toFixed(1)}%
-              </span>
-              <span className="text-[10px] font-mono uppercase text-gray-400">Max APR</span>
-            </div>
-            <div className="text-xs text-gray-300 font-medium">USDsui / USDC • Suilend Stable Loop</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <TokenBadge symbol="USDsui" logoUrl="/tokens/usdc.svg" size="w-8 h-8" />
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-          </div>
-        </div>
-
-        {/* Card 3: haSUI / SUI */}
-        <div
-          onClick={() => handleOpenStrategyDetail(dynamicStrategies[5] || MULTIPLY_STRATEGIES[5])}
-          className="group cursor-pointer bg-[#0c101a] hover:border-cyan-500/40 border border-white/10 rounded-2xl p-4 transition-all duration-300 relative overflow-hidden shadow-lg hover:shadow-cyan-500/5 flex items-center justify-between"
-        >
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-              <span className="text-2xl font-black text-emerald-400 font-mono">
-                {(dynamicStrategies[5]?.maxApr || 24.8).toFixed(1)}%
-              </span>
-              <span className="text-[10px] font-mono uppercase text-gray-400">Max APR</span>
-            </div>
-            <div className="text-xs text-gray-300 font-medium">haSUI / SUI • 9.8x LST Pegged</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <TokenBadge symbol="haSUI" logoUrl="/tokens/hasui.svg" size="w-8 h-8" />
-            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* 3. Market Submarket Selector & Category Tabs (Current Style) */}
