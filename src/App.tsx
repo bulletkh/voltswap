@@ -1706,34 +1706,43 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-volt selection:text-black">
       {/* Top Protocol Status Bar */}
-      <div className="bg-[#090b10] border-b border-white/[0.06] py-1.5 px-4 text-center text-[11px] font-mono text-gray-400 flex items-center justify-center gap-2">
+      <div className="bg-[#080b12] border-b border-white/[0.06] py-1.5 px-4 text-center text-xs font-mono text-gray-400 flex items-center justify-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-volt font-semibold tracking-wider">VOLT SMART ENGINE:</span>
+        <span className="text-cyan-400 font-semibold tracking-wider">VOLT SMART ENGINE:</span>
         <span className="hidden sm:inline text-gray-300">Live On-Chain Whale Radar • DeepBook v3 CLOB • Cetus CLMM Atomic Routing</span>
         <button
           onClick={() => setActiveTab('radar')}
-          className="text-volt hover:text-white transition-colors underline underline-offset-2 ml-1 cursor-pointer font-sans text-xs"
+          className="text-cyan-400 hover:text-white transition-colors underline underline-offset-2 ml-1 cursor-pointer font-sans text-xs"
         >
           Open Radar →
         </button>
       </div>
 
       {/* Header */}
-      <header className="border-b border-white/5 bg-[#0a0c12]/80 backdrop-blur-md sticky top-0 z-40 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+      <header className="border-b border-white/[0.08] bg-[#090c15]/90 backdrop-blur-xl sticky top-0 z-40 px-4 lg:px-8 py-3 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setActiveTab('swap')}>
-            <div className="w-10 h-10 rounded-2xl bg-volt flex items-center justify-center shadow-volt-glow">
-              <Zap className="w-6 h-6 text-black fill-black" />
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('swap')}>
+            <div className="relative w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00f2fe] via-[#4facfe] to-[#38ef7d] p-[1.5px] shadow-[0_0_20px_rgba(0,242,254,0.3)] group-hover:shadow-[0_0_28px_rgba(56,239,125,0.4)] transition-all">
+              <div className="w-full h-full bg-[#090d16] rounded-[14px] flex items-center justify-center">
+                <Zap className="w-5 h-5 text-volt fill-volt group-hover:scale-110 transition-transform" />
+              </div>
             </div>
             <div>
-              <span className="text-xl font-black tracking-tight text-white flex items-center gap-1">
-                VOLT <span className="text-volt text-xs px-1.5 py-0.5 rounded bg-volt/10 border border-volt/30">TERMINAL</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-extrabold tracking-tight text-white font-sans">
+                  VOLT
+                </span>
+                <span className="text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/25">
+                  PRO DEX
+                </span>
+              </div>
+              <span className="text-[10px] text-gray-400 font-mono tracking-wider block -mt-0.5">
+                SUI CLMM & DEEPBOOK V3 AGGREGATOR
               </span>
-              <span className="text-[10px] text-gray-400 font-mono tracking-wider block -mt-1">SUI DEX AGGREGATOR & WHALE RADAR</span>
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-1 bg-[#121620] p-1 rounded-2xl border border-white/5">
+          <nav className="hidden md:flex items-center gap-1 bg-[#0c101b]/90 backdrop-blur-md p-1.5 rounded-2xl border border-white/[0.08] shadow-inner">
             {[
               { id: 'swap', label: 'Trade', icon: Zap },
               { id: 'radar', label: 'Whale Radar', icon: Activity },
@@ -1753,13 +1762,13 @@ export default function App() {
                     setActiveTab(tab.id as any);
                     playClickSound();
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
                     isActive
-                      ? 'bg-white/10 text-white shadow-sm border border-white/10 font-bold'
+                      ? 'bg-gradient-to-r from-white/[0.12] to-white/[0.06] text-white shadow-sm border border-white/15 font-bold'
                       : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-volt' : 'text-gray-400'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : 'text-gray-400'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -1768,9 +1777,13 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 bg-[#121620] border border-white/5 rounded-2xl px-3 py-1.5 text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-mono text-gray-300">Sui Mainnet (~390ms)</span>
+          <div className="hidden sm:flex items-center gap-2 bg-[#0c101b]/90 border border-white/[0.08] rounded-2xl px-3 py-1.5 text-xs">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="font-mono text-gray-300 font-medium">Sui Mainnet</span>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">~390ms</span>
           </div>
 
           {/* Community Links */}
@@ -1779,7 +1792,7 @@ export default function App() {
               href="https://x.com/voltswap"
               target="_blank"
               rel="noreferrer"
-              className="p-2 rounded-xl bg-[#121620] hover:bg-[#1a202e] border border-white/10 text-gray-400 hover:text-cyan-300 transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-[#0c101b]/90 hover:bg-[#151c2e] border border-white/[0.08] text-gray-400 hover:text-cyan-300 transition-all cursor-pointer"
               title="Official Volt X / Twitter (@voltswap)"
             >
               <Twitter className="w-4 h-4" />
@@ -1788,7 +1801,7 @@ export default function App() {
               href="https://t.me/volt_swap"
               target="_blank"
               rel="noreferrer"
-              className="p-2 rounded-xl bg-[#121620] hover:bg-[#1a202e] border border-white/10 text-gray-400 hover:text-sky-300 transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-[#0c101b]/90 hover:bg-[#151c2e] border border-white/[0.08] text-gray-400 hover:text-sky-300 transition-all cursor-pointer"
               title="Official Volt Telegram Channel (@volt_swap)"
             >
               <Send className="w-4 h-4" />
@@ -1798,10 +1811,10 @@ export default function App() {
           {/* Audio FX Sound Toggle */}
           <button
             onClick={toggleSound}
-            className="p-2 rounded-xl bg-[#121620] hover:bg-[#1a202e] border border-white/10 text-gray-400 hover:text-white transition-all cursor-pointer"
+            className="p-2 rounded-xl bg-[#0c101b]/90 hover:bg-[#151c2e] border border-white/[0.08] text-gray-400 hover:text-white transition-all cursor-pointer"
             title={isSoundMuted ? 'Enable trading audio FX' : 'Mute audio'}
           >
-            {isSoundMuted ? <VolumeX className="w-4 h-4 text-gray-500" /> : <Volume2 className="w-4 h-4 text-volt" />}
+            {isSoundMuted ? <VolumeX className="w-4 h-4 text-gray-500" /> : <Volume2 className="w-4 h-4 text-cyan-400" />}
           </button>
 
           <ConnectButton />
@@ -1847,35 +1860,35 @@ export default function App() {
         {activeTab === 'swap' && (
           <div className="w-full space-y-4">
             {/* Live Institutional Metrics Strip */}
-            <div className="w-full grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 font-mono text-xs">
-              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
-                <span className="text-[11px] text-gray-400">SUI / USD</span>
+            <div className="w-full bg-[#0b0e17]/80 backdrop-blur-xl border border-white/[0.08] rounded-2xl p-2.5 sm:p-3 shadow-lg grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 font-mono text-xs">
+              <div className="px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400 font-sans">SUI / USD</span>
                 <span className="font-bold text-white flex items-center gap-1.5">
                   ${fromPrice > 0 ? fromPrice.toFixed(4) : '0.8640'}
                   <span className="text-[10px] text-emerald-400 font-semibold">+4.18%</span>
                 </span>
               </div>
-              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
-                <span className="text-[11px] text-gray-400">Order Routing</span>
+              <div className="px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400 font-sans">Routing Engine</span>
                 <span className="font-bold text-cyan-400 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                   PTB Atomic Split
                 </span>
               </div>
-              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
-                <span className="text-[11px] text-gray-400">DeepBook v3</span>
+              <div className="px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400 font-sans">DeepBook v3</span>
                 <span className="font-bold text-volt flex items-center gap-1.5">
                   CLOB L2 Active
                 </span>
               </div>
-              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
-                <span className="text-[11px] text-gray-400">MEV Protection</span>
+              <div className="px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400 font-sans">MEV Protection</span>
                 <span className="font-bold text-emerald-400 flex items-center gap-1.5">
                   🛡️ Shield Active
                 </span>
               </div>
-              <div className="hidden lg:flex p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] items-center justify-between">
-                <span className="text-[11px] text-gray-400">Finality Speed</span>
+              <div className="hidden lg:flex px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04] items-center justify-between">
+                <span className="text-[11px] text-gray-400 font-sans">Finality Speed</span>
                 <span className="font-bold text-gray-200">~390ms</span>
               </div>
             </div>
@@ -1922,9 +1935,9 @@ export default function App() {
               )}
 
               {/* Swap Card */}
-              <div className="bg-[#0f121a] border border-white/[0.08] rounded-3xl p-5 shadow-2xl relative">
+              <div className="bg-[#0b0e17]/95 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-5 sm:p-6 shadow-[0_25px_60px_rgba(0,0,0,0.6)] relative overflow-hidden">
                 {/* 3-Mode Clean Switcher: Market | Limit | DCA */}
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#090b10] border border-white/[0.08] rounded-2xl mb-4">
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#06080e] border border-white/[0.06] rounded-2xl mb-4">
                   {[
                     { id: 'market', label: 'Market', icon: Zap },
                     { id: 'limit', label: 'Limit', icon: Target },
@@ -1941,11 +1954,11 @@ export default function App() {
                         }}
                         className={`py-2 px-1.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                           isActive
-                            ? 'bg-[#1a1f2c] text-white border border-white/15 shadow-sm'
+                            ? 'bg-[#181d2a] text-white border border-white/15 shadow-sm'
                             : 'text-gray-400 hover:text-white hover:bg-white/[0.03]'
                         }`}
                       >
-                        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? (m.id === 'market' ? 'text-volt' : m.id === 'limit' ? 'text-cyan-400' : 'text-purple-400') : ''}`} />
+                        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? (m.id === 'market' ? 'text-cyan-400' : m.id === 'limit' ? 'text-cyan-400' : 'text-purple-400') : ''}`} />
                         <span>{m.label}</span>
                       </button>
                     );
@@ -1953,35 +1966,37 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-                    {swapMode === 'market' && 'Market Swap'}
-                    {swapMode === 'limit' && 'DeepBook v3 Limit Order'}
-                    {swapMode === 'dca' && 'Automated Dollar-Cost Averaging'}
-
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+                      {swapMode === 'market' && 'Swap'}
+                      {swapMode === 'limit' && 'Limit Order'}
+                      {swapMode === 'dca' && 'DCA Stream'}
+                    </span>
                     <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
                       swapMode === 'market'
-                        ? 'text-volt bg-volt/10 border border-volt/20'
+                        ? 'text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 font-bold'
                         : swapMode === 'limit'
                         ? 'text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 font-bold'
                         : 'text-purple-400 bg-purple-500/10 border border-purple-500/20 font-bold'
                     }`}>
                       {swapMode === 'market' && 'Cetus + DeepBook v3'}
-                      {swapMode === 'limit' && 'Zero Price Impact CLOB'}
+                      {swapMode === 'limit' && 'DeepBook CLOB'}
                       {swapMode === 'dca' && 'Auto PTB Grid'}
                     </span>
-                  </span>
+                  </div>
+
                   <div className="flex items-center gap-1.5">
-                    {/* Jupiter-style Chart & Orderbook Toggle */}
+                    {/* Real-time Chart & Orderbook Toggle */}
                     <button
                       onClick={toggleChart}
                       className={`px-2.5 py-1.5 rounded-xl border transition-all text-xs flex items-center gap-1.5 font-mono cursor-pointer ${
                         showChart
-                          ? 'bg-volt/15 text-volt border-volt/30 shadow-volt-glow'
+                          ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30'
                           : 'bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border-white/[0.06]'
                       }`}
                       title={showChart ? 'Hide Real-Time Chart & Orderbook' : 'Show Real-Time Chart & Orderbook'}
                     >
-                      <BarChart2 className="w-3.5 h-3.5 text-volt" />
+                      <BarChart2 className="w-3.5 h-3.5 text-cyan-400" />
                       <span className="font-semibold text-[11px] hidden sm:inline">{showChart ? 'Hide Chart' : 'Chart'}</span>
                     </button>
 
@@ -1997,10 +2012,11 @@ export default function App() {
                     )}
                     <button
                       onClick={() => setShowSettings(!showSettings)}
-                      className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border border-white/[0.06] transition-all text-xs flex items-center gap-1 font-mono cursor-pointer"
+                      className="p-1.5 px-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border border-white/[0.06] transition-all text-xs flex items-center gap-1 font-mono cursor-pointer"
+                      title="Slippage & MEV settings"
                     >
-                      <Layers className="w-3.5 h-3.5" />
-                      {slippage === '0.2' ? 'Auto (MEV)' : `${slippage}%`}
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-semibold">{slippage === '0.2' ? 'Auto' : `${slippage}%`}</span>
                     </button>
                   </div>
                 </div>
@@ -2039,23 +2055,23 @@ export default function App() {
                 )}
 
                 {/* From Token (Pay) */}
-                <div className="bg-[#0e1015] border border-white/5 rounded-2xl p-4 transition-all focus-within:border-volt/40 relative">
+                <div className="bg-[#06080e] border border-white/[0.08] hover:border-white/[0.14] focus-within:border-cyan-500/40 focus-within:shadow-[0_0_20px_rgba(6,182,212,0.08)] rounded-2xl p-4 transition-all relative">
                   <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
-                    <span className="font-semibold text-gray-400">Pay</span>
+                    <span className="font-medium text-gray-400 text-xs">You Pay</span>
                     <div
                       onClick={() => handleSetPercentage(100)}
                       className="flex items-center gap-1.5 cursor-pointer group select-none hover:opacity-90 transition-opacity"
                       title="Click balance to use 100% Max"
                     >
-                      <span>
+                      <span className="text-gray-400 text-xs">
                         Balance:{' '}
-                        <span className="text-white group-hover:text-volt font-mono font-bold underline decoration-dotted decoration-volt/40 group-hover:decoration-volt transition-colors">
+                        <span className="text-white group-hover:text-cyan-400 font-mono font-bold transition-colors">
                           {currentAccount ? formattedBalance : '0.00'}
                         </span>{' '}
                         {fromToken.symbol}
                       </span>
                       {currentAccount && parseFloat(formattedBalance) > 0 && (
-                        <span className="text-[10px] font-bold text-volt uppercase bg-volt/10 group-hover:bg-volt group-hover:text-black px-1.5 py-0.5 rounded transition-all">
+                        <span className="text-[10px] font-bold text-cyan-400 uppercase bg-cyan-500/10 group-hover:bg-cyan-500 group-hover:text-black px-1.5 py-0.5 rounded transition-all">
                           MAX
                         </span>
                       )}
@@ -2077,7 +2093,7 @@ export default function App() {
                         setFromAmount(val);
                       }}
                       placeholder="0.0"
-                      className="bg-transparent text-2xl font-mono font-bold text-white outline-none w-full placeholder:text-gray-600"
+                      className="bg-transparent text-3xl sm:text-4xl font-mono font-extrabold text-white outline-none w-full placeholder:text-gray-700 tracking-tight"
                     />
                     <button
                       type="button"
@@ -2086,7 +2102,7 @@ export default function App() {
                         setTokenSearchQuery('');
                         playClickSound();
                       }}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2436] border border-white/10 hover:border-volt/50 cursor-pointer transition-all shrink-0 active:scale-95"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-[#121622] hover:bg-[#1a2130] border border-white/10 hover:border-white/20 cursor-pointer transition-all shrink-0 active:scale-95 shadow-md"
                     >
                       <img
                         src={fromToken.logo}
@@ -2102,42 +2118,46 @@ export default function App() {
                   </div>
 
                   {/* Quick Volume Percentage Chips: 25%, 50%, 75%, MAX */}
-                  <div className="flex items-center gap-1.5 mt-2.5">
-                    {[25, 50, 75, 100].map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() => handleSetPercentage(pct)}
-                        className="flex-1 py-1 rounded-lg bg-[#141824] hover:bg-[#1f2638] active:scale-95 border border-white/5 hover:border-volt/30 text-[11px] font-mono font-semibold text-gray-300 hover:text-volt transition-all text-center cursor-pointer"
-                        title={`Set ${pct}% of ${fromToken.symbol} balance`}
-                      >
-                        {pct === 100 ? 'MAX' : `${pct}%`}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="text-xs text-gray-500 font-mono mt-1.5">
-                    ≈ ${(parseAmount(fromAmount) * fromPrice).toFixed(2)} USD
+                  <div className="flex items-center justify-between mt-3 pt-1 border-t border-white/[0.04]">
+                    <div className="text-xs text-gray-500 font-mono">
+                      ≈ ${(parseAmount(fromAmount) * fromPrice).toFixed(2)} USD
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {[25, 50, 75, 100].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => handleSetPercentage(pct)}
+                          className="px-2 py-0.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/[0.06] hover:border-cyan-500/30 text-[10px] font-mono font-medium text-gray-400 hover:text-cyan-300 transition-all cursor-pointer"
+                          title={`Set ${pct}% of ${fromToken.symbol} balance`}
+                        >
+                          {pct === 100 ? 'MAX' : `${pct}%`}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
                 {/* Switch Button */}
-                <div className="flex justify-center -my-3 relative z-10">
+                <div className="flex justify-center -my-3.5 relative z-10">
                   <button
                     type="button"
                     onClick={handleSwapTokens}
-                    className="w-10 h-10 rounded-2xl bg-[#1b202c] border border-white/10 flex items-center justify-center text-volt hover:scale-110 hover:border-volt/40 active:scale-95 transition-all shadow-lg cursor-pointer"
+                    className="w-10 h-10 rounded-2xl bg-[#111624] hover:bg-[#1a2238] border border-white/10 hover:border-cyan-400/50 flex items-center justify-center text-cyan-400 hover:text-cyan-300 hover:rotate-180 transition-all duration-300 shadow-xl cursor-pointer active:scale-95 group"
                     title="Swap pay and receive tokens"
                   >
-                    <ArrowDownUp className="w-4 h-4" />
+                    <ArrowDownUp className="w-4 h-4 transition-transform" />
                   </button>
                 </div>
 
                 {/* To Token (Receive) */}
-                <div className="bg-[#0e1015] border border-white/5 rounded-2xl p-4 mt-1 transition-all focus-within:border-volt/40 relative">
-                  <div className="flex justify-between text-xs text-gray-400 mb-2">
-                    <span className="font-semibold text-gray-400">Receive</span>
-                    <span>{isFetchingQuote ? 'Scanning Cetus + DeepBook...' : 'Best On-Chain Output'}</span>
+                <div className="bg-[#06080e] border border-white/[0.08] hover:border-white/[0.14] rounded-2xl p-4 transition-all relative">
+                  <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
+                    <span className="font-medium text-gray-400 text-xs">You Receive</span>
+                    <span className="text-[11px] font-mono text-emerald-400/80 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      {isFetchingQuote ? 'Scanning Cetus + DeepBook...' : 'Optimal On-Chain Route'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <input
@@ -2145,7 +2165,7 @@ export default function App() {
                       readOnly
                       value={isFetchingQuote && swapMode !== 'limit' ? '...' : (swapMode === 'limit' ? limitEstimatedOutput : rawToAmount)}
                       placeholder="0.0"
-                      className="bg-transparent text-2xl font-mono font-bold text-volt outline-none w-full placeholder:text-gray-600"
+                      className="bg-transparent text-3xl sm:text-4xl font-mono font-extrabold bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent outline-none w-full placeholder:text-gray-700 tracking-tight"
                     />
                     <button
                       type="button"
@@ -2154,7 +2174,7 @@ export default function App() {
                         setTokenSearchQuery('');
                         playClickSound();
                       }}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#141824] hover:bg-[#1e2436] border border-white/10 hover:border-volt/50 cursor-pointer transition-all shrink-0 active:scale-95"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-[#121622] hover:bg-[#1a2130] border border-white/10 hover:border-white/20 cursor-pointer transition-all shrink-0 active:scale-95 shadow-md"
                     >
                       <img
                         src={toToken.logo}
@@ -2169,8 +2189,13 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="text-xs text-gray-500 font-mono mt-2">
-                    ≈ ${(parseFloat(swapMode === 'limit' ? limitEstimatedOutput : (rawToAmount || '0')) * toPrice).toFixed(2)} USD
+                  <div className="flex items-center justify-between mt-3 pt-1 border-t border-white/[0.04]">
+                    <div className="text-xs text-gray-500 font-mono">
+                      ≈ ${(parseFloat(swapMode === 'limit' ? limitEstimatedOutput : (rawToAmount || '0')) * toPrice).toFixed(2)} USD
+                    </div>
+                    <div className="text-[10px] font-mono text-gray-400">
+                      Impact: <span className="text-emerald-400 font-medium">&lt;0.01%</span>
+                    </div>
                   </div>
                 </div>
 
@@ -2623,30 +2648,32 @@ export default function App() {
                 {/* Action Button */}
                 {!currentAccount ? (
                   <div className="mt-4">
-                    <ConnectButton className="w-full !rounded-2xl !py-4 !bg-volt !text-black !font-extrabold !text-base !shadow-volt-glow !w-full !justify-center" />
+                    <ConnectButton className="w-full !rounded-2xl !py-4 !bg-gradient-to-r !from-[#22c55e] !via-[#10b981] !to-[#06b6d4] !text-black !font-black !text-base !shadow-[0_0_30px_rgba(16,185,129,0.3)] !w-full !justify-center hover:!scale-[1.01] transition-all cursor-pointer" />
                   </div>
                 ) : (
                   <button
                     onClick={executeSwap}
                     disabled={isSwapping || isFetchingQuote || isInsufficientBalance || parseAmount(fromAmount) <= 0}
-                    className={`w-full mt-4 py-4 rounded-2xl font-extrabold text-base tracking-wide transition-all flex items-center justify-center gap-2 ${
+                    className={`w-full mt-4 py-4 rounded-2xl font-black text-base tracking-wide transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer ${
                       isInsufficientBalance
-                        ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30 cursor-not-allowed opacity-90'
+                        ? 'bg-rose-500/[0.08] text-rose-300 border border-rose-500/20 cursor-not-allowed opacity-90 shadow-none'
                         : parseAmount(fromAmount) <= 0
-                        ? 'bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed'
-                        : 'bg-volt text-black shadow-volt-glow hover:bg-[#eafc6d] active:scale-[0.99] disabled:opacity-50 cursor-pointer'
+                        ? 'bg-white/[0.04] text-gray-500 border border-white/[0.06] cursor-not-allowed shadow-none'
+                        : 'bg-gradient-to-r from-[#22c55e] via-[#10b981] to-[#06b6d4] text-slate-950 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] hover:scale-[1.008] active:scale-[0.99] disabled:opacity-50'
                     }`}
                   >
                     {isSwapping ? (
-                      <span className="animate-pulse text-base">⚡ Confirming in Wallet...</span>
+                      <span className="animate-pulse flex items-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-black" /> Confirming in Wallet...
+                      </span>
                     ) : isInsufficientBalance ? (
                       <span>Insufficient {fromToken.symbol} Balance</span>
                     ) : parseAmount(fromAmount) <= 0 ? (
                       <span>Enter an Amount</span>
                     ) : (
                       <>
-                        <Zap className="w-5 h-5 fill-black" />
-                        {swapMode === 'market' && `Swap ${fromToken.symbol} ➔ ${toToken.symbol}`}
+                        <Zap className="w-5 h-5 fill-slate-950 text-slate-950" />
+                        {swapMode === 'market' && `Swap ${fromToken.symbol} for ${toToken.symbol}`}
                         {swapMode === 'limit' && `Place DeepBook Limit Order @ ${effectiveLimitRate < 0.01 ? effectiveLimitRate.toFixed(6) : effectiveLimitRate.toFixed(4)} ${toToken.symbol}`}
                         {swapMode === 'dca' && `Start ${dcaOrdersCount}x DCA Stream (${dcaInterval})`}
                       </>
@@ -2659,16 +2686,16 @@ export default function App() {
               {!showChart && (
                 <button
                   onClick={toggleChart}
-                  className="w-full py-3 px-4 rounded-2xl bg-[#0f121a] hover:bg-[#151924] border border-white/[0.08] hover:border-volt/30 text-gray-400 hover:text-white text-xs font-mono font-medium flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg group"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-[#0b0e17]/80 hover:bg-[#121624] border border-white/[0.08] hover:border-cyan-500/30 text-gray-300 hover:text-white text-xs font-mono font-medium flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg group"
                 >
-                  <BarChart2 className="w-4 h-4 text-volt group-hover:scale-110 transition-transform" />
+                  <BarChart2 className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
                   <span>Show Live Price Chart & DeepBook v3 Orderbook</span>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
                 </button>
               )}
 
               {/* OPEN ORDERS & PERSONAL ACTIVITY TABS */}
-              <div className="bg-[#0f121a] border border-white/[0.08] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">
+              <div className="bg-[#0b0e17]/95 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">
                 <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5 gap-2">
                   <div className="flex items-center gap-1 bg-[#090b10] p-1 rounded-xl border border-white/[0.06]">
                     <button

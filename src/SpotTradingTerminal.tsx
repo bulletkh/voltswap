@@ -61,18 +61,7 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
   const baseToken = isQuoteUsd ? fromToken : (fromToken.symbol === 'USDC' || fromToken.symbol === 'USDT' ? toToken : fromToken);
   const quoteToken = baseToken === fromToken ? toToken : fromToken;
 
-  const isCexSupported = useMemo(() => {
-    const sym = baseToken.symbol.toUpperCase();
-    return ['SUI', 'CETUS', 'DEEP', 'BTC', 'WBTC', 'ETH', 'WETH', 'SOL', 'NAVX', 'SCA', 'HIPPO', 'BLUB'].includes(sym);
-  }, [baseToken.symbol]);
-
-  const [chartSource, setChartSource] = useState<'dexscreener' | 'tradingview'>('dexscreener');
-
-  useEffect(() => {
-    if (!isCexSupported) {
-      setChartSource('dexscreener');
-    }
-  }, [isCexSupported, baseToken.symbol]);
+  const [chartSource, setChartSource] = useState<'tradingview' | 'dexscreener'>('tradingview');
 
   // Base Exchange Rate from Props
   const effectiveBaseRate = useMemo(() => {
@@ -81,7 +70,7 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
     return r > 0 ? r : 0.835;
   }, [fromPrice, toPrice]);
 
-  // Determine TradingView Symbol
+  // Determine TradingView Symbol (Instant High-Speed Load on Binance/Gate.io)
   const tvSymbol = useMemo(() => {
     const sym = baseToken.symbol.toUpperCase();
     if (sym === 'SUI') return 'BINANCE:SUIUSDT';
@@ -96,8 +85,18 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
     if (sym === 'BTC' || sym === 'WBTC' || sym === 'HBTC' || sym === 'XBTC') return 'BINANCE:BTCUSDT';
     if (sym === 'ETH' || sym === 'WETH') return 'BINANCE:ETHUSDT';
     if (sym === 'SOL') return 'BINANCE:SOLUSDT';
-    if (sym === 'WAL' || sym === 'HAEDAL' || sym === 'HASUI' || sym === 'AFSUI' || sym === 'BUCK') return 'BINANCE:SUIUSDT';
+    if (sym === 'WAL') return 'GATEIO:WAL_USDT';
     return `BINANCE:${sym}USDT`;
+  }, [baseToken.symbol]);
+
+  // DexScreener verified Sui pool address fallback
+  const dexPoolAddress = useMemo(() => {
+    const sym = baseToken.symbol.toUpperCase();
+    if (sym === 'SUI') return '0x0df4f02d0e210169cb6d5aabd03c3058328c06f2c4dbb0804faa041159c78443';
+    if (sym === 'CETUS') return '0x2e041f3fd8804a6ceec99f7672dfb3441747448e894a503460b6976fd39c0e4d';
+    if (sym === 'DEEP') return '0x6a94f61f7ef3a31c6e147fb3b2f5b66d40ee71e98d9774640fb08dfb6c6b325c';
+    if (sym === 'WAL') return '0x985ae3c06e30018507db47214772e09405d4b553641398c8c512304859f9392e';
+    return '0x0df4f02d0e210169cb6d5aabd03c3058328c06f2c4dbb0804faa041159c78443';
   }, [baseToken.symbol]);
 
   // Price change indicator
@@ -314,7 +313,7 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
   const activeDisplayRate = orderbookData.mid > 0 ? orderbookData.mid : effectiveBaseRate;
 
   return (
-    <div className="bg-[#0f121a] border border-white/[0.08] rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3">
+    <div className="bg-[#0b0e17]/90 backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-4 sm:p-5 shadow-[0_20px_50px_rgba(0,0,0,0.6)] space-y-3 relative overflow-hidden">
       {/* 1. TERMINAL HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
         {/* Left: Active Pair Info & Live Dynamic Price */}
@@ -365,52 +364,26 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
         </div>
 
         {/* Center/Right: Terminal Mode Switcher & Tools */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {chartMode === 'chart' && (
-            <div className="flex items-center gap-1 bg-[#090b10] p-1 rounded-xl border border-white/[0.08]">
-              <button
-                onClick={() => setChartSource('dexscreener')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  chartSource === 'dexscreener'
-                    ? 'bg-volt/20 text-volt border border-volt/30 shadow-sm'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                title="View verified on-chain Sui DEX pool candlestick chart"
-              >
-                ⚡ On-Chain Pool
-              </button>
-              <button
-                onClick={() => setChartSource('tradingview')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  chartSource === 'tradingview'
-                    ? 'bg-[#1a1f2c] text-white border border-white/20 shadow-sm'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                title="View Global CEX / TradingView Market Chart"
-              >
-                📈 CEX
-              </button>
-            </div>
-          )}
-
+        <div className="flex items-center gap-2">
+          {/* Mode Tabs: Candles | Orderbook | Depth */}
           <div className="flex items-center gap-1 bg-[#090b10] p-1 rounded-xl border border-white/[0.08]">
             <button
               onClick={() => setChartMode('chart')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors duration-150 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 chartMode === 'chart'
-                  ? 'bg-[#1a1f2c] text-white border border-white/15 shadow-sm'
+                  ? 'bg-[#181d2a] text-white border border-white/15 shadow-sm'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              <BarChart2 className="w-3.5 h-3.5 text-volt" />
-              <span>Chart</span>
+              <BarChart2 className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Candles</span>
             </button>
 
             <button
               onClick={() => setChartMode('orderbook')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors duration-150 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 chartMode === 'orderbook'
-                  ? 'bg-[#1a1f2c] text-white border border-white/15 shadow-sm'
+                  ? 'bg-[#181d2a] text-white border border-white/15 shadow-sm'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -420,9 +393,9 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
 
             <button
               onClick={() => setChartMode('depth')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors duration-150 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 chartMode === 'depth'
-                  ? 'bg-[#1a1f2c] text-white border border-white/15 shadow-sm'
+                  ? 'bg-[#181d2a] text-white border border-white/15 shadow-sm'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -431,40 +404,21 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
             </button>
           </div>
 
-          <button
-            onClick={() => setShowDrawTools(!showDrawTools)}
-            className={`p-2 rounded-xl border transition-colors duration-150 cursor-pointer ${
-              showDrawTools
-                ? 'bg-volt/15 text-volt border-volt/30 shadow-sm'
-                : 'bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border border-white/[0.06]'
-            }`}
-            title={showDrawTools ? 'Hide Drawing Tools' : 'Show Drawing Tools'}
-          >
-            <PenTool className="w-3.5 h-3.5" />
-          </button>
-
+          {/* Fullscreen Button */}
           <button
             onClick={() => setIsModalOpen(true)}
-            className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border border-white/[0.06] transition-colors duration-150 cursor-pointer"
+            className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border border-white/[0.06] transition-all cursor-pointer"
             title="Maximize Terminal"
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
 
-          <button
-            onClick={onOpenRadar}
-            className="px-3 py-1.5 rounded-xl bg-volt/10 hover:bg-volt/20 text-volt border border-volt/20 text-xs font-semibold transition-colors duration-150 flex items-center gap-1.5 cursor-pointer"
-            title="Open Whale Radar Feed"
-          >
-            <Flame className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Whale Radar →</span>
-          </button>
-
+          {/* Close/Collapse Terminal Button */}
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 border border-white/[0.06] hover:border-rose-500/30 transition-colors duration-150 cursor-pointer"
-              title="Hide Chart & Orderbook"
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-gray-400 hover:text-white border border-white/[0.06] transition-all cursor-pointer"
+              title="Collapse Terminal"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -473,25 +427,16 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
       </div>
 
       {/* 2. VIEWPORT CONTAINER (Matched Height to Swap Box) */}
-      <div className="relative h-[520px] sm:h-[560px] w-full bg-[#0a0d14] rounded-2xl overflow-hidden border border-white/[0.06]">
+      <div className="relative h-[520px] sm:h-[560px] w-full bg-[#06080e] rounded-2xl overflow-hidden border border-white/[0.08]">
         {chartMode === 'chart' ? (
-          chartSource === 'dexscreener' ? (
-            <iframe
-              key={`spot-dex-${baseToken.address}`}
-              title="DexScreener On-Chain Sui Chart"
-              src={`https://dexscreener.com/sui/${encodeURIComponent(baseToken.address)}?embed=1&theme=dark&trades=0&info=0`}
-              className="w-full h-full border-0"
-            />
-          ) : (
-            <iframe
-              key={`spot-tv-${tvSymbol}-${showDrawTools}`}
-              title="TradingView Real-Time Chart"
-              src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
-                tvSymbol
-              )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=${showDrawTools ? '0' : '1'}&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%230a0d14`}
-              className="w-full h-full border-0"
-            />
-          )
+          <iframe
+            key={`spot-tv-${tvSymbol}`}
+            title="TradingView Real-Time Chart"
+            src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
+              tvSymbol
+            )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%2306080e`}
+            className="w-full h-full border-0"
+          />
         ) : chartMode === 'orderbook' ? (
           /* LIVE UPDATING DEEPBOOK V3 L2 ORDERBOOK */
           <div className="w-full h-full p-4 flex flex-col justify-between font-mono text-xs">
@@ -686,23 +631,14 @@ export const SpotTradingTerminal: React.FC<SpotTradingTerminalProps> = ({
               </button>
             </div>
             <div className="flex-1 p-4 bg-[#0a0d14]">
-              {chartSource === 'dexscreener' ? (
-                <iframe
-                  key={`modal-dex-${baseToken.address}`}
-                  title="DexScreener On-Chain Sui Chart Modal"
-                  src={`https://dexscreener.com/sui/${encodeURIComponent(baseToken.address)}?embed=1&theme=dark&trades=0&info=0`}
-                  className="w-full h-full border-0 rounded-2xl"
-                />
-              ) : (
-                <iframe
-                  key={`modal-tv-${tvSymbol}-${showDrawTools}`}
-                  title="TradingView Real-Time Chart Modal"
-                  src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
-                    tvSymbol
-                  )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=${showDrawTools ? '0' : '1'}&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%230a0d14`}
-                  className="w-full h-full border-0 rounded-2xl"
-                />
-              )}
+              <iframe
+                key={`modal-tv-${tvSymbol}`}
+                title="TradingView Real-Time Chart Modal"
+                src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
+                  tvSymbol
+                )}&interval=15&theme=dark&style=1&timezone=Etc%2FUTC&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hide_top_toolbar=0&withdateranges=0&locale=en&backgroundColor=%230a0d14`}
+                className="w-full h-full border-0 rounded-2xl"
+              />
             </div>
           </div>
         </div>
