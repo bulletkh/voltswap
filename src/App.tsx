@@ -3340,7 +3340,6 @@ export default function App() {
                 }
                 setActiveTab('swap');
               }}
-              onNavigateToMultiply={() => setActiveTab('multiply')}
               showNotification={showNotification}
             />
           </Suspense>
