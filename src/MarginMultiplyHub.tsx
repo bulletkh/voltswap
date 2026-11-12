@@ -332,7 +332,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   }, [selectedFilter, searchQuery]);
 
   // Calculations for Active Strategy Modal
-  const collateralNum = parseFloat(inputCollateral) || 0;
+  const collateralNum = parseFloat(inputCollateral.replace(',', '.')) || 0;
   const tokenPriceUsd = useMemo(() => {
     if (!activeStrategy) return 1.0;
     if (activeStrategy.supplyToken.includes('USD')) return 1.0;
@@ -450,7 +450,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
         }
         const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
-        await depositCoin(tx, naviPool.Sui, splitCoin, netMist);
+        await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(netMist));
 
       } else if (activeStrategy.supplyToken === 'USDC') {
         const totalUnits = BigInt(Math.floor(collateralNum * 1e6));
@@ -475,7 +475,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
           tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
         }
         const [splitCoin] = tx.splitCoins(primaryCoin, [netUnits]);
-        await depositCoin(tx, naviPool.nUSDC, splitCoin, netUnits);
+        await depositCoin(tx, naviPool.nUSDC, splitCoin, tx.pure.u64(netUnits));
 
       } else if (activeStrategy.supplyToken === 'haSUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
@@ -501,7 +501,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       } else {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
         const [splitCoin] = tx.splitCoins(tx.gas, [totalMist]);
-        await depositCoin(tx, naviPool.Sui, splitCoin, totalMist);
+        await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(totalMist));
       }
 
       const result = await signAndExecute({ transaction: tx });

@@ -608,7 +608,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   // Handle on-chain interaction (Direct Deposit + 1-Click ZAP via Cetus Aggregator Router)
   const handleConfirmOnChain = async () => {
     if (!activeVault) return;
-    const amt = parseFloat(inputAmount);
+    const amt = parseFloat(inputAmount.replace(',', '.'));
     if (isNaN(amt) || amt <= 0) {
       showNotification('warning', 'Invalid Amount', 'Please enter a valid amount.');
       return;
@@ -697,9 +697,9 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
 
         // 3. Deposit into target vault protocol Move contract
         if (baseVaultToken === 'USDC') {
-          await depositCoin(tx, naviPool.nUSDC, targetDepositCoinObj, finalDepositUnits);
+          await depositCoin(tx, naviPool.nUSDC, targetDepositCoinObj, tx.pure.u64(finalDepositUnits));
         } else if (baseVaultToken === 'USDT') {
-          await depositCoin(tx, naviPool.USDT, targetDepositCoinObj, finalDepositUnits);
+          await depositCoin(tx, naviPool.USDT, targetDepositCoinObj, tx.pure.u64(finalDepositUnits));
         } else if (activeVault.protocol === 'Scallop') {
           const [sCoin] = tx.moveCall({
             target: '0xefe8b36d5b2e43728cc323298626b83177803521d195cfb11e15b910e892fddf::mint::mint',
@@ -725,7 +725,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           tx.transferObjects([haSuiCoin], currentAccount.address);
         } else {
           // NAVI SUI, Cetus SUI, DeepBook SUI, Walrus SUI
-          await depositCoin(tx, naviPool.Sui, targetDepositCoinObj, finalDepositUnits);
+          await depositCoin(tx, naviPool.Sui, targetDepositCoinObj, tx.pure.u64(finalDepositUnits));
         }
 
       } else {
