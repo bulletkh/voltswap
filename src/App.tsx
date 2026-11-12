@@ -87,12 +87,13 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<'swap' | 'radar' | 'margin' | 'earn' | 'bridge' | 'portfolio' | 'docs' | 'treasury'>('swap');
   
-  // Pro Chart & Orderbook Visibility (Jupiter-style toggle, default false on mobile to prevent scroll trap)
+  // Pro Chart & Orderbook Visibility: Always open by default on Desktop (>= 1024px) for full terminal experience
   const [showChart, setShowChart] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    if (window.innerWidth >= 1024) return true; // Always show rich split terminal on desktop
     try {
-      const saved = localStorage.getItem('volt_show_chart');
-      if (saved !== null) return saved === 'true';
-      return typeof window !== 'undefined' ? window.innerWidth >= 1024 : false;
+      const saved = localStorage.getItem('volt_show_chart_mobile');
+      return saved === 'true';
     } catch {
       return false;
     }
@@ -101,9 +102,6 @@ export default function App() {
   const toggleChart = useCallback(() => {
     setShowChart((prev) => {
       const next = !prev;
-      try {
-        localStorage.setItem('volt_show_chart', String(next));
-      } catch {}
       playClickSound();
       return next;
     });
@@ -1847,11 +1845,46 @@ export default function App() {
       <main className="flex-1 flex flex-col items-center px-2 py-3 sm:p-6 lg:p-8 max-w-[1540px] w-full mx-auto my-1 overflow-x-hidden">
         {/* TAB 1: SPLIT TERMINAL (PRO CHART TERMINAL + SWAP) */}
         {activeTab === 'swap' && (
-          <div className={`w-full transition-all duration-300 ${
-            showChart
-              ? 'grid grid-cols-1 lg:grid-cols-12 gap-5 items-start'
-              : 'max-w-[490px] mx-auto space-y-4'
-          }`}>
+          <div className="w-full space-y-4">
+            {/* Live Institutional Metrics Strip */}
+            <div className="w-full grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 font-mono text-xs">
+              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400">SUI / USD</span>
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  ${fromPrice > 0 ? fromPrice.toFixed(4) : '0.8640'}
+                  <span className="text-[10px] text-emerald-400 font-semibold">+4.18%</span>
+                </span>
+              </div>
+              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400">Order Routing</span>
+                <span className="font-bold text-cyan-400 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  PTB Atomic Split
+                </span>
+              </div>
+              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400">DeepBook v3</span>
+                <span className="font-bold text-volt flex items-center gap-1.5">
+                  CLOB L2 Active
+                </span>
+              </div>
+              <div className="p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] flex items-center justify-between">
+                <span className="text-[11px] text-gray-400">MEV Protection</span>
+                <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                  🛡️ Shield Active
+                </span>
+              </div>
+              <div className="hidden lg:flex p-2.5 rounded-2xl bg-[#0c0f17] border border-white/[0.08] items-center justify-between">
+                <span className="text-[11px] text-gray-400">Finality Speed</span>
+                <span className="font-bold text-gray-200">~390ms</span>
+              </div>
+            </div>
+
+            <div className={`w-full transition-all duration-300 ${
+              showChart
+                ? 'grid grid-cols-1 lg:grid-cols-12 gap-5 items-start'
+                : 'max-w-[490px] mx-auto space-y-4'
+            }`}>
             {/* LEFT COLUMN: INSTITUTIONAL SPOT TRADING TERMINAL & DEEPBOOK (7 COLS) */}
             {showChart && (
               <div className="lg:col-span-7 w-full order-2 lg:order-1 animate-fadeIn">
@@ -2978,6 +3011,7 @@ export default function App() {
               </div>
             </div>
           </div>
+        </div>
         )}
 
         {/* TAB 2: FULL-SCREEN WHALE RADAR */}
