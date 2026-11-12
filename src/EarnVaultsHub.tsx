@@ -69,10 +69,10 @@ export interface EcosystemVault {
 
 // Exactly 7 Verified Sui Ecosystem Blue-Chip Vaults (No Duplicates)
 export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
-  // 1. USDC MONEY MARKET (Aggregated NAVI & Scallop Institutional Yield)
+  // 1. USDC MONEY MARKET
   {
     id: 'navi-usdc',
-    name: 'Volt USDC Money Market',
+    name: 'USDC',
     symbol: 'USDC',
     receiptToken: 'vUSDC',
     protocol: 'NAVI',
@@ -82,14 +82,14 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
     protocolUrl: 'https://naviprotocol.io',
     tokenLogos: ['/tokens/usdc.svg'],
     coinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-    category: 'Lending Vault',
+    category: 'Lending Market',
     categoryBadgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     apy: 13.85,
     baseApy: 9.60,
     bonusApy: 4.25,
     tvlUsd: 142500000,
     risk: 'Ultra Low',
-    riskLabel: '0% Impermanent Loss • Capital Safe',
+    riskLabel: 'NAVI & Scallop • Institutional Lending Reserve',
     lockup: 'Instant Redeem',
     description: 'Supplies USDC into NAVI & Scallop audited money markets with automated yield compounding into Volt vUSDC.',
     packageId: '0x8344a10fed3e8d93e1b084df8da47b199d629a8a7bfdb6515c0e176378e9f50e',
@@ -100,24 +100,24 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
   // 2. USDT HIGH-YIELD
   {
     id: 'navi-usdt',
-    name: 'Volt USDT High-Yield',
+    name: 'USDT',
     symbol: 'USDT',
     receiptToken: 'vUSDT',
     protocol: 'NAVI',
     protocolLogo: '/tokens/navx.svg',
-    protocolBadge: 'NAVI Lending',
+    protocolBadge: 'NAVI Protocol',
     protocolColor: 'from-cyan-500/20 to-blue-500/20 text-cyan-300 border-cyan-500/30',
     protocolUrl: 'https://naviprotocol.io',
     tokenLogos: ['/tokens/usdt.svg'],
     coinType: '0x375f70cf2ae4c00bf37117d0c85a2c71545e6ee05c4a5c7d282cd66a4504b068::usdt::USDT',
-    category: 'Lending Vault',
+    category: 'Lending Market',
     categoryBadgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     apy: 13.10,
     baseApy: 9.20,
     bonusApy: 3.90,
     tvlUsd: 58200000,
     risk: 'Ultra Low',
-    riskLabel: '0% Impermanent Loss • High Liquidity',
+    riskLabel: 'NAVI Protocol • High-Yield Lending Market',
     lockup: 'Instant Redeem',
     description: 'Supplies USDT into NAVI markets on Sui. Protected by Volt smart vault wrapper and insurance reserves.',
     packageId: '0x8344a10fed3e8d93e1b084df8da47b199d629a8a7bfdb6515c0e176378e9f50e',
@@ -128,24 +128,24 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
   // 3. PURE SUI RESERVE
   {
     id: 'navi-sui',
-    name: 'Volt SUI Core Reserve',
+    name: 'SUI',
     symbol: 'SUI',
     receiptToken: 'vSUI',
     protocol: 'NAVI',
     protocolLogo: '/tokens/navx.svg',
-    protocolBadge: 'NAVI & Scallop',
+    protocolBadge: 'NAVI Protocol',
     protocolColor: 'from-cyan-500/20 to-blue-500/20 text-cyan-300 border-cyan-500/30',
     protocolUrl: 'https://naviprotocol.io',
     tokenLogos: ['/tokens/sui.svg'],
     coinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-    category: 'Lending Vault',
+    category: 'Lending Market',
     categoryBadgeColor: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
     apy: 7.80,
     baseApy: 6.90,
     bonusApy: 0.90,
     tvlUsd: 98400000,
     risk: 'Ultra Low',
-    riskLabel: '100% Capital Safety • Zero IL',
+    riskLabel: 'NAVI Protocol • Core Lending Reserve',
     lockup: 'Instant Redeem',
     description: 'Pure single-sided SUI lending reserve. Earns institutional borrow rates without impermanent loss.',
     packageId: '0x8344a10fed3e8d93e1b084df8da47b199d629a8a7bfdb6515c0e176378e9f50e',
@@ -156,12 +156,12 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
   // 4. HAEDAL HASUI - SUI PEGGED BOOSTER
   {
     id: 'haedal-hasui-sui-pegged',
-    name: 'Volt haSUI - SUI Pegged Booster',
+    name: 'haSUI / SUI',
     symbol: 'haSUI-SUI',
     receiptToken: 'vLP-haSUI',
     protocol: 'Haedal',
     protocolLogo: '/tokens/hasui.svg',
-    protocolBadge: 'Haedal LST 1:1',
+    protocolBadge: 'Haedal Protocol',
     protocolColor: 'from-emerald-500/20 to-teal-500/20 text-emerald-400 border-emerald-500/30',
     protocolUrl: 'https://haedal.xyz',
     tokenLogos: ['/tokens/hasui.svg', '/tokens/sui.svg'],
@@ -173,7 +173,7 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
     bonusApy: 6.40,
     tvlUsd: 38200000,
     risk: 'Low',
-    riskLabel: 'Zero IL • 1:1 Soft Pegged Boost',
+    riskLabel: 'Haedal Protocol • Liquid Staking (1:1 Soft-Pegged)',
     lockup: 'Instant Redeem',
     description: '1:1 soft-pegged liquidity pool pairing haSUI with SUI. Earns dual rewards: validator staking rewards + swap fees with 0% impermanent loss.',
     packageId: '0x2c68443db9e8c813b194010c11040a3ce59f47e4eb97a2ec805371505dad7459',
@@ -184,24 +184,24 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
   // 5. CETUS SUI / USDC CLMM
   {
     id: 'cetus-sui-usdc',
-    name: 'Volt Cetus SUI / USDC CLMM',
+    name: 'SUI / USDC',
     symbol: 'SUI-USDC',
     receiptToken: 'vLP-SUI-USDC',
     protocol: 'Cetus',
     protocolLogo: '/tokens/cetus.svg',
-    protocolBadge: 'Cetus CLMM',
-    protocolColor: 'from-amber-500/20 to-volt/20 text-volt border-volt/30',
+    protocolBadge: 'Cetus Protocol',
+    protocolColor: 'from-cyan-500/20 to-blue-500/20 text-cyan-300 border-cyan-500/30',
     protocolUrl: 'https://cetus.zone',
     tokenLogos: ['/tokens/sui.svg', '/tokens/usdc.svg'],
     coinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
     category: 'DEX CLMM',
-    categoryBadgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    categoryBadgeColor: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
     apy: 24.60,
     baseApy: 18.20,
     bonusApy: 6.40,
     tvlUsd: 28500000,
     risk: 'Low',
-    riskLabel: 'Top Sui DEX Pool • Auto-Rebalanced',
+    riskLabel: 'Cetus Protocol • Concentrated Liquidity (CLMM)',
     lockup: 'Instant Redeem',
     description: 'Concentrated liquidity market maker on Cetus wrapped in Volt auto-rebalancing vault. Collects real swap fees 24/7.',
     packageId: '0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb',
@@ -212,7 +212,7 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
   // 6. DEEPBOOK V3 CLOB
   {
     id: 'deepbook-alpha',
-    name: 'Volt DeepBook DEEP / SUI CLOB',
+    name: 'DEEP / SUI',
     symbol: 'DEEP-SUI',
     receiptToken: 'vLP-DEEP',
     protocol: 'DeepBook',
@@ -222,14 +222,14 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
     protocolUrl: 'https://deepbook.tech',
     tokenLogos: ['/tokens/deep.svg', '/tokens/sui.svg'],
     coinType: '0xdeeb7a4662eec9f2f3def03fb937a663dddaa2e215b8078a284d026b7946c270::deep::DEEP',
-    category: 'Orderbook',
+    category: 'Orderbook CLOB',
     categoryBadgeColor: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
     apy: 34.20,
     baseApy: 26.50,
     bonusApy: 7.70,
     tvlUsd: 18200000,
     risk: 'Medium',
-    riskLabel: 'Mysten Labs Orderbook • Maker Rebates',
+    riskLabel: 'DeepBook v3 • Central Limit Order Book',
     lockup: 'Instant Redeem',
     description: 'Supplies maker liquidity into Mysten Labs native DeepBook v3 on-chain orderbook. Earns institutional maker rebates and gas fee burns.',
     packageId: '0xdee9',
@@ -240,7 +240,7 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
   // 7. WALRUS STORAGE FARM
   {
     id: 'walrus-ecosystem',
-    name: 'Volt Walrus WAL / SUI Storage Farm',
+    name: 'WAL / SUI',
     symbol: 'WAL-SUI',
     receiptToken: 'vLP-WAL',
     protocol: 'Walrus',
@@ -250,14 +250,14 @@ export const SUI_ECOSYSTEM_VAULTS: EcosystemVault[] = [
     protocolUrl: 'https://walrus.xyz',
     tokenLogos: ['/tokens/wal.svg', '/tokens/sui.svg'],
     coinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-    category: 'Ecosystem Farm',
+    category: 'Decentralized Storage',
     categoryBadgeColor: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
     apy: 38.50,
     baseApy: 22.00,
     bonusApy: 16.50,
     tvlUsd: 9400000,
     risk: 'Medium',
-    riskLabel: 'Mysten Decentralized Storage Farm',
+    riskLabel: 'Walrus Mysten • Decentralized Storage',
     lockup: 'Instant Redeem',
     description: 'Liquidity vault for Walrus decentralized storage protocol by Mysten Labs. High trading fee APR + WAL storage ecosystem rewards.',
     packageId: '0xwalrus_storage_mainnet',
@@ -427,6 +427,10 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
     return Object.values(userPositions).reduce((acc, p) => acc + (p?.stakedUsd || 0), 0);
   }, [userPositions]);
 
+  const totalAccruedYield = useMemo(() => {
+    return Object.values(userPositions).reduce((acc, p) => acc + (p?.accruedYield || 0), 0);
+  }, [userPositions]);
+
   // Handle on-chain interaction
   const handleConfirmOnChain = async () => {
     if (!activeVault) return;
@@ -517,7 +521,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         showNotification(
           'success',
           'Volt Smart Vault Deposit Confirmed',
-          `Successfully deposited ${amt.toFixed(4)} ${activeVault.symbol} (~$${usdVal.toFixed(2)} USD) into ${activeVault.name}.\n\nYou received ${amt.toFixed(4)} ${activeVault.receiptToken} receipt tokens.\nEarned +${ptsAwarded} Volt Points!\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+          `Successfully deposited ${amt.toFixed(4)} ${activeVault.symbol} (~$${usdVal.toFixed(2)} USD) into ${activeVault.name}.\n\nYou received ${amt.toFixed(4)} ${activeVault.receiptToken} receipt tokens.\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
           'View on Suiscan',
           `https://suiscan.xyz/mainnet/tx/${digest}`
         );
@@ -613,53 +617,47 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           </div>
         </div>
 
-        {/* 4 Stat Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5 pt-5 border-t border-white/10">
-          <div className="p-3 rounded-2xl bg-[#090c13]/90 border border-white/10">
-            <div className="flex items-center justify-between text-gray-400 text-[11px] mb-0.5">
+        {/* 3 Balanced Metric Cards (Zero Sparks/XP) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-5 pt-5 border-t border-white/10">
+          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-white/10 backdrop-blur-md">
+            <div className="flex items-center justify-between text-gray-400 text-xs mb-1">
               <span>Total Protocol TVL</span>
-              <Landmark className="w-3.5 h-3.5 text-volt" />
+              <Landmark className="w-4 h-4 text-cyan-400" />
             </div>
-            <div className="text-base sm:text-xl font-black text-white font-mono">${(totalProtocolTvl / 1000000).toFixed(1)}M USD</div>
-            <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1 mt-0.5">
-              <TrendingUp className="w-3 h-3" /> 7 Verified Blue-Chips
+            <div className="text-lg sm:text-2xl font-black text-white font-mono">${(totalProtocolTvl / 1000000).toFixed(1)}M USD</div>
+            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 mt-1">
+              <TrendingUp className="w-3.5 h-3.5" /> 7 Verified Blue-Chip Pools
             </span>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#090c13]/90 border border-white/10">
-            <div className="flex items-center justify-between text-gray-400 text-[11px] mb-0.5">
-              <span>Max Looping APY</span>
-              <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-white/10 backdrop-blur-md">
+            <div className="flex items-center justify-between text-gray-400 text-xs mb-1">
+              <span>Highest Pool APY</span>
+              <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400" />
             </div>
-            <div className="text-base sm:text-xl font-black text-amber-300 font-mono">24.80% APY</div>
-            <span className="text-[10px] text-gray-400 font-mono mt-0.5 block truncate">
-              haSUI / SUI Soft-Pegged
+            <div className="text-lg sm:text-2xl font-black text-cyan-300 font-mono">38.50% APY</div>
+            <span className="text-xs text-gray-400 font-mono mt-1 block truncate">
+              WAL / SUI Storage Pool
             </span>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#090c13]/90 border border-cyan-500/30">
-            <div className="flex items-center justify-between text-cyan-400 text-[11px] mb-0.5">
+          <div className="p-4 rounded-2xl bg-[#090c13]/90 border border-cyan-500/30 backdrop-blur-md">
+            <div className="flex items-center justify-between text-cyan-400 text-xs mb-1">
               <span>Your Staked Position</span>
-              <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
             </div>
-            <div className="text-base sm:text-xl font-black text-cyan-400 font-mono">
-              ${totalUserStakedUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            <div className="text-lg sm:text-2xl font-black text-white font-mono">
+              ${totalUserStakedUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1 mt-0.5 animate-pulse">
-              ● +$44.32 Real-Time Yield
-            </span>
-          </div>
-
-          <div className="p-3 rounded-2xl bg-[#090c13]/90 border border-volt/30">
-            <div className="flex items-center justify-between text-volt text-[11px] mb-0.5">
-              <span>Volt Sparks Accrual</span>
-              <Award className="w-3.5 h-3.5 text-volt" />
-            </div>
-            <div className="text-base sm:text-xl font-black text-volt font-mono">
-              ⚡ {userVoltPoints.toLocaleString()} XP
-            </div>
-            <span className="text-[10px] text-volt/80 font-mono mt-0.5 block">
-              Tier 2 • 1.25x Yield Boost
+            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1 mt-1">
+              {totalUserStakedUsd > 0 ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  +${totalAccruedYield.toFixed(2)} Real-Time Yield
+                </>
+              ) : (
+                <span className="text-gray-500 font-normal">● No active deposits</span>
+              )}
             </span>
           </div>
         </div>
@@ -683,14 +681,14 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           onClick={() => setViewMode('multiply')}
           className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
             viewMode === 'multiply'
-              ? 'bg-gradient-to-r from-amber-400 to-volt text-black shadow-volt-glow'
+              ? 'bg-gradient-to-r from-sky-400 to-cyan-300 text-slate-950 shadow-volt-glow'
               : 'text-gray-400 hover:text-white hover:bg-white/5'
           }`}
         >
           <Zap className="w-4 h-4 fill-current" />
           <span>1-Click Multiply Looping</span>
           <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-            viewMode === 'multiply' ? 'bg-black/30 text-black' : 'bg-amber-400/20 text-amber-300'
+            viewMode === 'multiply' ? 'bg-black/30 text-black' : 'bg-cyan-400/20 text-cyan-300'
           }`}>
             Up to 9.8x
           </span>
@@ -854,11 +852,20 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
             </div>
           )}
 
-          {/* 4. CLEAN SPATIOUS VAULT CARDS LIST (NO CLUTTERED TABLE) */}
-          <div className="space-y-3">
+          {/* 4. INSTITUTIONAL DATAGRID TABLE */}
+          <div className="space-y-2.5">
+            {/* Table Column Headers (Desktop) */}
+            <div className="hidden md:grid grid-cols-12 items-center px-6 py-2.5 text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-white/5">
+              <div className="col-span-4">Asset / Pair</div>
+              <div className="col-span-2">Strategy & Receipt</div>
+              <div className="col-span-2 text-left">TVL (USD)</div>
+              <div className="col-span-2 text-right">Net APY</div>
+              <div className="col-span-2 text-right">Action</div>
+            </div>
+
             {filteredVaults.length === 0 ? (
               <div className="p-10 text-center text-gray-500 rounded-3xl bg-[#0b0e17] border border-white/5">
-                No vaults match your criteria.
+                No pools match your search criteria.
               </div>
             ) : (
               filteredVaults.map((vault) => {
@@ -873,16 +880,16 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                       setActiveVault(vault);
                       setModalMode(hasDeposit ? 'withdraw' : 'deposit');
                     }}
-                    className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all duration-200 cursor-pointer ${
+                    className={`p-4 rounded-2xl border transition-all duration-200 cursor-pointer ${
                       hasDeposit
                         ? 'bg-gradient-to-r from-[#0d1726] to-[#080d16] border-cyan-500/40 shadow-lg shadow-cyan-500/5'
-                        : 'bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] border-white/10 hover:border-volt/40 hover:bg-[#0e1320]'
+                        : 'bg-gradient-to-r from-[#0c101a] via-[#090d16] to-[#07090f] border-white/10 hover:border-cyan-500/40 hover:bg-[#0e1320]'
                     }`}
                   >
-                    {/* Desktop & Tablet Layout (md+) */}
-                    <div className="hidden md:flex items-center justify-between gap-4">
-                      {/* 1. Asset & Protocol Info */}
-                      <div className="flex items-center gap-3.5 min-w-[280px]">
+                    {/* Desktop Layout (md+) - Strict 12-Column Grid */}
+                    <div className="hidden md:grid grid-cols-12 items-center gap-4">
+                      {/* 1. Asset & Pair Info (col-span-4) */}
+                      <div className="col-span-4 flex items-center gap-3.5 min-w-0">
                         <div className="flex items-center shrink-0">
                           {vault.tokenLogos.length > 1 ? (
                             <div className="flex -space-x-2.5">
@@ -908,59 +915,55 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                             />
                           )}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-white text-base hover:text-volt transition-colors">
+                            <h3 className="font-bold text-white text-base hover:text-cyan-400 transition-colors truncate">
                               {vault.name}
                             </h3>
                             {hasDeposit && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">
                                 Active (${userPos.stakedUsd.toFixed(2)})
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
-                            <span className="font-semibold text-gray-300">{vault.protocolBadge}</span>
-                            <span>•</span>
-                            <span>{vault.riskLabel}</span>
+                          <div className="text-xs text-gray-400 truncate mt-0.5 font-sans">
+                            {vault.riskLabel}
                           </div>
                         </div>
                       </div>
 
-                      {/* 2. Strategy & Receipt Token */}
-                      <div className="hidden lg:flex flex-col items-start min-w-[130px]">
+                      {/* 2. Strategy & Receipt Token (col-span-2) */}
+                      <div className="col-span-2 flex flex-col items-start min-w-0">
                         <span className="px-2.5 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-xs font-mono font-bold">
                           {vault.receiptToken}
                         </span>
-                        <span className="text-[10px] text-gray-500 mt-1">
-                          {vault.category}
+                        <span className="text-[11px] text-gray-400 mt-1 truncate">
+                          {vault.protocolBadge}
                         </span>
                       </div>
 
-                      {/* 3. TVL & XP Multiplier */}
-                      <div className="flex flex-col items-start min-w-[120px]">
+                      {/* 3. TVL (col-span-2 text-left) */}
+                      <div className="col-span-2 flex flex-col items-start">
                         <span className="text-base font-bold text-white font-mono">
                           ${(vault.tvlUsd / 1000000).toFixed(1)}M
                         </span>
-                        <span className="text-[10px] font-bold text-volt flex items-center gap-1 mt-0.5">
-                          <Zap className="w-2.5 h-2.5 fill-volt" />
-                          {vault.pointsMultiplier}x XP Boost
+                        <span className="text-[11px] text-gray-500">
+                          {vault.lockup}
                         </span>
                       </div>
 
-                      {/* 4. Net APY */}
-                      <div className="text-right min-w-[140px]">
-                        <div className="inline-flex items-center justify-end gap-1.5 text-volt font-black text-xl font-mono">
-                          <Zap className="w-4 h-4 fill-volt" />
+                      {/* 4. Net APY (col-span-2 text-right) */}
+                      <div className="col-span-2 text-right">
+                        <div className="inline-flex items-center justify-end gap-1.5 text-emerald-400 font-black text-xl font-mono">
                           <span>{vault.apy.toFixed(2)}%</span>
                         </div>
-                        <span className="text-[10px] text-gray-500 block">
+                        <span className="text-[10px] text-gray-500 block font-mono">
                           Base {vault.baseApy}% + Boost {vault.bonusApy}%
                         </span>
                       </div>
 
-                      {/* 5. Action Button */}
-                      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {/* 5. Action Button (col-span-2 flex justify-end) */}
+                      <div className="col-span-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
                         {hasDeposit ? (
                           <button
                             onClick={() => { setActiveVault(vault); setModalMode('withdraw'); }}
@@ -982,9 +985,8 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
 
                     {/* Mobile Layout (< md) */}
                     <div className="md:hidden space-y-3">
-                      {/* Top: Icon + Name + APY */}
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <div className="flex items-center shrink-0">
                             {vault.tokenLogos.length > 1 ? (
                               <div className="flex -space-x-2">
@@ -1010,42 +1012,36 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                               />
                             )}
                           </div>
-                          <div>
-                            <h3 className="font-bold text-white text-sm">
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-white text-sm truncate">
                               {vault.name}
                             </h3>
-                            <span className="text-[10px] text-gray-400 font-mono">
-                              {vault.protocolBadge} • {vault.category}
+                            <span className="text-[10px] text-gray-400 font-sans block truncate">
+                              {vault.riskLabel}
                             </span>
                           </div>
                         </div>
 
                         <div className="text-right shrink-0">
-                          <div className="inline-flex items-center gap-1 text-volt font-black text-base font-mono">
-                            <Zap className="w-3.5 h-3.5 fill-volt" />
+                          <div className="inline-flex items-center gap-1 text-emerald-400 font-black text-base font-mono">
                             <span>{vault.apy.toFixed(2)}%</span>
                           </div>
                           <span className="text-[9px] text-gray-500 block">Net APY</span>
                         </div>
                       </div>
 
-                      {/* Badges Bar */}
                       <div className="flex items-center gap-1.5 flex-wrap text-[11px] pt-1">
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                          {vault.risk === 'Ultra Low' ? '🛡️ 0% IL' : vault.riskLabel.split('•')[0].trim()}
+                        <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-mono text-[10px]">
+                          {vault.receiptToken}
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-white/5 text-gray-300 font-mono">
+                        <span className="px-2 py-0.5 rounded-md bg-white/5 text-gray-300 font-mono text-[10px]">
                           TVL ${(vault.tvlUsd / 1000000).toFixed(1)}M
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-volt/10 text-volt border border-volt/20 font-bold">
-                          ⚡ {vault.pointsMultiplier}x XP
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-mono">
-                          {vault.receiptToken}
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">
+                          {vault.lockup}
                         </span>
                       </div>
 
-                      {/* Bottom CTA Row */}
                       <div className="flex items-center justify-between pt-2 border-t border-white/5" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs text-gray-400 font-mono">
                           Wallet: <strong className="text-white">{balance} {vault.symbol}</strong>
@@ -1171,8 +1167,8 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
                 <span className="text-gray-300">10% on profit only (0% on principal)</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400">Volt Points Rate:</span>
-                <span className="text-volt font-bold">+{activeVault.pointsMultiplier}x Points / $1 TVL</span>
+                <span className="text-gray-400">Capital Custody:</span>
+                <span className="text-cyan-400 font-bold">100% Non-Custodial (Sui PTB)</span>
               </div>
               <div className="flex justify-between items-center border-t border-white/5 pt-2">
                 <span className="text-gray-300 font-bold">Projected 1-Year Net Return:</span>
