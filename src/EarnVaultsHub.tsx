@@ -842,7 +842,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           }`}
         >
           <Coins className="w-4 h-4 text-cyan-400" />
-          <span>7 Blue-Chip Pools & Vaults</span>
+          <span>Pools & Vaults</span>
         </button>
 
         <button
@@ -854,7 +854,7 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
           }`}
         >
           <Zap className="w-4 h-4 text-cyan-400 fill-cyan-400/20" />
-          <span>1-Click Multiply Looping</span>
+          <span>Multiply</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-cyan-400/15 text-cyan-300 border border-cyan-500/30">
             Up to 9.8x
           </span>
