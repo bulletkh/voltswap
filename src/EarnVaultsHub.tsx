@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
 import { depositCoin, withdrawCoin, pool as naviPool } from 'navi-sdk';
-import { MarginMultiplyHub } from './MarginMultiplyHub';
 
 export type ProtocolFilter = 'all' | 'navi' | 'cetus' | 'haedal' | 'scallop' | 'walrus' | 'deepbook';
 
@@ -285,9 +284,6 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
   onNavigateToSwap,
   showNotification
 }) => {
-  // View Mode: 7 Blue-Chip Vaults vs 1-Click Multiply Looping
-  const [viewMode, setViewMode] = useState<'vaults' | 'multiply'>('vaults');
-
   // Category Filter & Search
   const [categoryFilter, setCategoryFilter] = useState<'all' | 'single' | 'lst' | 'dex'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -663,55 +659,20 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
         </div>
       </div>
 
-      {/* 2. MODE SELECTOR */}
-      <div className="flex items-center p-1 bg-[#0b0e17] border border-white/10 rounded-2xl w-full sm:w-auto self-start gap-1">
-        <button
-          onClick={() => setViewMode('vaults')}
-          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-            viewMode === 'vaults'
-              ? 'bg-volt text-black shadow-volt-glow'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
+      {/* 2. SECTION BADGE / TAB */}
+      <div className="flex items-center p-1 bg-[#0b0e17] border border-white/10 rounded-2xl w-fit">
+        <div className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black bg-volt text-black shadow-volt-glow">
           <Coins className="w-4 h-4" />
-          <span>7 Blue-Chip Pools & Vaults</span>
-        </button>
-
-        <button
-          onClick={() => setViewMode('multiply')}
-          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-            viewMode === 'multiply'
-              ? 'bg-gradient-to-r from-sky-400 to-cyan-300 text-slate-950 shadow-volt-glow'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          <Zap className="w-4 h-4 fill-current" />
-          <span>1-Click Multiply Looping</span>
-          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-            viewMode === 'multiply' ? 'bg-black/30 text-black' : 'bg-cyan-400/20 text-cyan-300'
-          }`}>
-            Up to 9.8x
-          </span>
-        </button>
+          <span>Pools & Vaults</span>
+        </div>
       </div>
 
-      {viewMode === 'multiply' ? (
-        <MarginMultiplyHub
-          currentAccount={currentAccount}
-          suiClient={suiClient}
-          signAndExecute={signAndExecute}
-          currentAccountAddress={currentAccountAddress}
-          onNavigateToSwap={onNavigateToSwap}
-          showNotification={showNotification}
-        />
-      ) : (
-        <>
-          {/* 3. SINGLE CLEAN FILTER & SEARCH BAR (NO CLUTTER) */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-[#0b0e17] border border-white/10">
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {[
-                { id: 'all', label: 'All Vaults (7)' },
+      {/* 3. SINGLE CLEAN FILTER & SEARCH BAR (NO CLUTTER) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 rounded-2xl bg-[#0b0e17] border border-white/10">
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {[
+            { id: 'all', label: 'All Pools (7)' },
                 { id: 'single', label: '🛡️ 0% IL Stables & SUI' },
                 { id: 'lst', label: '💧 LST 1:1 Peg' },
                 { id: 'dex', label: '⚡ DEX & Storage' }
@@ -1069,8 +1030,6 @@ export const EarnVaultsHub: React.FC<EarnVaultsHubProps> = ({
               })
             )}
           </div>
-        </>
-      )}
 
       {/* 5. MODAL: VOLT SMART VAULT DEPOSIT & REDEEM */}
       {activeVault && (
