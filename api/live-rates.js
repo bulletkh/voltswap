@@ -24,10 +24,9 @@ export default async function handler(req, res) {
     // 1. Suilend v2 Strategies
     'suilend-ssui-sui-loop': { supplyApr: 5.10, borrowApr: 1.20, maxApr: 7.67, tvlUsd: 8200000 },
     'suilend-usdsui-usdc-loop': { supplyApr: 8.50, borrowApr: 4.20, maxApr: 12.38, tvlUsd: 1250000 },
-    'suilend-ssui-usdc-loop': { supplyApr: 5.10, borrowApr: 4.50, maxApr: 18.50, tvlUsd: 52380 },
-    'suilend-xbtc-loop': { supplyApr: 1.80, borrowApr: 1.90, maxApr: 2.40, tvlUsd: 28510 },
 
-    // 2. Current Market / NAVI / Scallop Strategies
+    // 2. Ember, Current Market, NAVI & Scallop Strategies
+    'ember-eearn-usdc-loop': { supplyApr: 7.40, borrowApr: 5.00, maxApr: 14.90, tvlUsd: 18400000 },
     'current-ausn-usdc-loop': { supplyApr: 5.50, borrowApr: 4.20, maxApr: 15.00, tvlUsd: 78000000 },
     'hasui-sui-loop': { supplyApr: 7.80, borrowApr: 0.60, maxApr: 24.80, tvlUsd: 66400000 },
     'short-sui-hedge': { supplyApr: 6.80, borrowApr: 0.70, maxApr: 23.00, tvlUsd: 70870 },

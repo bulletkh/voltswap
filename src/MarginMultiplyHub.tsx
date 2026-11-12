@@ -62,7 +62,7 @@ export interface MultiplyStrategy {
   borrowApr: number;
   liquidationRisk: 'Zero IL / Soft-Pegged' | 'Low Risk' | 'Medium Risk';
   liquidationThreshold: number; // e.g. 0.95 for pegged, 0.75 for volatile
-  protocol: 'NAVI' | 'Scallop' | 'Haedal' | 'Current Market' | 'Suilend';
+  protocol: 'NAVI' | 'Scallop' | 'Haedal' | 'Current Market' | 'Suilend' | 'Ember';
   protocolLogo: string;
   marketGroup: 'main' | 'suilend' | 'scallop';
   description: string;
@@ -143,60 +143,33 @@ export const MULTIPLY_STRATEGIES: MultiplyStrategy[] = [
     description: 'Suilend v2 First Digital USDsui stablecoin looping. Multiplies delta-neutral stablecoin returns by borrowing USDC and supplying USDsui with automated compounding.',
     pointsMultiplier: 16
   },
+  // 2. EMBER & CURRENT MARKET & NAVI HIGH-YIELD HERO STRATEGIES
   {
-    id: 'suilend-ssui-usdc-loop',
-    name: 'sSUI / USDC Leveraged Upside',
-    supplyToken: 'sSUI',
-    supplyTokenLogo: '/tokens/sui.svg',
-    supplyCoinType: '0xdb515250f16b251873815f94f48b8b5cd0233ea8a10db0e9d6189e2e63338b::coin::COIN',
-    supplyTvlUsd: 52380,
+    id: 'ember-eearn-usdc-loop',
+    name: 'eEARN / USDC Ember Yield Loop',
+    supplyToken: 'eEARN',
+    supplyTokenLogo: '/tokens/usdc.svg',
+    supplyCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    supplyTvlUsd: 18400000,
     borrowToken: 'USDC',
     borrowTokenLogo: '/tokens/usdc.svg',
     borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-    borrowBorrowedUsd: 38500,
-    strategyType: 'Long SUI',
-    strategyBadgeColor: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-    maxApr: 18.50,
-    maxMultiplier: 3.0,
-    defaultMultiplier: 2.0,
-    supplyApr: 5.10,
-    borrowApr: 4.50,
-    liquidationRisk: 'Low Risk',
-    liquidationThreshold: 0.80,
-    protocol: 'Suilend',
-    protocolLogo: '/tokens/sui.svg',
-    marketGroup: 'suilend',
-    description: 'Supplies SpringSui (sSUI) on Suilend to borrow USDC, auto-swaps to sSUI via Cetus router, and loops up to 3.0x exposure with yield accumulation.',
-    pointsMultiplier: 14
-  },
-  {
-    id: 'suilend-xbtc-loop',
-    name: 'xBTC / suiWBTC Bitcoin Looping',
-    supplyToken: 'xBTC',
-    supplyTokenLogo: '/tokens/btc.svg',
-    supplyCoinType: '0x027792d9fed7f9844eb4839566001bb6f6cb4804f66aa2da6fe1ee242d896881::coin::COIN',
-    supplyTvlUsd: 28510,
-    borrowToken: 'suiWBTC',
-    borrowTokenLogo: '/tokens/wbtc.svg',
-    borrowCoinType: '0x027792d9fed7f9844eb4839566001bb6f6cb4804f66aa2da6fe1ee242d896881::coin::COIN',
-    borrowBorrowedUsd: 21200,
-    strategyType: 'RWA',
-    strategyBadgeColor: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    maxApr: 2.40,
-    maxMultiplier: 2.2,
-    defaultMultiplier: 1.8,
-    supplyApr: 1.80,
-    borrowApr: 1.90,
+    borrowBorrowedUsd: 12100000,
+    strategyType: 'Stablecoin',
+    strategyBadgeColor: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+    maxApr: 14.90,
+    maxMultiplier: 4.1,
+    defaultMultiplier: 3.0,
+    supplyApr: 7.40,
+    borrowApr: 5.00,
     liquidationRisk: 'Zero IL / Soft-Pegged',
-    liquidationThreshold: 0.90,
-    protocol: 'Suilend',
-    protocolLogo: '/tokens/btc.svg',
-    marketGroup: 'suilend',
-    description: 'Suilend Bitcoin soft-pegged strategy. Loops synthetic xBTC against wrapped suiWBTC with isolated risk parameters.',
-    pointsMultiplier: 10
+    liquidationThreshold: 0.93,
+    protocol: 'Ember',
+    protocolLogo: '/tokens/usdc.svg',
+    marketGroup: 'main',
+    description: 'Curated Ember Protocol yield-bearing vault token (eEARN) looped against native USDC up to 4.1x. Captures multi-strategy delta-neutral stablecoin yield with minimal volatility.',
+    pointsMultiplier: 18
   },
-
-  // 2. CURRENT MARKET & NAVI HIGH-YIELD HERO STRATEGIES
   {
     id: 'current-ausn-usdc-loop',
     name: 'aUSN / USDC Agora RWA Loop',
@@ -352,32 +325,6 @@ export const MULTIPLY_STRATEGIES: MultiplyStrategy[] = [
     marketGroup: 'scallop',
     description: 'Supplies Volo vSUI to borrow SUI at 0.6% APR on Scallop. Auto-reinvests into vSUI to amplify native PoS validation yield with isolated risk parameter.',
     pointsMultiplier: 18
-  },
-  {
-    id: 'scallop-sui-usdc-loop',
-    name: 'SUI / USDC Scallop Leverage Loop',
-    supplyToken: 'SUI',
-    supplyTokenLogo: '/tokens/sui.svg',
-    supplyCoinType: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-    supplyTvlUsd: 31200000,
-    borrowToken: 'USDC',
-    borrowTokenLogo: '/tokens/usdc.svg',
-    borrowCoinType: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-    borrowBorrowedUsd: 14200000,
-    strategyType: 'Long SUI',
-    strategyBadgeColor: 'bg-sky-500/15 text-sky-400 border-sky-500/30',
-    maxApr: 26.50,
-    maxMultiplier: 4.0,
-    defaultMultiplier: 2.5,
-    supplyApr: 6.90,
-    borrowApr: 4.80,
-    liquidationRisk: 'Low Risk',
-    liquidationThreshold: 0.82,
-    protocol: 'Scallop',
-    protocolLogo: '/tokens/sca.svg',
-    marketGroup: 'scallop',
-    description: 'Supplies SUI into Scallop Money Market, borrows USDC and loops back via Cetus/Aftermath to amplify SUI staking and liquidity incentives.',
-    pointsMultiplier: 16
   },
   {
     id: 'usdc-usdsui-stable-loop',
@@ -610,7 +557,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     if (tokenSymbol === 'SUI' && userBalances['SUI']) {
       return userBalances['SUI'];
     }
-    if (tokenSymbol.includes('USD') && userBalances['USDC']) {
+    if ((tokenSymbol.includes('USD') || tokenSymbol === 'eEARN') && userBalances['USDC']) {
       return userBalances['USDC'];
     }
     return '0.0000';
@@ -649,7 +596,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   const collateralNum = parseFloat(inputCollateral.replace(',', '.')) || 0;
   const tokenPriceUsd = useMemo(() => {
     if (!activeStrategy) return 1.0;
-    if (activeStrategy.supplyToken.includes('USD')) return 1.0;
+    if (activeStrategy.supplyToken.includes('USD') || activeStrategy.supplyToken === 'eEARN') return 1.0;
     if (activeStrategy.supplyToken.includes('BTC')) return 96500.0;
     return 0.85; // SUI/sSUI/haSUI reference price
   }, [activeStrategy]);
@@ -704,10 +651,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       const tx = new Transaction();
       tx.setSender(currentAccount.address);
 
-      const feeRate = effectiveFeeRate ?? 0.0020;
+      const feeRate = effectiveFeeRate ?? 0.0025;
       const feeRateBps = BigInt(Math.max(1, Math.round(feeRate * 10000)));
 
-      // Real On-Chain PTB Execution with NAVI / Scallop / Haedal / Suilend Move Call
+      // Real On-Chain PTB Execution with NAVI / Scallop / Haedal / Suilend / Ember Move Call
       if (activeStrategy.supplyToken === 'SUI') {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
         const feeMist = (totalMist * feeRateBps) / 10000n;
@@ -720,7 +667,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
         await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(netMist));
 
-      } else if (activeStrategy.supplyToken.includes('USD')) {
+      } else if (activeStrategy.supplyToken.includes('USD') || activeStrategy.supplyToken === 'eEARN') {
         const totalUnits = BigInt(Math.floor(collateralNum * 1e6));
         const feeUnits = (totalUnits * feeRateBps) / 10000n;
         const netUnits = totalUnits - feeUnits;
@@ -768,8 +715,15 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       } else {
         const totalMist = BigInt(Math.floor(collateralNum * 1e9));
-        const [splitCoin] = tx.splitCoins(tx.gas, [totalMist]);
-        await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(totalMist));
+        const feeMist = (totalMist * feeRateBps) / 10000n;
+        const netMist = totalMist - feeMist;
+
+        if (feeMist > 0n) {
+          const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
+          tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+        }
+        const [splitCoin] = tx.splitCoins(tx.gas, [netMist]);
+        await depositCoin(tx, naviPool.Sui, splitCoin, tx.pure.u64(netMist));
       }
 
       const result = await signAndExecute({ transaction: tx });
@@ -800,7 +754,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       showNotification(
         'success',
         'Leveraged Multiply Position Opened',
-        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Collateral: ${collateralNum.toFixed(4)} ${activeStrategy.supplyToken} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: 0.20%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        `Successfully opened ${multiplier.toFixed(1)}x ${activeStrategy.name}!\n• Collateral: ${collateralNum.toFixed(4)} ${activeStrategy.supplyToken} (~$${collateralUsd.toFixed(2)})\n• Protocol Tier Fee: ${(feeRate * 100).toFixed(2)}%\n• Total Exposure: ~$${totalExposureUsd.toFixed(2)}\n• Net APY: ${calculatedNetApr.toFixed(2)}%\n• Health Factor: ${calculatedHealthFactor.toFixed(2)}\n\nTransaction Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -838,7 +792,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         const mist = BigInt(Math.floor(pos.collateralAmount * 1e9));
         const [withdrawnCoin] = await withdrawCoin(tx, naviPool.Sui, mist);
         tx.transferObjects([withdrawnCoin], currentAccount.address);
-      } else if (pos.supplyToken.includes('USD')) {
+      } else if (pos.supplyToken.includes('USD') || pos.supplyToken === 'eEARN') {
         const units = BigInt(Math.floor(pos.collateralAmount * 1e6));
         const [withdrawnCoin] = await withdrawCoin(tx, naviPool.nUSDC, units);
         tx.transferObjects([withdrawnCoin], currentAccount.address);
@@ -1295,7 +1249,9 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                     </div>
                     <div className="flex justify-between items-center border-t border-white/5 pt-2">
                       <span className="text-gray-400">Volt Protocol Fee:</span>
-                      <span className="text-gray-300">10% on Net Yield on close (0% on deposit)</span>
+                      <span className="text-gray-300">
+                        {((effectiveFeeRate ?? 0.0025) * 100).toFixed(2)}% on deposit • 10% on Net Yield
+                      </span>
                     </div>
                   </div>
 
