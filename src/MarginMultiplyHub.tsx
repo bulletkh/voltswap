@@ -45,6 +45,8 @@ import {
   flashloan,
   repayFlashLoan,
   getConfig as getNaviConfig,
+  OracleProConfig,
+  PriceFeedConfig,
   pool as naviPool,
 } from 'navi-sdk';
 
@@ -81,6 +83,35 @@ const getTokenDecimals = (symbol: string): number => {
   if (s.includes('USD') || s === 'EEARN') return 6;
   if (s.includes('BTC')) return 8;
   return 9;
+};
+
+const getNaviPriceFeedConfig = (symbol: string) => {
+  const s = symbol.toUpperCase();
+  if (s === 'SUI') return PriceFeedConfig.SUI;
+  if (s === 'HASUI') return PriceFeedConfig.HASUI;
+  if (s === 'VSUI') return PriceFeedConfig.CERT;
+  if (s === 'SSUI') return PriceFeedConfig.STSUI || PriceFeedConfig.HASUI;
+  if (s === 'USDY') return PriceFeedConfig.USDY;
+  if (s === 'USDSUI') return PriceFeedConfig.USDSUI || PriceFeedConfig.NUSDC;
+  if (s === 'USDC' || s === 'AUSN' || s === 'EEARN') return PriceFeedConfig.NUSDC;
+  return PriceFeedConfig.SUI;
+};
+
+const updateNaviOracleSinglePrice = (tx: Transaction, symbol: string) => {
+  const feedCfg = getNaviPriceFeedConfig(symbol);
+  if (!feedCfg) return;
+  tx.moveCall({
+    target: `${OracleProConfig.PackageId}::oracle_pro::update_single_price_v2`,
+    arguments: [
+      tx.object('0x6'),
+      tx.object(OracleProConfig.OracleConfig),
+      tx.object(OracleProConfig.PriceOracle),
+      tx.object(OracleProConfig.SupraOracleHolder),
+      tx.object(feedCfg.pythPriceInfoObject),
+      tx.object('0x1fa7566f40f93cdbafd5a029a231e06664219444debb59beec2fe3f19ca08b7e'),
+      tx.pure.address(feedCfg.feedId),
+    ],
+  });
 };
 
 export type MarginStrategyFilter = 'all' | 'lst' | 'long_sui' | 'short_sui' | 'stablecoin' | 'rwa';
@@ -1104,6 +1135,12 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         }
 
         if (depositedToNavi && flashBorrowUnits > 0) {
+          // Refresh NAVI on-chain OraclePro timestamps before flashloan/borrow
+          updateNaviOracleSinglePrice(tx, depositTokenSymbol);
+          if (activeStrategy.borrowToken !== depositTokenSymbol) {
+            updateNaviOracleSinglePrice(tx, activeStrategy.borrowToken);
+          }
+
           // Real NAVI Flash-Loan -> Deposit Collateral -> Borrow -> Repay Flash-Loan
           const [flashBalance, receipt] = await flashloan(tx, borrowPoolCfg, flashBorrowUnits);
           const [flashCoin] = tx.moveCall({
@@ -1329,6 +1366,12 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
       const tx = new Transaction();
       tx.setSender(currentAccount.address);
+
+      // Refresh NAVI on-chain OraclePro timestamp before withdraw_v2 / repay
+      updateNaviOracleSinglePrice(tx, targetSymbol);
+      if (pos.borrowToken !== targetSymbol) {
+        updateNaviOracleSinglePrice(tx, pos.borrowToken);
+      }
 
       // If user has active on-chain borrow in this strategy's borrow token, repay it first if SUI
       const borrowPoolKey = getNaviPortfolioKey(pos.borrowToken);
