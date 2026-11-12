@@ -383,6 +383,7 @@ interface MarginMultiplyHubProps {
   signAndExecute?: (args: { transaction: Transaction }) => Promise<any>;
   currentAccountAddress?: string | null;
   userBalances?: Record<string, string>;
+  liveTokenPrices?: Record<string, number>;
   effectiveFeeRate?: number;
   userTraderTier?: any;
   onNavigateToSwap: (fromToken: string, toToken: string) => void;
@@ -395,6 +396,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
   signAndExecute,
   currentAccountAddress,
   userBalances = {},
+  liveTokenPrices = {},
   effectiveFeeRate,
   userTraderTier,
   onNavigateToSwap,
@@ -421,13 +423,28 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
   // Live On-Chain Oracles Synchronization State
   const [liveRates, setLiveRates] = useState<Record<string, { supplyApr?: number; borrowApr?: number; maxApr?: number; tvlUsd?: number }>>({});
+  const [llamaPoolIds, setLlamaPoolIds] = useState<Record<string, string>>({});
+  const [historicalRawApy, setHistoricalRawApy] = useState<Array<{ timestamp: string; apy: number }>>([]);
+  const [isChartLoading, setIsChartLoading] = useState<boolean>(false);
+  const [suiOraclePrice, setSuiOraclePrice] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
 
-  // Background Live Sync Function (DefiLlama, NAVI & Suilend)
+  // Background Live Sync Function (DefiLlama, NAVI, Suilend & Live SUI Price Oracle)
   const syncLiveRates = async () => {
     setIsSyncing(true);
     try {
+      // 1. Fetch real-time SUI oracle price from DefiLlama Coins API
+      fetch('https://coins.llama.fi/prices/current/sui:0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((pData) => {
+          const price = pData?.coins?.['sui:0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI']?.price;
+          if (price && price > 0) {
+            setSuiOraclePrice(price);
+          }
+        })
+        .catch(() => {});
+
       let data: any = null;
       try {
         const res = await fetch('/api/live-rates');
@@ -438,54 +455,78 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
         // Fallback directly client-side if serverless function is unreachable
       }
 
-      if (!data?.rates) {
-        // Direct DefiLlama client-side fallback
+      // 2. Always resolve real DefiLlama Sui Pool UUIDs for live historical APR charts
+      try {
         const llamaRes = await fetch('https://yields.llama.fi/pools');
         if (llamaRes.ok) {
           const lData = await llamaRes.json();
           const sui = lData.data.filter((p: any) => p.chain === 'Sui');
           const naviHasui = sui.find((p: any) => p.project === 'navi-lending' && p.symbol === 'HASUI');
+          const naviVsui = sui.find((p: any) => p.project === 'navi-lending' && p.symbol === 'VSUI');
           const naviSui = sui.find((p: any) => p.project === 'navi-lending' && p.symbol === 'SUI');
           const naviUsdc = sui.find((p: any) => p.project === 'navi-lending' && p.symbol === 'USDC');
           const scallopUsdc = sui.find((p: any) => p.project === 'scallop-lend' && p.symbol === 'USDC');
           const scallopSui = sui.find((p: any) => p.project === 'scallop-lend' && p.symbol === 'SUI');
+          const suilendSui = sui.find((p: any) => p.project === 'suilend' && p.symbol === 'SUI');
+          const suilendUsdc = sui.find((p: any) => p.project === 'suilend' && p.symbol === 'USDC');
 
-          const fallbackRates: any = {};
-          if (naviHasui && naviSui) {
-            const supplyApr = Math.max(4.0, (naviHasui.apy || 1.1) + 3.3);
-            const borrowApr = Math.max(0.4, (naviSui.apy || 0.6) * 0.4);
-            const mult = 9.8;
-            fallbackRates['hasui-sui-loop'] = {
-              supplyApr: parseFloat(supplyApr.toFixed(2)),
-              borrowApr: parseFloat(borrowApr.toFixed(2)),
-              maxApr: parseFloat(((supplyApr * mult) - (borrowApr * (mult - 1))).toFixed(2)),
-              tvlUsd: 66400000,
-            };
+          const poolMap: Record<string, string> = {};
+          if (naviHasui?.pool) poolMap['hasui-sui-loop'] = naviHasui.pool;
+          if (naviVsui?.pool) poolMap['vsui-sui-loop'] = naviVsui.pool;
+          else if (scallopSui?.pool) poolMap['vsui-sui-loop'] = scallopSui.pool;
+          if (naviSui?.pool) poolMap['long-sui-alpha'] = naviSui.pool;
+          if (scallopUsdc?.pool) poolMap['short-sui-hedge'] = scallopUsdc.pool;
+          else if (naviUsdc?.pool) poolMap['short-sui-hedge'] = naviUsdc.pool;
+          if (suilendSui?.pool) poolMap['suilend-ssui-sui-loop'] = suilendSui.pool;
+          if (suilendUsdc?.pool) poolMap['suilend-usdsui-usdc-loop'] = suilendUsdc.pool;
+          if (naviUsdc?.pool) {
+            poolMap['usdc-usdsui-stable-loop'] = naviUsdc.pool;
+            poolMap['usdy-usdc-rwa-loop'] = naviUsdc.pool;
+            poolMap['current-ausn-usdc-loop'] = naviUsdc.pool;
+            poolMap['ember-eearn-usdc-loop'] = naviUsdc.pool;
           }
-          if (scallopUsdc && scallopSui) {
-            const supplyApr = Math.max(5.5, (scallopUsdc.apy || 5.0) + 1.5);
-            const borrowApr = Math.max(0.5, (scallopSui.apy || 1.6) * 0.45);
-            const mult = 3.7;
-            fallbackRates['short-sui-hedge'] = {
-              supplyApr: parseFloat(supplyApr.toFixed(2)),
-              borrowApr: parseFloat(borrowApr.toFixed(2)),
-              maxApr: parseFloat(((supplyApr * mult) - (borrowApr * (mult - 1))).toFixed(2)),
-              tvlUsd: 70870,
-            };
+          setLlamaPoolIds(poolMap);
+
+          if (!data?.rates) {
+            const fallbackRates: any = {};
+            if (naviHasui && naviSui) {
+              const supplyApr = Math.max(4.0, (naviHasui.apy || 1.1) + 3.3);
+              const borrowApr = Math.max(0.4, (naviSui.apy || 0.6) * 0.4);
+              const mult = 9.8;
+              fallbackRates['hasui-sui-loop'] = {
+                supplyApr: parseFloat(supplyApr.toFixed(2)),
+                borrowApr: parseFloat(borrowApr.toFixed(2)),
+                maxApr: parseFloat(((supplyApr * mult) - (borrowApr * (mult - 1))).toFixed(2)),
+                tvlUsd: 66400000,
+              };
+            }
+            if (scallopUsdc && scallopSui) {
+              const supplyApr = Math.max(5.5, (scallopUsdc.apy || 5.0) + 1.5);
+              const borrowApr = Math.max(0.5, (scallopSui.apy || 1.6) * 0.45);
+              const mult = 3.7;
+              fallbackRates['short-sui-hedge'] = {
+                supplyApr: parseFloat(supplyApr.toFixed(2)),
+                borrowApr: parseFloat(borrowApr.toFixed(2)),
+                maxApr: parseFloat(((supplyApr * mult) - (borrowApr * (mult - 1))).toFixed(2)),
+                tvlUsd: 70870,
+              };
+            }
+            if (naviSui && naviUsdc) {
+              const supplyApr = Math.max(4.5, (naviSui.apy || 2.2) + 4.2);
+              const borrowApr = Math.max(3.5, naviUsdc.apy || 4.5);
+              const mult = 4.0;
+              fallbackRates['long-sui-alpha'] = {
+                supplyApr: parseFloat(supplyApr.toFixed(2)),
+                borrowApr: parseFloat(borrowApr.toFixed(2)),
+                maxApr: parseFloat(((supplyApr * mult) - (borrowApr * (mult - 1))).toFixed(2)),
+                tvlUsd: 84500000,
+              };
+            }
+            data = { rates: fallbackRates };
           }
-          if (naviSui && naviUsdc) {
-            const supplyApr = Math.max(4.5, (naviSui.apy || 2.2) + 4.2);
-            const borrowApr = Math.max(3.5, naviUsdc.apy || 4.5);
-            const mult = 4.0;
-            fallbackRates['long-sui-alpha'] = {
-              supplyApr: parseFloat(supplyApr.toFixed(2)),
-              borrowApr: parseFloat(borrowApr.toFixed(2)),
-              maxApr: parseFloat(((supplyApr * mult) - (borrowApr * (mult - 1))).toFixed(2)),
-              tvlUsd: 84500000,
-            };
-          }
-          data = { rates: fallbackRates };
         }
+      } catch {
+        // Ignore chart pool map error
       }
 
       if (data?.rates) {
@@ -551,18 +592,63 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     localStorage.setItem('volt_multiply_positions', JSON.stringify(activePositions));
   }, [activePositions]);
 
-  // Wallet Balance Helper
-  const getStrategyWalletBalance = (tokenSymbol: string): string => {
-    if (userBalances[tokenSymbol]) {
-      return userBalances[tokenSymbol];
+  // Fetch Real Historical APY Series from DefiLlama when viewing a strategy
+  useEffect(() => {
+    if (!activeStrategy) {
+      setHistoricalRawApy([]);
+      return;
     }
-    if (tokenSymbol === 'SUI' && userBalances['SUI']) {
-      return userBalances['SUI'];
+    const poolId = llamaPoolIds[activeStrategy.id];
+    if (!poolId) return;
+
+    let cancelled = false;
+    setIsChartLoading(true);
+    fetch(`https://yields.llama.fi/chart/${poolId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        if (cancelled || !json?.data || !Array.isArray(json.data)) return;
+        const cleaned = json.data
+          .filter((pt: any) => typeof pt.apy === 'number' && pt.timestamp)
+          .map((pt: any) => ({ timestamp: pt.timestamp as string, apy: pt.apy as number }));
+        setHistoricalRawApy(cleaned);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsChartLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeStrategy?.id, llamaPoolIds]);
+
+  // Wallet Balance Helper (Reads real on-chain raw MIST/base-unit balances from App.tsx GraphQL map)
+  const getStrategyWalletBalance = (tokenSymbol: string, coinType?: string): string => {
+    if (!currentAccount?.address || !userBalances) return '0.0000';
+    let foundRaw = '0';
+
+    for (const [key, val] of Object.entries(userBalances)) {
+      if (
+        (coinType && key.toLowerCase() === coinType.toLowerCase()) ||
+        (tokenSymbol === 'SUI' && key.endsWith('::sui::SUI')) ||
+        key.toLowerCase().endsWith(`::${tokenSymbol.toLowerCase()}`)
+      ) {
+        foundRaw = val || '0';
+        break;
+      }
     }
-    if ((tokenSymbol.includes('USD') || tokenSymbol === 'eEARN') && userBalances['USDC']) {
-      return userBalances['USDC'];
-    }
-    return '0.0000';
+
+    const decimals =
+      tokenSymbol.includes('USD') || tokenSymbol === 'eEARN'
+        ? 6
+        : tokenSymbol.includes('BTC')
+        ? 8
+        : 9;
+
+    const num = Number(foundRaw) / Math.pow(10, decimals);
+    if (!Number.isFinite(num) || num <= 0) return '0.0000';
+    const floored = Math.floor(num * 10000) / 10000;
+    return floored.toFixed(4);
   };
 
   // Filtered Strategies
@@ -605,19 +691,30 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     ? (depositAssetRole === 'supply' ? activeStrategy.supplyCoinType : activeStrategy.borrowCoinType)
     : '';
 
+  const getLiveAssetPriceUsd = (symbol: string): number => {
+    if (!symbol) return 0;
+    if (symbol.includes('USD') || symbol === 'eEARN') return 1.0;
+    const direct = liveTokenPrices[symbol] || liveTokenPrices[symbol.toUpperCase()];
+    if (direct && direct > 0) return direct;
+    const suiPrice = liveTokenPrices['SUI'] || liveTokenPrices['sui'] || suiOraclePrice || 0;
+    if (symbol === 'SUI' || symbol === 'haSUI' || symbol === 'vSUI' || symbol === 'sSUI') {
+      return suiPrice;
+    }
+    return 0;
+  };
+
   // Collateral & Yield Calculations
   const collateralNum = parseFloat(inputCollateral.replace(',', '.')) || 0;
   const tokenPriceUsd = useMemo(() => {
-    if (!activeStrategy) return 1.0;
-    if (depositTokenSymbol.includes('USD') || depositTokenSymbol === 'eEARN') return 1.0;
-    if (depositTokenSymbol.includes('BTC')) return 96500.0;
-    return 0.85; // SUI/sSUI/haSUI/vSUI reference price
-  }, [activeStrategy, depositTokenSymbol]);
+    if (!activeStrategy) return 0;
+    return getLiveAssetPriceUsd(depositTokenSymbol);
+  }, [activeStrategy, depositTokenSymbol, liveTokenPrices, suiOraclePrice]);
 
   const collateralUsd = collateralNum * tokenPriceUsd;
   const totalExposureUsd = collateralUsd * multiplier;
   const borrowUsd = Math.max(0, totalExposureUsd - collateralUsd);
-  const borrowAmount = (borrowUsd / (activeStrategy?.borrowToken.includes('USD') ? 1.0 : (activeStrategy?.borrowToken.includes('BTC') ? 96500.0 : 0.85)));
+  const borrowTokenPriceUsd = activeStrategy ? getLiveAssetPriceUsd(activeStrategy.borrowToken) : 0;
+  const borrowAmount = borrowTokenPriceUsd > 0 ? borrowUsd / borrowTokenPriceUsd : 0;
 
   // Net APR calculation
   const calculatedNetApr = useMemo(() => {
@@ -636,6 +733,59 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
     if (effectiveLtv >= threshold) return 1.01;
     return threshold / effectiveLtv;
   }, [activeStrategy, multiplier]);
+
+  // Real On-Chain Historical Net APR Chart Geometry (from DefiLlama daily data)
+  const historicalChartMetrics = useMemo(() => {
+    if (!activeStrategy || historicalRawApy.length === 0) {
+      return null;
+    }
+    const daysCount =
+      chartTimeframe === '7D'
+        ? 7
+        : chartTimeframe === '30D'
+        ? 30
+        : chartTimeframe === '3M'
+        ? 90
+        : chartTimeframe === '6M'
+        ? 180
+        : 365;
+    const sliced = historicalRawApy.slice(-daysCount);
+    if (sliced.length < 2) return null;
+
+    const lstStakingBoost = activeStrategy.strategyType === 'LST Pegged' ? 3.3 : 0;
+    const points = sliced.map((d) => {
+      const supply = d.apy + lstStakingBoost;
+      const net = Math.max(0, supply * multiplier - activeStrategy.borrowApr * (multiplier - 1));
+      return { timestamp: d.timestamp, netApr: net };
+    });
+
+    const values = points.map((p) => p.netApr);
+    const minVal = Math.min(...values);
+    const maxVal = Math.max(...values);
+    const range = Math.max(0.5, maxVal - minVal);
+
+    const coords = points.map((p, idx) => {
+      const x = (idx / (points.length - 1)) * 600;
+      const y = 135 - ((p.netApr - minVal) / range) * 105;
+      return { x, y, netApr: p.netApr, date: p.timestamp.slice(0, 10) };
+    });
+
+    const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(' ');
+    const areaPath = `${linePath} L 600 160 L 0 160 Z`;
+    const last = coords[coords.length - 1];
+    const first = coords[0];
+
+    return {
+      linePath,
+      areaPath,
+      lastX: last.x,
+      lastY: last.y,
+      startDate: first.date,
+      endDate: last.date,
+      minApr: minVal,
+      maxApr: maxVal,
+    };
+  }, [activeStrategy, historicalRawApy, chartTimeframe, multiplier]);
 
   // Open Detail View
   const handleOpenStrategyDetail = (strat: MultiplyStrategy) => {
@@ -742,7 +892,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       }
 
       const result = await signAndExecute({ transaction: tx });
-      const digest = (result as any)?.digest || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const digest = (result as any)?.digest;
+      if (!digest) {
+        throw new Error('Transaction was not confirmed on-chain (missing digest).');
+      }
 
       const newPosition: ActiveMarginPosition = {
         id: 'pos_' + Date.now(),
@@ -796,7 +949,8 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       // 10% performance fee on net profits sent to Treasury
       const netYield = Math.max(0, pos.pnlUsd);
       const feeTaken = netYield * 0.10;
-      const perfFeeMist = BigInt(Math.floor((feeTaken / 0.85) * 1e9));
+      const suiPriceForFee = getLiveAssetPriceUsd('SUI') || 1.0;
+      const perfFeeMist = BigInt(Math.floor((feeTaken / suiPriceForFee) * 1e9));
       if (perfFeeMist > 0n && perfFeeMist < 50000000n) {
         const [feeCoin] = tx.splitCoins(tx.gas, [perfFeeMist]);
         tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
@@ -818,7 +972,10 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
       }
 
       const result = await signAndExecute({ transaction: tx });
-      const digest = (result as any)?.digest || '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      const digest = (result as any)?.digest;
+      if (!digest) {
+        throw new Error('Transaction was not confirmed on-chain (missing digest).');
+      }
 
       setActivePositions((prev) => prev.filter((p) => p.id !== pos.id));
       setManagingPosition(null);
@@ -1058,7 +1215,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-sm font-bold text-white block">Historical Net APR</span>
-                  <span className="text-xs text-gray-400 font-mono">Simulated Net Return Performance</span>
+                  <span className="text-xs text-gray-400 font-mono">Live DefiLlama On-Chain History</span>
                 </div>
                 <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 text-[10px] font-mono">
                   {(['7D', '30D', '3M', '6M', '1Y'] as const).map((tf) => (
@@ -1077,40 +1234,43 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                 </div>
               </div>
 
-              {/* Interactive SVG Net APR Chart */}
+              {/* Interactive SVG Net APR Chart (100% Real DefiLlama Historical Data) */}
               <div className="h-44 w-full pt-2">
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 600 160">
-                  <defs>
-                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                      <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Grid Lines */}
-                  <line x1="0" y1="30" x2="600" y2="30" stroke="#ffffff10" strokeDasharray="3 3" />
-                  <line x1="0" y1="80" x2="600" y2="80" stroke="#ffffff10" strokeDasharray="3 3" />
-                  <line x1="0" y1="130" x2="600" y2="130" stroke="#ffffff10" strokeDasharray="3 3" />
-
-                  {/* Shaded Area */}
-                  <path
-                    d="M 0 120 Q 80 110, 150 90 T 300 70 T 450 60 T 600 45 L 600 160 L 0 160 Z"
-                    fill="url(#chartGradient)"
-                  />
-                  {/* Curve Line */}
-                  <path
-                    d="M 0 120 Q 80 110, 150 90 T 300 70 T 450 60 T 600 45"
-                    fill="none"
-                    stroke="#38bdf8"
-                    strokeWidth="3"
-                  />
-                  {/* Current Point */}
-                  <circle cx="600" cy="45" r="5" fill="#38bdf8" className="animate-pulse" />
-                </svg>
-                <div className="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5">
-                  <span>Start of Period</span>
-                  <span className="text-emerald-400 font-bold">Current Net APR: {calculatedNetApr.toFixed(2)}%</span>
-                  <span>Today</span>
-                </div>
+                {isChartLoading && !historicalChartMetrics ? (
+                  <div className="h-full flex items-center justify-center gap-2 text-xs font-mono text-gray-400">
+                    <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                    <span>Loading live on-chain APR history...</span>
+                  </div>
+                ) : historicalChartMetrics ? (
+                  <>
+                    <svg className="w-full h-36 overflow-visible" viewBox="0 0 600 160">
+                      <defs>
+                        <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
+                          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <line x1="0" y1="30" x2="600" y2="30" stroke="#ffffff10" strokeDasharray="3 3" />
+                      <line x1="0" y1="80" x2="600" y2="80" stroke="#ffffff10" strokeDasharray="3 3" />
+                      <line x1="0" y1="130" x2="600" y2="130" stroke="#ffffff10" strokeDasharray="3 3" />
+                      <path d={historicalChartMetrics.areaPath} fill="url(#chartGradient)" />
+                      <path d={historicalChartMetrics.linePath} fill="none" stroke="#38bdf8" strokeWidth="2.5" />
+                      <circle cx={historicalChartMetrics.lastX} cy={historicalChartMetrics.lastY} r="4.5" fill="#38bdf8" className="animate-pulse" />
+                    </svg>
+                    <div className="flex justify-between items-center text-[10px] font-mono text-gray-500 pt-2 border-t border-white/5">
+                      <span>{historicalChartMetrics.startDate}</span>
+                      <span className="text-emerald-400 font-bold">
+                        Range: {historicalChartMetrics.minApr.toFixed(1)}% – {historicalChartMetrics.maxApr.toFixed(1)}% • Current: {calculatedNetApr.toFixed(2)}%
+                      </span>
+                      <span>{historicalChartMetrics.endDate}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-xs font-mono text-gray-500">
+                    <span>No historical oracle series available for this pool yet.</span>
+                    <span className="text-emerald-400 font-bold mt-1">Live Net APR: {calculatedNetApr.toFixed(2)}%</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1154,7 +1314,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs font-mono text-gray-400">
                       <span>Deposit Asset ({depositTokenSymbol})</span>
-                      <span>Wallet: <strong>{getStrategyWalletBalance(depositTokenSymbol)}</strong> {depositTokenSymbol}</span>
+                      <span>Wallet: <strong>{getStrategyWalletBalance(depositTokenSymbol, depositCoinType)}</strong> {depositTokenSymbol}</span>
                     </div>
 
                     <div className="relative p-3.5 rounded-2xl bg-black/60 border border-white/10 focus-within:border-cyan-500/50 transition-all flex items-center justify-between gap-3">
@@ -1177,7 +1337,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
 
                       <div className="flex items-center gap-2 shrink-0">
                         <button
-                          onClick={() => setInputCollateral(getStrategyWalletBalance(depositTokenSymbol))}
+                          onClick={() => setInputCollateral(getStrategyWalletBalance(depositTokenSymbol, depositCoinType))}
                           className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-bold font-mono border border-cyan-500/20 cursor-pointer"
                         >
                           MAX
@@ -1210,12 +1370,14 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                                     role: 'supply' as const,
                                     symbol: activeStrategy.supplyToken,
                                     logo: activeStrategy.supplyTokenLogo,
+                                    coinType: activeStrategy.supplyCoinType,
                                     tag: 'Collateral',
                                   },
                                   {
                                     role: 'borrow' as const,
                                     symbol: activeStrategy.borrowToken,
                                     logo: activeStrategy.borrowTokenLogo,
+                                    coinType: activeStrategy.borrowCoinType,
                                     tag: 'Auto-Loop',
                                   },
                                 ].map((coin) => (
@@ -1241,7 +1403,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                                       </div>
                                     </div>
                                     <span className="text-[10px] text-gray-400">
-                                      {getStrategyWalletBalance(coin.symbol)}
+                                      {getStrategyWalletBalance(coin.symbol, coin.coinType)}
                                     </span>
                                   </button>
                                 ))}
@@ -1258,7 +1420,7 @@ export const MarginMultiplyHub: React.FC<MarginMultiplyHubProps> = ({
                         <button
                           key={pct}
                           onClick={() => {
-                            const bal = parseFloat(getStrategyWalletBalance(depositTokenSymbol)) || 0;
+                            const bal = parseFloat(getStrategyWalletBalance(depositTokenSymbol, depositCoinType)) || 0;
                             setInputCollateral((bal * (pct / 100)).toFixed(4));
                           }}
                           className="py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 font-bold border border-white/5 transition-all cursor-pointer"

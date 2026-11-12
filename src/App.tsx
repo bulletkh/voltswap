@@ -3326,6 +3326,7 @@ export default function App() {
               signAndExecute={signAndExecute}
               currentAccountAddress={currentAccount?.address}
               userBalances={userBalances}
+              liveTokenPrices={liveTokenPrices}
               effectiveFeeRate={effectiveFeeRate}
               userTraderTier={userTraderTier}
               cetusClient={cetusClient}
@@ -3354,6 +3355,7 @@ export default function App() {
               signAndExecute={signAndExecute}
               currentAccountAddress={currentAccount?.address}
               userBalances={userBalances}
+              liveTokenPrices={liveTokenPrices}
               effectiveFeeRate={effectiveFeeRate}
               userTraderTier={userTraderTier}
               onNavigateToSwap={(from, to) => {
