@@ -1,4 +1,4 @@
-import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
+import { Transaction } from '@mysten/sui/transactions';
 
 export async function getOwnedCoinObjects(owner: string, coinType: string) {
   const query = `
@@ -18,7 +18,6 @@ export async function getOwnedCoinObjects(owner: string, coinType: string) {
     }
   `;
 
-  // Standard coin type filter
   const targetType = coinType.startsWith('0x2::coin::Coin<') ? coinType : `0x2::coin::Coin<${coinType}>`;
 
   const res = await fetch('https://graphql.mainnet.sui.io/graphql', {
@@ -43,11 +42,19 @@ export async function getOwnedCoinObjects(owner: string, coinType: string) {
   }));
 }
 
+interface Sip58RedeemEntry {
+  cmdIdx: number;
+  coinType: string;
+  amount: bigint;
+}
+
 /**
  * Resolves an exact input Coin<T> argument for a Sui PTB.
- * Uses owned Coin<T> objects when sufficient, and falls back to the
- * `CoinWithBalance` intent so wallets with SIP-58 Address Balances (e.g. Slush)
- * automatically withdraw from address storage without manual consolidation.
+ * Uses owned Coin<T> objects when sufficient. When part of the balance
+ * lives in Sui SIP-58 Address Balance, inserts a placeholder MoveCall
+ * merged with any owned Coin<T> objects; `finalizeTxForWallet` then
+ * rewrites the placeholder into a `FundsWithdrawal` + `0x2::coin::redeem_funds`
+ * call so wallets like Slush spend SIP-58 balances seamlessly.
  */
 export async function resolveInputCoin(
   txb: Transaction,
@@ -67,10 +74,58 @@ export async function resolveInputCoin(
     return splitCoin;
   }
 
-  // Fallback to CoinWithBalance intent for SIP-58 Address Balance resolution by wallet
-  return coinWithBalance({
-    type: coinType,
-    balance: rawNeeded,
-    useGasCoin: false,
-  })(txb);
+  const abNeeded = rawNeeded - totalSpendable;
+  const cmdIdx = txb.getData().commands.length;
+  const [abCoin] = txb.moveCall({
+    target: '0x2::coin::zero',
+    typeArguments: [coinType],
+  });
+
+  if (coinObjects.length > 0) {
+    const ownedRefs = coinObjects.map((c: any) => txb.object(c.objectId));
+    txb.mergeCoins(abCoin, ownedRefs);
+  }
+
+  const redeems: Sip58RedeemEntry[] = (txb as any).__sip58Redeems || [];
+  redeems.push({ cmdIdx, coinType, amount: abNeeded });
+  (txb as any).__sip58Redeems = redeems;
+
+  return abCoin;
+}
+
+/**
+ * Converts a Transaction into a wallet-ready payload. If any SIP-58
+ * address-balance redeems were queued by `resolveInputCoin`, serializes
+ * to v2 JSON and patches in the `FundsWithdrawal` inputs + `0x2::coin::redeem_funds`.
+ */
+export async function finalizeTxForWallet(txb: Transaction, client: any): Promise<any> {
+  const redeems: Sip58RedeemEntry[] | undefined = (txb as any).__sip58Redeems;
+  if (!redeems || redeems.length === 0) {
+    return txb;
+  }
+
+  const jsonStr = await txb.toJSON({ client });
+  const txJson = JSON.parse(jsonStr);
+
+  for (const r of redeems) {
+    const inputIdx = txJson.inputs.length;
+    txJson.inputs.push({
+      FundsWithdrawal: {
+        reservation: { MaxAmountU64: r.amount.toString() },
+        typeArg: { Balance: r.coinType },
+        withdrawFrom: { Sender: true },
+      },
+    });
+    txJson.commands[r.cmdIdx] = {
+      MoveCall: {
+        package: '0x0000000000000000000000000000000000000000000000000000000000000002',
+        module: 'coin',
+        function: 'redeem_funds',
+        typeArguments: [r.coinType],
+        arguments: [{ Input: inputIdx }],
+      },
+    };
+  }
+
+  return JSON.stringify(txJson);
 }

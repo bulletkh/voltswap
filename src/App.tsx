@@ -48,7 +48,7 @@ import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
 import BN from 'bn.js';
 import { POPULAR_TOKENS, Token, TRADER_TIERS, TraderTierConfig, VOLT_TREASURY_ADDRESS } from './constants';
 import { executeTransactionViaGraphQL } from './graphqlExecutor';
-import { resolveInputCoin } from './coinHelper';
+import { resolveInputCoin, finalizeTxForWallet } from './coinHelper';
 import { SpotTradingTerminal } from './SpotTradingTerminal';
 import { PnlShareModal, PnlTradeData } from './PnlShareModal';
 import type { BluefinPosition } from './BluefinMarginTerminal';
@@ -1258,7 +1258,8 @@ export default function App() {
               txb.transferObjects([targetCoin], txb.pure.address(currentAccount.address));
             }
 
-            const res = await signAndExecute({ transaction: txb });
+            const finalTx = await finalizeTxForWallet(txb, suiClient);
+            const res = await signAndExecute({ transaction: finalTx });
             setSwapTxDigest(res.digest);
             setIsSwapping(false);
 
@@ -1397,7 +1398,8 @@ export default function App() {
           });
         }
 
-        const res = await signAndExecute({ transaction: txb });
+        const finalTx = await finalizeTxForWallet(txb, suiClient);
+        const res = await signAndExecute({ transaction: finalTx });
 
         // Save created BalanceManager ID for future 1-click orders
         if (!savedManagerId && res?.effects?.created) {
@@ -1597,7 +1599,8 @@ export default function App() {
           });
         }
 
-        const res = await signAndExecute({ transaction: txb });
+        const finalTx = await finalizeTxForWallet(txb, suiClient);
+        const res = await signAndExecute({ transaction: finalTx });
 
         if (!savedManagerId && res?.effects?.created) {
           const createdShared = res.effects.created.find((c: any) => c.owner && typeof c.owner === 'object' && 'Shared' in c.owner);
@@ -1763,8 +1766,9 @@ export default function App() {
         txb.transferObjects([targetCoin], txb.pure.address(currentAccount.address));
       }
 
+      const finalTx = await finalizeTxForWallet(txb, suiClient);
       const res = await signAndExecute({
-        transaction: txb
+        transaction: finalTx
       });
 
       console.log('Swap executed on-chain! Digest:', res.digest);
