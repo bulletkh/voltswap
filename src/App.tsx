@@ -48,7 +48,7 @@ import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
 import BN from 'bn.js';
 import { POPULAR_TOKENS, Token, TRADER_TIERS, TraderTierConfig, VOLT_TREASURY_ADDRESS } from './constants';
 import { executeTransactionViaGraphQL } from './graphqlExecutor';
-import { getOwnedCoinObjects } from './coinHelper';
+import { resolveInputCoin } from './coinHelper';
 import { SpotTradingTerminal } from './SpotTradingTerminal';
 import { PnlShareModal, PnlTradeData } from './PnlShareModal';
 import type { BluefinPosition } from './BluefinMarginTerminal';
@@ -1242,11 +1242,7 @@ export default function App() {
               inputCoinObj = splitCoin;
             } else {
               const rawNeeded = BigInt(rawIn);
-              const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
-              const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
-              if (otherCoins.length > 0) txb.mergeCoins(primaryCoin, otherCoins);
-              const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(rawNeeded.toString())]);
-              inputCoinObj = splitCoin;
+              inputCoinObj = await resolveInputCoin(txb, currentAccount.address, fromToken.address, rawNeeded);
             }
 
             const targetCoin = await cetusClient.routerSwap({
@@ -1345,15 +1341,12 @@ export default function App() {
           const [splitCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(netIn.toString())]);
           inputCoinObj = splitCoin;
         } else {
-          const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
-          const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
-          if (otherCoins.length > 0) txb.mergeCoins(primaryCoin, otherCoins);
+          const sourceCoin = await resolveInputCoin(txb, currentAccount.address, fromToken.address, rawTotalIn);
           if (feeRaw > 0n) {
-            const [feeCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(feeRaw.toString())]);
+            const [feeCoin] = txb.splitCoins(sourceCoin, [txb.pure.u64(feeRaw.toString())]);
             txb.transferObjects([feeCoin], txb.pure.address(VOLT_TREASURY_ADDRESS));
           }
-          const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(netIn.toString())]);
-          inputCoinObj = splitCoin;
+          inputCoinObj = sourceCoin;
         }
 
         // 1. Deposit base or quote asset into DeepBook BalanceManager
@@ -1524,15 +1517,12 @@ export default function App() {
           const [splitCoin] = txb.splitCoins(txb.gas, [txb.pure.u64(netSpendableRaw.toString())]);
           inputCoinObj = splitCoin;
         } else {
-          const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
-          const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
-          if (otherCoins.length > 0) txb.mergeCoins(primaryCoin, otherCoins);
+          const sourceCoin = await resolveInputCoin(txb, currentAccount.address, fromToken.address, rawTotalIn);
           if (feeRaw > 0n) {
-            const [feeCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(feeRaw.toString())]);
+            const [feeCoin] = txb.splitCoins(sourceCoin, [txb.pure.u64(feeRaw.toString())]);
             txb.transferObjects([feeCoin], txb.pure.address(VOLT_TREASURY_ADDRESS));
           }
-          const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(netSpendableRaw.toString())]);
-          inputCoinObj = splitCoin;
+          inputCoinObj = sourceCoin;
         }
 
         // 2. Deposit Net Funds into DeepBook BalanceManager
@@ -1748,28 +1738,16 @@ export default function App() {
       } else {
         const amt = parseAmount(fromAmount);
         const rawNeeded = BigInt(Math.floor(amt * Math.pow(10, fromToken.decimals)).toString());
-        const coinObjects = await getOwnedCoinObjects(currentAccount.address, fromToken.address);
-
-        const totalSpendable = coinObjects.reduce((acc, c) => acc + c.balance, 0n);
-        if (coinObjects.length === 0 || rawNeeded > totalSpendable) {
+        if (rawNeeded > currentTokenBalanceRaw) {
           setIsSwapping(false);
-          const formattedAvailable = (Number(totalSpendable) / Math.pow(10, fromToken.decimals)).toFixed(4);
-          const formattedTotal = (Number(currentTokenBalanceRaw) / Math.pow(10, fromToken.decimals)).toFixed(4);
           showNotification(
-            'info',
-            'Sui SIP-58 Coin Balance Info',
-            `Wallet balance displays ${formattedTotal} ${fromToken.symbol}, but spendable coin objects currently equal ${formattedAvailable} ${fromToken.symbol} (the remainder is held in Sui SIP-58 address storage).\n\nTo consolidate your full balance into a single spendable coin, open Slush or your wallet and Send ${fromAmount} ${fromToken.symbol} to your own address.`
+            'error',
+            `Insufficient ${fromToken.symbol} Balance`,
+            `Entered amount exceeds your available ${fromToken.symbol} balance.`
           );
           return;
         }
-
-        const [primaryCoin, ...otherCoins] = coinObjects.map(c => txb.object(c.objectId));
-        if (otherCoins.length > 0) {
-          txb.mergeCoins(primaryCoin, otherCoins);
-        }
-
-        const [splitCoin] = txb.splitCoins(primaryCoin, [txb.pure.u64(rawNeeded.toString())]);
-        inputCoinObj = splitCoin;
+        inputCoinObj = await resolveInputCoin(txb, currentAccount.address, fromToken.address, rawNeeded);
       }
 
       const targetCoin = await cetusClient.routerSwap({
