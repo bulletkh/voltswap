@@ -61,21 +61,10 @@ import {
 } from '../deepbookV3';
 import { fetchSwapPairCandles } from '../spotCandles';
 import { ProCandleChart, type ChartTimeframe } from './ProCandleChart';
-import {
-  DeepBookMarginAccountBar,
-  DeepBookMarginTicket,
-  loadMarginWorkspaceData,
-} from './DeepBookMarginPanel';
-import {
-  discoverMarginEnabledPoolKeys,
-  filterMarginEnabledPools,
-  type MarginManagerPosition,
-  type MarginPoolRiskConfig,
-} from '../deepbookMargin';
 import type { PnlTradeData } from '../PnlShareModal';
 import { AiCopilotModal } from './AiCopilotModal';
 
-export type SwapMode = 'market' | 'limit' | 'margin';
+export type SwapMode = 'market' | 'limit';
 
 interface SwapWorkspaceProps {
   onNotify: (
@@ -254,38 +243,14 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [depositAmt, setDepositAmt] = useState<string>('');
   const [isVaultBusy, setIsVaultBusy] = useState(false);
 
-  // DeepBook v3 Margin Trading state
-  const [marginRiskConfig, setMarginRiskConfig] = useState<MarginPoolRiskConfig | null>(null);
-  const [marginPosition, setMarginPosition] = useState<MarginManagerPosition | null>(null);
-  const [marginLoading, setMarginLoading] = useState(false);
-  const [selectedBookPrice, setSelectedBookPrice] = useState<string>('');
-  const [discoveredMarginKeys, setDiscoveredMarginKeys] = useState<string[]>([]);
 
   // DeepBook Pair Dropdown & Spot Dock tab state
   const [showPoolDropdown, setShowPoolDropdown] = useState(false);
   const [poolSearch, setPoolSearch] = useState('');
-  const [poolQuoteFilter, setPoolQuoteFilter] = useState<'all' | 'usdc' | 'sui' | 'bluechip' | 'margin'>('all');
+  const [poolQuoteFilter, setPoolQuoteFilter] = useState<'all' | 'usdc' | 'sui' | 'bluechip'>('all');
   const [spotDockTab, setSpotDockTab] = useState<'orders' | 'vault'>('orders');
   const [showSpotVaultModal, setShowSpotVaultModal] = useState<'deposit' | 'withdraw' | null>(null);
   const poolDropdownRef = useRef<HTMLDivElement>(null);
-
-  const marginPools = useMemo(
-    () => filterMarginEnabledPools(pools, discoveredMarginKeys),
-    [pools, discoveredMarginKeys]
-  );
-
-  const marginPoolNameSet = useMemo(
-    () => new Set(marginPools.map((p) => p.poolName)),
-    [marginPools]
-  );
-
-  useEffect(() => {
-    if (mode === 'margin' && marginPools.length > 0) {
-      if (!marginPools.some((p) => p.poolName === activePool.poolName)) {
-        setActivePool(marginPools[0]);
-      }
-    }
-  }, [mode, marginPools, activePool.poolName]);
 
   // Tier & Referral (synced with Sui Mainnet + Aftermath on-chain volume)
   const { volumeUsd: walletVolumeUsd } = useSyncedWalletVolume(account?.address);
@@ -357,9 +322,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     fetchDeepBookPools().then((list) => {
       setPools(list);
       setActivePool((curr) => list.find((p) => p.poolName === curr.poolName) || list[0]);
-      discoverMarginEnabledPoolKeys(list)
-        .then(setDiscoveredMarginKeys)
-        .catch(() => {});
     });
     fetchVoltSpotReferrals().then(setSpotReferrals).catch(() => {});
   }, []);
@@ -471,22 +433,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     };
   }, [mode, activePool.poolName]);
 
-  // Refresh DeepBook Margin state & risk config in Margin mode
-  const refreshMarginAccount = useCallback(async () => {
-    if (mode !== 'margin') return;
-    setMarginLoading(true);
-    try {
-      const data = await loadMarginWorkspaceData(account?.address, activePool);
-      setMarginRiskConfig(data.riskConfig);
-      setMarginPosition(data.position);
-    } finally {
-      setMarginLoading(false);
-    }
-  }, [account?.address, mode, activePool]);
-
-  useEffect(() => {
-    refreshMarginAccount();
-  }, [refreshMarginAccount]);
 
   // Discover & sync DeepBook v3 BalanceManagers + Open Orders
   const refreshDeepBookAccount = useCallback(async () => {
@@ -953,21 +899,17 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     ? readBalanceFromMap(balances, activePool.quoteCoinId, activePool.quoteDecimals)
     : 0;
 
-  const activeClobPoolList = useMemo(
-    () => (mode === 'margin' && marginPools.length > 0 ? marginPools : pools),
-    [mode, marginPools, pools]
-  );
+  const activeClobPoolList = pools;
 
   const filteredClobPools = useMemo(() => {
     const q = poolSearch.trim().toLowerCase();
-    const bluechips = new Set(['SUI', 'XBTC', 'HBTC', 'LZWBTC', 'WBTC', 'BWETH', 'BETH', 'DEEP', 'WAL']);
+    const bluechips = new Set(['SUI', 'XBTC', 'HBTC', 'LZWBTC', 'WBTC', 'BWETH', 'BETH', 'DEEP', 'WAL', 'CETUS']);
     return activeClobPoolList.filter((p) => {
       if (poolQuoteFilter === 'usdc' && !['USDC', 'WUSDC', 'USDSUI', 'SUIUSDE', 'AUSD'].includes(p.quoteSymbol)) {
         return false;
       }
       if (poolQuoteFilter === 'sui' && p.quoteSymbol !== 'SUI') return false;
       if (poolQuoteFilter === 'bluechip' && !bluechips.has(p.baseSymbol)) return false;
-      if (poolQuoteFilter === 'margin' && !marginPoolNameSet.has(p.poolName)) return false;
       if (!q) return true;
       return (
         p.poolName.toLowerCase().includes(q) ||
@@ -976,7 +918,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         p.quoteSymbol.toLowerCase().includes(q)
       );
     });
-  }, [activeClobPoolList, poolQuoteFilter, poolSearch, marginPoolNameSet]);
+  }, [activeClobPoolList, poolQuoteFilter, poolSearch]);
 
   return (
     <div className="w-full overflow-x-hidden">
@@ -1443,8 +1385,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         </div>
       )}
 
-      {/* MODE 2 & 3: BENTO DEEPBOOK-PRO CLOB TERMINAL (SPOT CLOB + MARGIN 4.5x) */}
-      {(mode === 'limit' || mode === 'margin') && (
+      {/* MODE 2: BENTO DEEPBOOK-PRO SPOT CLOB TERMINAL */}
+      {mode === 'limit' && (
         <div className="w-full overflow-x-hidden bg-[#000000] animate-panel-in">
           <div className="w-full p-1.5 sm:p-2 gap-1.5 sm:gap-2 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_265px_325px] xl:grid-cols-[minmax(0,1fr)_290px_345px]">
             {/* Cols 1-2, Row 1: DeepBook Alpha Pair Dropdown + 24h Ticker Strip */}
@@ -1469,9 +1411,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       {activePool.baseSymbol}/{activePool.quoteSymbol}
                     </span>
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] font-semibold">
-                      {mode === 'margin'
-                        ? `${(marginRiskConfig?.maxLeverageSafe ?? 4.5).toFixed(1)}x`
-                        : `${activeClobPoolList.length} Pairs`}
+                      {activeClobPoolList.length} Pairs
                     </span>
                     <ChevronDown className={`w-3.5 h-3.5 text-[#8E98A8] transition-transform ${showPoolDropdown ? 'rotate-180' : ''}`} />
                   </button>
@@ -1485,29 +1425,18 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           autoFocus
                           value={poolSearch}
                           onChange={(e) => setPoolSearch(e.target.value)}
-                          placeholder={
-                            mode === 'margin'
-                              ? `Search ${activeClobPoolList.length} margin-enabled DeepBook pools...`
-                              : `Search ${activeClobPoolList.length} live DeepBook v3 CLOB pairs...`
-                          }
+                          placeholder={`Search ${activeClobPoolList.length} live DeepBook v3 CLOB pairs...`}
                           className="w-full pl-8 pr-3 py-1.5 rounded bg-[#000000] border border-[#323D52] text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
                         />
                       </div>
 
                       <div className="flex flex-wrap gap-1 mb-2.5">
-                        {(mode === 'margin'
-                          ? [
-                              { id: 'all', label: `All (${activeClobPoolList.length})` },
-                              { id: 'usdc', label: 'USDC Quote' },
-                            ]
-                          : [
-                              { id: 'all', label: `All (${activeClobPoolList.length})` },
-                              { id: 'bluechip', label: 'Bluechips' },
-                              { id: 'usdc', label: 'USDC / Stables' },
-                              { id: 'sui', label: 'SUI Pairs' },
-                              { id: 'margin', label: `Margin (${marginPools.length})` },
-                            ]
-                        ).map((tab) => (
+                        {[
+                          { id: 'all', label: `All (${activeClobPoolList.length})` },
+                          { id: 'bluechip', label: 'Bluechips' },
+                          { id: 'usdc', label: 'USDC / Stables' },
+                          { id: 'sui', label: 'SUI Pairs' },
+                        ].map((tab) => (
                           <button
                             key={tab.id}
                             type="button"
@@ -1533,7 +1462,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       <div className="max-h-72 overflow-y-auto divide-y divide-[#283142]">
                         {filteredClobPools.map((pool) => {
                           const isSelected = pool.poolName === activePool.poolName;
-                          const isMarginSupported = marginPoolNameSet.has(pool.poolName);
                           const chg = pool.change24hPct;
                           return (
                             <button
@@ -1542,7 +1470,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                               onClick={() => {
                                 setActivePool(pool);
                                 setLimitPrice('');
-                                setSelectedBookPrice('');
                                 setShowPoolDropdown(false);
                               }}
                               className={`w-full grid grid-cols-12 items-center px-2 py-2 text-left text-xs font-mono transition-colors ${
@@ -1551,13 +1478,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                             >
                               <div className="col-span-5 flex items-center gap-2 min-w-0">
                                 <PairBadgeIcons pool={pool} size="sm" />
-                                <div className="truncate">
-                                  <div className="text-white font-semibold truncate">
-                                    {pool.baseSymbol}/{pool.quoteSymbol}
-                                  </div>
-                                  {isMarginSupported && (
-                                    <span className="text-[10px] text-[#60A5FA]">4.5x Margin</span>
-                                  )}
+                                <div className="truncate text-white font-semibold">
+                                  {pool.baseSymbol}/{pool.quoteSymbol}
                                 </div>
                               </div>
                               <div className="col-span-3 text-right text-white tabular-nums">
@@ -1598,7 +1520,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
                 {/* Quick Flagship Pair Pills */}
                 <div className="hidden xl:flex items-center gap-1">
-                  {activeClobPoolList.slice(0, mode === 'margin' ? 6 : 5).map((pool) => {
+                  {activeClobPoolList.slice(0, 7).map((pool) => {
                     const active = activePool.poolName === pool.poolName;
                     return (
                       <button
@@ -1607,7 +1529,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         onClick={() => {
                           setActivePool(pool);
                           setLimitPrice('');
-                          setSelectedBookPrice('');
                         }}
                         className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-mono whitespace-nowrap transition-colors border ${
                           active
@@ -1656,22 +1577,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   <div className="text-[10px] text-[#8E98A8]">Spread</div>
                   <div className="text-slate-200">{orderbook.spreadPct.toFixed(3)}%</div>
                 </div>
-                {mode === 'margin' && marginRiskConfig && (
-                  <>
-                    <div>
-                      <div className="text-[10px] text-[#8E98A8]">Max Lev</div>
-                      <div className="text-[#60A5FA] font-bold">
-                        {marginRiskConfig.maxLeverageSafe.toFixed(1)}x
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] text-[#8E98A8]">Borrow APR</div>
-                      <div className="text-white">
-                        {marginRiskConfig.quoteBorrowAprPct.toFixed(2)}%
-                      </div>
-                    </div>
-                  </>
-                )}
+                <div className="hidden md:block">
+                  <div className="text-[10px] text-[#8E98A8]">Book Depth</div>
+                  <div className="text-[#60A5FA]">
+                    {orderbook.bids.length} Bids / {orderbook.asks.length} Asks
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1679,7 +1590,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
             <div className="lg:col-start-1 lg:row-start-2 terminal-pane rounded-xl overflow-hidden min-w-0">
               <ProCandleChart
                 symbolLabel={`${activePool.baseSymbol}/${activePool.quoteSymbol}`}
-                sourceLabel={mode === 'margin' ? 'DeepBook v3 Margin' : chartMeta.source}
+                sourceLabel="DeepBook v3 CLOB"
                 candles={candles}
                 timeframe={timeframe}
                 onTimeframeChange={setTimeframe}
@@ -1735,9 +1646,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           key={`ask-${idx}`}
                           type="button"
                           onClick={() => {
-                            const val = lv.price.toString();
-                            setLimitPrice(val);
-                            setSelectedBookPrice(val);
+                            setLimitPrice(lv.price.toString());
                           }}
                           className="relative w-full grid grid-cols-3 px-1.5 py-[2.5px] rounded hover:bg-white/[0.04] text-left transition-colors"
                         >
@@ -1775,9 +1684,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           key={`bid-${idx}`}
                           type="button"
                           onClick={() => {
-                            const val = lv.price.toString();
-                            setLimitPrice(val);
-                            setSelectedBookPrice(val);
+                            setLimitPrice(lv.price.toString());
                           }}
                           className="relative w-full grid grid-cols-3 px-1.5 py-[2.5px] rounded hover:bg-white/[0.04] text-left transition-colors"
                         >
@@ -1820,29 +1727,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               )}
             </div>
 
-            {/* Col 3, Rows 1-3: Full-Height Order Ticket (Spot CLOB OR DeepBook Margin) */}
+            {/* Col 3, Rows 1-3: Full-Height Spot CLOB Order Ticket */}
             <div className="lg:col-start-3 lg:row-start-1 lg:row-span-3 terminal-pane rounded-xl overflow-hidden flex flex-col min-w-0">
-              {mode === 'margin' ? (
-                <DeepBookMarginTicket
-                  pool={activePool}
-                  midPrice={orderbook.midPrice}
-                  selectedBookPrice={selectedBookPrice}
-                  balances={balances}
-                  feeRate={traderTier.feeRate}
-                  refSharePct={refTier.revSharePct}
-                  riskConfig={marginRiskConfig}
-                  position={marginPosition}
-                  onSuccessRefresh={() => {
-                    refreshBalances();
-                    refreshMarginAccount();
-                  }}
-                  onNotify={onNotify}
-                  onTradeRecorded={onTradeRecorded}
-                  onVolumeUpdated={onVolumeUpdated}
-                />
-              ) : (
-                <div className="p-3 flex flex-col gap-3">
-                  <div className="space-y-3">
+              <div className="p-3 flex flex-col gap-3">
+                <div className="space-y-3">
                     {/* Spot Order Type Switcher: Market | Limit */}
                     <div className="flex items-center justify-between gap-2 border-b border-[#2D374B] pb-1.5">
                       <div className="inline-flex items-center gap-3">
@@ -2042,83 +1930,65 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       onClick={spotOrderStyle === 'market' ? executePlaceSpotMarket : executePlaceLimit}
                       className={`w-full py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                         limitSide === 'buy'
-                          ? 'btn-deepbook'
-                          : 'bg-[#F0525E] hover:bg-[#FF6370] text-white'
+                          ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.35)]'
+                          : 'bg-[#F0525E] hover:bg-[#FF6370] text-white shadow-[0_0_16px_rgba(240,82,94,0.35)]'
                       } disabled:opacity-50`}
                     >
                       {isPlacingLimit && <Loader2 className="w-4 h-4 animate-spin" />}
                       <span>
-                        {spotOrderStyle === 'market'
-                          ? `Market ${limitSide === 'buy' ? 'Buy' : 'Sell'} ${activePool.baseSymbol}`
-                          : managerIds.length === 0
-                            ? `Create Vault & Place ${limitSide === 'buy' ? 'Buy' : 'Sell'}`
-                            : `Place Limit ${limitSide === 'buy' ? 'Buy' : 'Sell'}`}
+                        {!account?.address
+                          ? 'Connect Sui Wallet to Trade'
+                          : spotOrderStyle === 'market'
+                            ? `Market ${limitSide === 'buy' ? 'Buy' : 'Sell'} ${activePool.baseSymbol} (Direct Wallet)`
+                            : `Place Limit ${limitSide === 'buy' ? 'Buy' : 'Sell'} ${activePool.baseSymbol}`}
                       </span>
                     </button>
+
+                    <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-[#08D189] text-center pt-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>1-Tx Non-Custodial: Auto-draws from wallet · No pre-deposit required</span>
+                    </div>
                   </div>
 
-                  {/* Spot CLOB BalanceManager Vault Card (Direct Deposit / Withdraw) */}
-                  <div className="bg-[#06070A] border border-[#323D52] hover:border-[#2B7FFF]/40 rounded-lg px-2.5 py-2.5 space-y-2 text-xs transition-colors">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex items-center gap-2">
-                        <ShieldCheck className="w-3.5 h-3.5 text-[#60A5FA] shrink-0" />
-                        <div className="truncate">
-                          <div className="text-slate-200 font-semibold truncate">
-                            BalanceManager Vault{' '}
-                            <span className="text-[#8E98A8] font-mono font-normal">
-                              ({managerIds.length > 1 ? `${managerIds.length} Vaults` : managerIds[0] ? `${managerIds[0].slice(0, 6)}...` : '1-Tx Auto'})
-                            </span>
-                          </div>
-                          <div className="text-[11px] font-mono text-[#8E98A8] tabular-nums">
-                            Free: {vaultSummary.freeBase.toFixed(3)} {activePool.baseSymbol} · {vaultSummary.freeQuote.toFixed(2)} {activePool.quoteSymbol}
-                          </div>
+                  {/* Settled Funds & Vault Balances Notice */}
+                  {(vaultSummary.freeBase > 0 || vaultSummary.freeQuote > 0 || vaultSummary.settledBase > 0 || vaultSummary.settledQuote > 0) ? (
+                    <div className="bg-[#06080C] border border-[#222B3A] rounded-lg p-2.5 space-y-2 text-xs font-mono">
+                      <div className="flex items-center justify-between text-[11px] text-[#8E98A8]">
+                        <span className="flex items-center gap-1 text-slate-300">
+                          <ShieldCheck className="w-3.5 h-3.5 text-[#60A5FA]" />
+                          <span>Vault Settled Coins</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleWithdrawManagerAll(false)}
+                          disabled={isVaultBusy}
+                          className="text-[#08D189] hover:underline font-bold"
+                        >
+                          Claim to Wallet →
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5 text-[11px] tabular-nums">
+                        <div className="bg-[#000000] p-1.5 rounded border border-[#1E2532]">
+                          <span className="text-slate-400">{activePool.baseSymbol}: </span>
+                          <span className="text-white font-bold">{(vaultSummary.freeBase + vaultSummary.settledBase).toFixed(3)}</span>
+                        </div>
+                        <div className="bg-[#000000] p-1.5 rounded border border-[#1E2532]">
+                          <span className="text-slate-400">{activePool.quoteSymbol}: </span>
+                          <span className="text-white font-bold">{(vaultSummary.freeQuote + vaultSummary.settledQuote).toFixed(2)}</span>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setSpotDockTab('vault')}
-                        className="px-2 py-0.5 rounded bg-[#0C0E13] hover:bg-[#141821] border border-[#38445B] text-[10px] font-mono text-[#8E98A8] hover:text-white shrink-0 transition-colors"
-                      >
-                        Dock ↓
-                      </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setShowSpotVaultModal('deposit')}
-                        className="py-1.5 rounded btn-deepbook text-[11px] font-bold flex items-center justify-center gap-1"
-                      >
-                        <ArrowDownToLine className="w-3.5 h-3.5" />
-                        <span>DEPOSIT</span>
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!account || (!managerState && managerIds.length === 0) || isVaultBusy}
-                        onClick={() => setShowSpotVaultModal('withdraw')}
-                        className="py-1.5 rounded bg-[#10131A] hover:bg-[#171C26] border border-[#3B475E] text-[11px] font-bold text-slate-200 hover:text-white flex items-center justify-center gap-1 disabled:opacity-45 transition-colors"
-                      >
-                        <ArrowUpFromLine className="w-3.5 h-3.5" />
-                        <span>WITHDRAW</span>
-                      </button>
+                  ) : (
+                    <div className="text-[11px] font-mono text-[#6E7B91] text-center border-t border-[#1C2330] pt-2">
+                      DeepBook v3 Institutional CLOB · Zero Custodial Risk
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
             </div>
 
-            {/* Cols 1-2, Row 3: Bottom Dock (Open Spot Limit Orders / BalanceManager Vault OR Isolated Margin Manager Account) */}
+            {/* Cols 1-2, Row 3: Bottom Dock (Open Spot Limit Orders & BalanceManager Vault) */}
             <div className="lg:col-start-1 lg:col-span-2 lg:row-start-3 terminal-pane rounded-xl overflow-hidden min-w-0">
-              {mode === 'margin' ? (
-                <DeepBookMarginAccountBar
-                  pool={activePool}
-                  position={marginPosition}
-                  riskConfig={marginRiskConfig}
-                  isLoading={marginLoading}
-                  onRefresh={refreshMarginAccount}
-                  onNotify={onNotify}
-                />
-              ) : (
-                <div className="p-3.5 sm:p-4 min-h-[210px] space-y-3">
+              <div className="p-3.5 sm:p-4 min-h-[210px] space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2D374B] pb-2">
                     <div className="flex flex-wrap items-center gap-4">
                       <button
@@ -2279,7 +2149,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     </div>
                   )}
                 </div>
-              )}
             </div>
           </div>
         </div>
@@ -2536,12 +2405,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
       <AiCopilotModal
         isOpen={showAiCopilot}
-        initialTab={mode === 'margin' ? 'yield' : 'grid'}
+        initialTab="grid"
         onClose={() => setShowAiCopilot(false)}
         defaultPool={activePool}
         defaultCandles={candles}
-        marginPosition={marginPosition}
-        marginRiskConfig={marginRiskConfig}
+        marginPosition={null}
+        marginRiskConfig={null}
         onNotify={onNotify}
         onDeployed={async () => {
           await Promise.all([refreshDeepBookAccount(), refreshBalances()]);
