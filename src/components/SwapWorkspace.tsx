@@ -198,9 +198,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [amountIn, setAmountIn] = useState<string>('1');
   const [slippagePct, setSlippagePct] = useState<number>(0.5);
   const [showSettings, setShowSettings] = useState(false);
-  const [showMarketChart, setShowMarketChart] = useState<boolean>(() =>
-    typeof window === 'undefined' ? true : window.innerWidth >= 1024
-  );
+  const [showMarketChart, setShowMarketChart] = useState<boolean>(false);
   const [showAiCopilot, setShowAiCopilot] = useState(false);
   const [tokenPickerFor, setTokenPickerFor] = useState<'from' | 'to' | null>(null);
   const [tokenQuery, setTokenQuery] = useState('');
@@ -1087,109 +1085,9 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   return (
     <div className="w-full overflow-x-hidden">
       {/* Sub-navigation bar */}
-      <div className="w-full border-b border-[#2D374B] bg-[#000000] px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2.5">
-        <div className="inline-flex items-center p-0.5 rounded-lg bg-[#06070A] border border-[#2E384C] gap-1">
-          <button
-            type="button"
-            onClick={() => setMode('market')}
-            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all flex items-center gap-1.5 ${
-              mode === 'market'
-                ? 'bg-[#2B7FFF] text-white shadow-[0_0_12px_rgba(43,127,255,0.28)]'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-pulse" />
-            <span>Swap Aggregator</span>
-            <span
-              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                mode === 'market' ? 'bg-black/30 text-white' : 'bg-[#2B7FFF]/15 text-[#60A5FA]'
-              }`}
-            >
-              7 DEXs
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('limit')}
-            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all flex items-center gap-1.5 ${
-              mode === 'limit'
-                ? 'bg-[#2B7FFF] text-white shadow-[0_0_12px_rgba(43,127,255,0.28)]'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <span>Spot CLOB</span>
-            <span
-              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                mode === 'limit' ? 'bg-black/25 text-white' : 'bg-white/[0.06] text-slate-300'
-              }`}
-            >
-              DeepBook v3
-            </span>
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-300">
-          <button
-            type="button"
-            onClick={() => setShowAiCopilot(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#06070A] border border-[#323D52] text-slate-200 hover:border-[#2B7FFF]/60 hover:text-white font-sans font-semibold text-xs transition-colors"
-          >
-            <Bot className="w-3.5 h-3.5 text-[#60A5FA]" />
-            <span>AI Copilot</span>
-          </button>
-          <span className="px-2.5 py-1.5 rounded-md bg-[#06070A] border border-[#323D52] text-xs">
-            {traderTier.badgeEmoji} <span className="text-white font-semibold">{traderTier.name}</span> ·{' '}
-            <span className="text-[#60A5FA] font-bold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
-          </span>
-          {activeReferrer && (
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#08D189]/10 border border-[#08D189]/35 text-[#08D189] font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Ref Split Active
-            </span>
-          )}
-        </div>
-      </div>
-
       {/* MODE 1: INSTITUTIONAL INSTANT SWAP STAGE */}
       {mode === 'market' && (
-        <div className="max-w-[1280px] mx-auto px-3 sm:px-6 py-6 animate-panel-in">
-          {/* Institutional 7-Protocol Aggregator Ribbon */}
-          <div className="mb-4 p-3 rounded-xl bg-[#06080C] border border-[#263143] flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-[#2B7FFF]/15 border border-[#2B7FFF]/35 flex items-center justify-center shrink-0">
-                <Zap className="w-4 h-4 text-[#60A5FA]" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-white tracking-wide uppercase font-mono">
-                    Sui Multi-DEX Aggregator
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-[#08D189] bg-[#08D189]/15 border border-[#08D189]/30 px-1.5 py-0.5 rounded">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-pulse" />
-                    7 Protocols Racing
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Dual-engine parallel routing guaranteeing lowest slippage &amp; maximum return on Sui.
-                </p>
-              </div>
-            </div>
-
-            {/* Protocol Badges */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {AGGREGATED_PROTOCOLS.map((p) => (
-                <span
-                  key={p.id}
-                  className="px-2 py-1 rounded bg-[#0D121B] border border-[#263246] text-[11px] font-mono text-slate-300 flex items-center gap-1 shadow-sm hover:border-[#2B7FFF]/40 transition-colors"
-                  title={`${p.name} (${p.note})`}
-                >
-                  <span className="w-1 h-1 rounded-full bg-[#2B7FFF]" />
-                  <span className="font-semibold text-white">{p.name}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-
+        <div className="max-w-[1280px] mx-auto px-3 sm:px-6 py-5 sm:py-7 animate-panel-in">
           <div
             className={`grid gap-5 items-start ${
               showMarketChart ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'
@@ -1212,10 +1110,69 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
             <div
               className={
                 showMarketChart
-                  ? 'lg:col-span-5 xl:col-span-4 w-full'
-                  : 'w-full max-w-[460px] mx-auto pt-2'
+                  ? 'lg:col-span-5 xl:col-span-4 w-full space-y-3'
+                  : 'w-full max-w-[470px] mx-auto space-y-3'
               }
             >
+              {/* Compact Quick-Pairs & Utility Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    { from: 'SUI', to: 'USDC' },
+                    { from: 'DEEP', to: 'SUI' },
+                    { from: 'WAL', to: 'USDC' },
+                    { from: 'CETUS', to: 'SUI' },
+                  ].map((pair) => {
+                    const isCurrent =
+                      fromToken.symbol === pair.from && toToken.symbol === pair.to;
+                    return (
+                      <button
+                        key={`${pair.from}-${pair.to}`}
+                        type="button"
+                        onClick={() => {
+                          const f = SUI_TOKENS.find((t) => t.symbol === pair.from);
+                          const t = SUI_TOKENS.find((t) => t.symbol === pair.to);
+                          if (f && t) {
+                            setFromToken(f);
+                            setToToken(t);
+                          }
+                        }}
+                        className={`px-2 py-1 rounded-md text-[11px] font-mono font-semibold border transition-all ${
+                          isCurrent
+                            ? 'bg-[#2B7FFF]/15 border-[#2B7FFF]/50 text-[#60A5FA]'
+                            : 'bg-[#080B10] border-[#263246] text-slate-400 hover:text-white hover:border-[#3A4863]'
+                        }`}
+                      >
+                        {pair.from}/{pair.to}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowAiCopilot(true)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#080B10] border border-[#2D374B] text-[11px] font-semibold text-slate-200 hover:border-[#2B7FFF]/60 hover:text-white transition-colors"
+                    title="Open AI Trading Copilot"
+                  >
+                    <Bot className="w-3.5 h-3.5 text-[#60A5FA]" />
+                    <span>AI</span>
+                  </button>
+                  <span
+                    className="px-2 py-1 rounded-md bg-[#080B10] border border-[#2D374B] text-[11px] font-mono text-slate-300"
+                    title={`Trader Tier: ${traderTier.name}`}
+                  >
+                    {traderTier.badgeEmoji} <span className="text-[#60A5FA] font-bold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+                  </span>
+                  {activeReferrer && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#08D189]/10 border border-[#08D189]/35 text-[10px] font-mono text-[#08D189] font-semibold">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Ref
+                    </span>
+                  )}
+                </div>
+              </div>
               <div className="panel-carbon rounded-xl p-4 sm:p-5 space-y-3 border border-[#2E384C]">
                 {/* Top Controls */}
                 <div className="flex items-center justify-between">
@@ -1734,6 +1691,34 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Compact 7-DEX Best-Price Engine & Pro Shortcut Strip */}
+              <div className="rounded-xl bg-[#06080C] border border-[#242E40] px-3.5 py-2.5 space-y-2">
+                <div className="flex items-center justify-between gap-2 text-[11px] font-mono">
+                  <span className="inline-flex items-center gap-1.5 text-[#08D189] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-pulse" />
+                    7 Sui DEXs Racing
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMode('limit')}
+                    className="text-slate-400 hover:text-[#60A5FA] transition-colors font-sans font-semibold"
+                  >
+                    Orderbook &amp; Candles → Pro
+                  </button>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {AGGREGATED_PROTOCOLS.map((p) => (
+                    <span
+                      key={p.id}
+                      className="px-1.5 py-0.5 rounded bg-[#0C1018] border border-[#222C3E] text-[10px] font-mono text-slate-300"
+                      title={`${p.name} (${p.note})`}
+                    >
+                      {p.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1746,6 +1731,14 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
             {/* Cols 1-2, Row 1: DeepBook Alpha Pair Dropdown + 24h Ticker Strip */}
             <div className="min-w-0 relative z-20 lg:col-start-1 lg:col-span-2 lg:row-start-1 terminal-pane rounded-xl px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0 flex-wrap" ref={poolDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setMode('market')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-[#06070A] border border-[#323D52] hover:border-[#2B7FFF]/60 text-xs font-semibold text-slate-200 hover:text-white transition-colors"
+                  title="Back to Lite Swap"
+                >
+                  <span>← Lite</span>
+                </button>
                 {/* Searchable Pair Dropdown Trigger */}
                 <div className="relative">
                   <button

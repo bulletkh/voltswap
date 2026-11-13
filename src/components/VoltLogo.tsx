@@ -7,12 +7,12 @@ interface VoltLogoProps {
 }
 
 export const VoltLogo: React.FC<VoltLogoProps> = ({
-  className = 'w-9 h-9',
+  className = 'w-10 h-10',
   showWordmark = false,
-  subtitle = 'SUI PRO',
+  subtitle = 'SUI DEX',
 }) => {
   return (
-    <div className="inline-flex items-center gap-2.5 select-none">
+    <div className="inline-flex items-center gap-3 select-none">
       <div className={`relative shrink-0 ${className}`}>
         <div
           className="absolute inset-0 rounded-xl blur-md opacity-45 pointer-events-none"
@@ -60,12 +60,12 @@ export const VoltLogo: React.FC<VoltLogoProps> = ({
       </div>
 
       {showWordmark && (
-        <div className="flex items-baseline gap-1.5 leading-none">
-          <span className="text-[18px] font-extrabold tracking-tight text-white">
+        <div className="flex items-center gap-2 leading-none">
+          <span className="text-[21px] sm:text-[22px] font-black tracking-tight text-white">
             VOLT
           </span>
           {subtitle && (
-            <span className="hidden xl:inline-block px-1.5 py-0.5 rounded bg-[#2B7FFF]/15 border border-[#2B7FFF]/35 text-[10px] font-bold tracking-widest text-[#60A5FA] uppercase">
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 text-[10px] font-bold tracking-widest text-[#60A5FA] uppercase">
               {subtitle}
             </span>
           )}

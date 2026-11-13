@@ -147,7 +147,7 @@ export function App() {
               onClick={() => setActiveTab('swap')}
               className="flex items-center text-left hover:opacity-95 hover:scale-[1.01] transition-all shrink-0"
             >
-              <VoltLogo className="w-7 h-7" showWordmark subtitle="PRO" />
+              <VoltLogo className="w-9 h-9 sm:w-10 sm:h-10" showWordmark subtitle="SUI DEX" />
             </button>
 
             {/* Primary Institutional Nav */}
