@@ -40,14 +40,45 @@
   }
 }
 
+.volt-hero-surface {
+  background-color: #000000;
+  background-image:
+    radial-gradient(ellipse 75% 42% at 50% -12%, rgba(43, 127, 255, 0.11), transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 0%, rgba(8, 209, 137, 0.045), transparent 65%);
+}
+
 .panel-carbon {
-  background: #06070a;
+  background: linear-gradient(180deg, rgba(11, 14, 21, 0.96) 0%, #050609 100%);
   border: 1px solid #1e232d;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 14px 36px -22px rgba(0, 0, 0, 0.9);
+  transition: border-color 180ms ease, box-shadow 200ms ease, transform 180ms ease;
 }
 
 .panel-carbon-sub {
-  background: #0b0e14;
+  background: linear-gradient(180deg, #0d1118 0%, #090b10 100%);
   border: 1px solid #1e232d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.panel-carbon-interactive {
+  background: linear-gradient(180deg, rgba(12, 16, 24, 0.98) 0%, #050609 100%);
+  border: 1px solid #1e232d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  transition:
+    border-color 190ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 190ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.panel-carbon-interactive:hover {
+  border-color: rgba(43, 127, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 30px -16px rgba(43, 127, 255, 0.25);
+  transform: translateY(-1.5px);
 }
 
 .pnl-green {
@@ -59,19 +90,71 @@
 }
 
 .btn-deepbook {
-  background: #2b7fff;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #3587ff 0%, #2573f0 100%);
   color: #ffffff;
   font-weight: 700;
-  transition: background-color 160ms ease, transform 120ms ease, box-shadow 180ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 4px 16px -6px rgba(43, 127, 255, 0.45);
+  transition:
+    background 180ms ease,
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms ease;
 }
 
-.btn-deepbook:hover {
-  background: #3d8bff;
-  box-shadow: 0 0 20px rgba(43, 127, 255, 0.28);
+.btn-deepbook::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 65%;
+  height: 100%;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 100%
+  );
+  transform: skewX(-18deg);
+  transition: left 480ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
 }
 
-.btn-deepbook:active {
-  transform: scale(0.99);
+.btn-deepbook:hover:not(:disabled) {
+  background: linear-gradient(180deg, #4391ff 0%, #2b7fff 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 24px rgba(43, 127, 255, 0.38);
+}
+
+.btn-deepbook:hover:not(:disabled)::after {
+  left: 140%;
+}
+
+.btn-deepbook:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+@keyframes voltShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.volt-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.22) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: voltShimmer 2.8s linear infinite;
 }
 
 input[type='number']::-webkit-inner-spin-button,

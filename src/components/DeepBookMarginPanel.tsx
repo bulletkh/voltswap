@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowDownToLine,
   ArrowUpDown,
+  ArrowUpFromLine,
   CheckCircle2,
   Loader2,
   RefreshCw,
+  ShieldCheck,
   TrendingDown,
   TrendingUp,
   X,
@@ -78,6 +81,66 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
   const [tpPriceInput, setTpPriceInput] = useState<string>('');
   const [slPriceInput, setSlPriceInput] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [showMarginVaultModal, setShowMarginVaultModal] = useState<'deposit' | 'withdraw' | null>(null);
+  const [vaultAssetSide, setVaultAssetSide] = useState<'quote' | 'base'>('quote');
+  const [vaultAmt, setVaultAmt] = useState<string>('');
+  const [isVaultBusy, setIsVaultBusy] = useState<boolean>(false);
+
+  const handleMarginVaultSubmit = async (mode: 'deposit' | 'withdraw') => {
+    if (!account?.address) return;
+    const amt = Number(vaultAmt);
+    if (!Number.isFinite(amt) || amt <= 0) return;
+    if (mode === 'withdraw' && !position?.managerId) return;
+    setIsVaultBusy(true);
+    try {
+      const tx =
+        mode === 'deposit'
+          ? buildMarginDepositCollateralTx({
+              owner: account.address,
+              pool,
+              managerId: position?.managerId ?? null,
+              assetSide: vaultAssetSide,
+              amount: amt,
+            })
+          : buildMarginWithdrawCollateralTx({
+              owner: account.address,
+              pool,
+              managerId: position!.managerId,
+              asset: vaultAssetSide,
+              amount: amt,
+            });
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        throw new Error(sim.errorMessage || `Margin ${mode} simulation failed.`);
+      }
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
+      onNotify(
+        'success',
+        mode === 'deposit'
+          ? position?.managerId
+            ? 'Margin Collateral Deposited'
+            : 'Margin Vault Created & Funded'
+          : 'Margin Collateral Withdrawn',
+        `${amt} ${vaultAssetSide === 'base' ? pool.baseSymbol : pool.quoteSymbol} ${
+          mode === 'deposit' ? 'deposited to' : 'withdrawn from'
+        } isolated MarginManager.`,
+        digest ? 'View on Suiscan' : undefined,
+        digest ? `https://suiscan.xyz/mainnet/tx/${digest}` : undefined
+      );
+      setVaultAmt('');
+      setShowMarginVaultModal(null);
+      onSuccessRefresh();
+    } catch (err: any) {
+      onNotify(
+        'error',
+        `Margin ${mode === 'deposit' ? 'Deposit' : 'Withdraw'} Failed`,
+        err?.message || `Unable to ${mode} collateral.`
+      );
+    } finally {
+      setIsVaultBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedBookPrice) {
@@ -267,6 +330,45 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
 
   return (
     <div className="bg-[#000000] p-3 flex flex-col gap-3">
+      {/* Compact Isolated Margin Vault Banner (Direct Deposit / Withdraw) */}
+      <div className="bg-[#06070A] border border-[#1E232D] hover:border-[#2B7FFF]/40 rounded-lg px-2.5 py-2 space-y-2 text-xs transition-colors">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#60A5FA] shrink-0" />
+            <span className="font-semibold text-white truncate">
+              Margin Vault{' '}
+              <span className="text-[#8E98A8] font-mono font-normal">
+                ({position?.managerId ? `#${position.managerId.slice(0, 6)}...` : '1-Tx Auto'})
+              </span>
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-[#8E98A8] tabular-nums shrink-0">
+            {position
+              ? `${position.baseAsset.toFixed(2)} ${pool.baseSymbol} · ${position.quoteAsset.toFixed(2)} ${pool.quoteSymbol}`
+              : 'Isolated 4.5x'}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowMarginVaultModal('deposit')}
+            className="py-1.5 rounded btn-deepbook text-[11px] font-bold flex items-center justify-center gap-1"
+          >
+            <ArrowDownToLine className="w-3.5 h-3.5" />
+            <span>DEPOSIT</span>
+          </button>
+          <button
+            type="button"
+            disabled={!account || !position || isVaultBusy}
+            onClick={() => setShowMarginVaultModal('withdraw')}
+            className="py-1.5 rounded bg-[#10131A] hover:bg-[#171C26] border border-[#262C3B] text-[11px] font-bold text-slate-200 hover:text-white flex items-center justify-center gap-1 disabled:opacity-45 transition-colors"
+          >
+            <ArrowUpFromLine className="w-3.5 h-3.5" />
+            <span>WITHDRAW</span>
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-2.5">
         {/* Long / Short Toggle */}
         <div className="grid grid-cols-2 gap-1.5">
@@ -537,6 +639,130 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
                 }`}
         </span>
       </button>
+
+      {/* Isolated Margin Vault Deposit / Withdraw Modal */}
+      {showMarginVaultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="panel-carbon rounded-xl w-full max-w-md p-5 space-y-4 border border-[#2B7FFF]/35 animate-panel-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {showMarginVaultModal === 'deposit' ? (
+                  <ArrowDownToLine className="w-4 h-4 text-[#2B7FFF]" />
+                ) : (
+                  <ArrowUpFromLine className="w-4 h-4 text-[#08D189]" />
+                )}
+                <h3 className="text-base font-bold text-white">
+                  {showMarginVaultModal === 'deposit'
+                    ? 'Deposit Isolated Margin Collateral'
+                    : 'Withdraw Margin Collateral'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMarginVaultModal(null)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 bg-[#06070A] p-1 rounded-lg border border-[#1E232D]">
+              <button
+                type="button"
+                onClick={() => setVaultAssetSide('quote')}
+                className={`py-1.5 rounded text-xs font-bold transition-colors ${
+                  vaultAssetSide === 'quote'
+                    ? 'bg-[#2B7FFF] text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {pool.quoteSymbol}
+              </button>
+              <button
+                type="button"
+                onClick={() => setVaultAssetSide('base')}
+                className={`py-1.5 rounded text-xs font-bold transition-colors ${
+                  vaultAssetSide === 'base'
+                    ? 'bg-[#2B7FFF] text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {pool.baseSymbol}
+              </button>
+            </div>
+
+            <div className="bg-[#06070A] border border-[#1E232D] rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span>
+                  Amount ({vaultAssetSide === 'base' ? pool.baseSymbol : pool.quoteSymbol})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (showMarginVaultModal === 'deposit') {
+                      const bal = vaultAssetSide === 'base' ? walletBaseBal : walletQuoteBal;
+                      const safe =
+                        vaultAssetSide === 'base' && pool.baseSymbol === 'SUI'
+                          ? Math.max(0, bal - 0.05)
+                          : bal;
+                      if (safe > 0) setVaultAmt(safe.toFixed(4));
+                    } else if (position) {
+                      const avail =
+                        vaultAssetSide === 'base' ? position.baseAsset : position.quoteAsset;
+                      if (avail > 0) setVaultAmt((avail * 0.99).toFixed(4));
+                    }
+                  }}
+                  className="text-[#60A5FA] hover:text-white font-mono"
+                >
+                  {showMarginVaultModal === 'deposit'
+                    ? `Wallet: ${(vaultAssetSide === 'base' ? walletBaseBal : walletQuoteBal).toFixed(4)}`
+                    : `Vault: ${(vaultAssetSide === 'base' ? position?.baseAsset ?? 0 : position?.quoteAsset ?? 0).toFixed(4)}`}{' '}
+                  (MAX)
+                </button>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={vaultAmt}
+                onChange={(e) => setVaultAmt(e.target.value)}
+                placeholder="10.00"
+                className="w-full bg-transparent text-xl font-bold font-mono text-white outline-none"
+              />
+            </div>
+
+            {!position && showMarginVaultModal === 'deposit' && (
+              <div className="text-[11px] font-mono text-[#60A5FA] bg-[#2B7FFF]/10 border border-[#2B7FFF]/30 rounded-lg px-3 py-2">
+                No {pool.poolName} MarginManager yet — creates, funds &amp; shares your isolated margin vault in 1 atomic TX.
+              </div>
+            )}
+
+            <button
+              type="button"
+              disabled={
+                isVaultBusy ||
+                !account ||
+                !vaultAmt ||
+                Number(vaultAmt) <= 0 ||
+                (showMarginVaultModal === 'withdraw' && !position)
+              }
+              onClick={() => handleMarginVaultSubmit(showMarginVaultModal)}
+              className="w-full py-2.5 rounded-lg btn-deepbook text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-45"
+            >
+              {isVaultBusy && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>
+                {!account
+                  ? 'Connect Wallet'
+                  : showMarginVaultModal === 'deposit'
+                    ? position
+                      ? `Deposit ${vaultAssetSide === 'base' ? pool.baseSymbol : pool.quoteSymbol}`
+                      : `Create Vault & Deposit ${vaultAssetSide === 'base' ? pool.baseSymbol : pool.quoteSymbol}`
+                    : `Withdraw ${vaultAssetSide === 'base' ? pool.baseSymbol : pool.quoteSymbol}`}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

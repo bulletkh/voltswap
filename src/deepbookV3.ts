@@ -785,6 +785,46 @@ export function buildDepositManagerTx(params: {
   return tx;
 }
 
+/**
+ * Atomic 1-TX BalanceManager creation + Coin deposit + Referral registration + Share
+ * for first-time Spot CLOB users who don't own a BalanceManager yet.
+ */
+export function buildCreateAndDepositManagerTx(params: {
+  owner: string;
+  coinType: string;
+  decimals: number;
+  amount: number;
+  spotReferralId?: string | null;
+}): Transaction {
+  const tx = new Transaction();
+  tx.setSender(params.owner);
+  const ext = createDeepBookClient(params.owner);
+  const manager = tx.add(ext.deepbook.balanceManager.createBalanceManagerWithOwner(params.owner));
+
+  const depositUnits = BigInt(Math.max(1, Math.round(params.amount * Math.pow(10, params.decimals))));
+  const depositCoin = coinWithBalance({
+    type: params.coinType,
+    balance: depositUnits,
+  })(tx);
+
+  tx.moveCall({
+    package: DEEPBOOK_PACKAGE_ID,
+    module: 'balance_manager',
+    function: 'deposit',
+    arguments: [manager, depositCoin],
+    typeArguments: [params.coinType],
+  });
+
+  tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
+    arguments: [manager, tx.object(DEEPBOOK_REGISTRY_ID)],
+  });
+
+  attachSpotReferralInTx(tx, manager, params.spotReferralId, params.owner);
+  tx.add(ext.deepbook.balanceManager.shareBalanceManager(manager));
+  return tx;
+}
+
 export function buildWithdrawAllManagersAndCancelTx(params: {
   owner: string;
   pool: DeepBookPoolMeta;

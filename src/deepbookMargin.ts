@@ -496,7 +496,7 @@ export function computeMarginHealthMetrics(
 export function buildMarginDepositCollateralTx(params: {
   owner: string;
   pool: DeepBookPoolMeta;
-  managerId: string;
+  managerId?: string | null;
   assetSide: 'base' | 'quote';
   amount: number;
 }): Transaction {
@@ -504,9 +504,25 @@ export function buildMarginDepositCollateralTx(params: {
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error('Collateral amount must be greater than zero.');
   }
-  const ext = createDeepBookMarginClient(owner, managerId, poolMeta.poolName);
+  const ext = createDeepBookMarginClient(owner, managerId ?? undefined, poolMeta.poolName);
   const tx = new Transaction();
   tx.setSender(owner);
+  if (!managerId) {
+    const { pool, baseCoin, quoteCoin } = getPoolCoins(poolMeta.poolName);
+    const { manager, initializer } = ext.deepbook.marginManager.newMarginManagerWithInitializer(
+      poolMeta.poolName
+    )(tx);
+    tx.add(
+      ext.deepbook.marginManager.depositDuringInitialization({
+        manager,
+        poolKey: poolMeta.poolName,
+        coinType: assetSide === 'base' ? pool.baseCoin ?? baseCoin.type : pool.quoteCoin ?? quoteCoin.type,
+        amount,
+      })
+    );
+    tx.add(ext.deepbook.marginManager.shareMarginManager(poolMeta.poolName, manager, initializer));
+    return tx;
+  }
   if (assetSide === 'base') {
     tx.add(ext.deepbook.marginManager.depositBase({ managerKey: 'MAIN', amount }));
   } else {

@@ -196,7 +196,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                 </div>
                 <div className="w-full h-2.5 rounded-full bg-[#121620] overflow-hidden border border-[#1E232D]">
                   <div
-                    className="h-full bg-gradient-to-r from-[#2B7FFF] to-[#08D189] transition-all"
+                    className="h-full bg-gradient-to-r from-[#2B7FFF] to-[#08D189] volt-shimmer transition-all duration-500"
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
@@ -279,7 +279,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                     className={`rounded-xl p-4 space-y-2.5 border transition-all ${
                       isActive
                         ? 'bg-[#2B7FFF]/12 border-[#2B7FFF]/60 shadow-[0_0_24px_rgba(43,127,255,0.14)]'
-                        : 'panel-carbon-sub hover:border-[#2B7FFF]/35'
+                        : 'panel-carbon-interactive'
                     }`}
                   >
                     <div className="flex items-center justify-between">

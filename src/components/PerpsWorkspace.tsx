@@ -1429,7 +1429,11 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 onClick={handleCreateAccount}
                 className="w-full py-1.5 rounded btn-deepbook text-xs font-bold"
               >
-                {isCollateralBusy ? 'Creating...' : 'Create On-Chain Perp Account'}
+                {!account
+                  ? 'Connect Wallet to Create Perp Account'
+                  : isCollateralBusy
+                    ? 'Creating...'
+                    : 'Create On-Chain Perp Account'}
               </button>
             )}
           </div>

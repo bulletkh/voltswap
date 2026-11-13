@@ -7,9 +7,12 @@ import {
   RefreshCw,
   Loader2,
   ArrowDownToLine,
+  ArrowUpFromLine,
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  Wallet,
+  X,
   Zap,
   Bot,
 } from 'lucide-react';
@@ -22,6 +25,7 @@ import {
   quotePredictTrade,
   buildPredictPlaceBetTx,
   buildPredictEarlySellTx,
+  buildPredictDepositTx,
   buildPredictWithdrawTx,
   buildPredictClaimRecordTx,
   PREDICT_ORDER_USD_MIN,
@@ -121,7 +125,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [isQuoting, setIsQuoting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDepositing, setIsDepositing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [vaultModal, setVaultModal] = useState<'deposit' | 'withdraw' | null>(null);
+  const [vaultAmt, setVaultAmt] = useState<string>('');
   const [busyRecordKey, setBusyRecordKey] = useState<string | null>(null);
 
   const [walletUsdc, setWalletUsdc] = useState<number>(0);
@@ -456,11 +463,50 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
     }
   };
 
-  const handleWithdrawAvailable = async () => {
+  const handleDepositUsdc = async (amtNum: number) => {
+    if (!account?.address || !board || !(amtNum > 0)) return;
+    setIsDepositing(true);
+    try {
+      const tx = buildPredictDepositTx({
+        sender: account.address,
+        amountUsdc: amtNum,
+        hasAccount: Boolean(board.account?.hasAccount),
+        protocol: board.protocol,
+      });
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        onNotify('error', 'Deposit Simulation Failed', sim.errorMessage || 'Cannot deposit right now.');
+        return;
+      }
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
+      setVaultModal(null);
+      setVaultAmt('');
+      onNotify(
+        'success',
+        'Deposited to Predict Vault',
+        `+${amtNum.toFixed(2)} USDC funded for popup-free Predict execution.`,
+        'Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`
+      );
+      await loadBoard();
+    } catch (err: any) {
+      onNotify('error', 'Deposit Failed', err?.message || 'Wallet rejected deposit.');
+    } finally {
+      setIsDepositing(false);
+    }
+  };
+
+  const handleWithdrawAvailable = async (customAmount?: number) => {
     if (!account?.address || !board?.account || board.account.availableUsdc <= 0.001) return;
+    const amt = Math.min(
+      board.account.availableUsdc,
+      customAmount && customAmount > 0 ? customAmount : board.account.availableUsdc
+    );
+    if (!(amt > 0.001)) return;
     setIsWithdrawing(true);
     try {
-      const tx = buildPredictWithdrawTx(account.address, board.account.availableUsdc);
+      const tx = buildPredictWithdrawTx(account.address, amt);
       const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
       if (!sim.ok) {
         onNotify('error', 'Withdraw Simulation Failed', sim.errorMessage || 'Cannot withdraw right now.');
@@ -468,10 +514,12 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
       }
       const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
       const digest = extractTxDigest(res);
+      setVaultModal(null);
+      setVaultAmt('');
       onNotify(
         'success',
         'Predict USDC Withdrawn',
-        `${board.account.availableUsdc.toFixed(2)} USDC returned to your Sui wallet.`,
+        `${amt.toFixed(2)} USDC returned to your Sui wallet.`,
         'Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -615,7 +663,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           {/* Account Balance & Refresh */}
           <div className="flex items-center gap-2 shrink-0">
             {account && (
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#06070A] border border-[#1E232D] text-xs font-mono">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#06070A] border border-[#1E232D] text-xs font-mono">
                 <span className="text-[#8E98A8]">Vault:</span>
                 <span className="text-white font-semibold tabular-nums">
                   ${availableUsdc.toFixed(2)}
@@ -623,21 +671,30 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 {pendingUsdc > 0 && (
                   <span className="text-amber-300 text-[11px]">(+${pendingUsdc.toFixed(2)})</span>
                 )}
-                {availableUsdc > 0.01 && (
-                  <button
-                    type="button"
-                    disabled={isWithdrawing}
-                    onClick={handleWithdrawAvailable}
-                    className="ml-1 px-2 py-0.5 rounded bg-[#08D189]/15 border border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/25 text-[11px] font-sans font-semibold inline-flex items-center gap-1"
-                  >
-                    {isWithdrawing ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <ArrowDownToLine className="w-3 h-3" />
-                    )}
-                    Withdraw
-                  </button>
-                )}
+                <button
+                  type="button"
+                  disabled={isDepositing}
+                  onClick={() => {
+                    setVaultAmt(walletUsdc > 0 ? Math.min(walletUsdc, 5).toFixed(2) : '5');
+                    setVaultModal('deposit');
+                  }}
+                  className="ml-1 px-2 py-0.5 rounded bg-[#2B7FFF]/20 border border-[#2B7FFF]/45 text-[#60A5FA] hover:bg-[#2B7FFF]/30 text-[11px] font-sans font-semibold inline-flex items-center gap-1 transition-colors"
+                >
+                  <ArrowDownToLine className="w-3 h-3" />
+                  Deposit
+                </button>
+                <button
+                  type="button"
+                  disabled={isWithdrawing || availableUsdc <= 0.001}
+                  onClick={() => {
+                    setVaultAmt(availableUsdc.toFixed(2));
+                    setVaultModal('withdraw');
+                  }}
+                  className="px-2 py-0.5 rounded bg-[#08D189]/15 border border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/25 text-[11px] font-sans font-semibold inline-flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ArrowUpFromLine className="w-3 h-3" />
+                  Withdraw
+                </button>
               </div>
             )}
             <button
@@ -936,6 +993,42 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
 
         {/* Right: Flush Order Ticket */}
         <div className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2 bg-[#000000] p-3.5 space-y-3">
+          {/* Predict Account Vault Card (Symmetric with Perps Account) */}
+          <div className="bg-[#06070A] border border-[#1B1F27] rounded-lg p-2.5 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-300 font-sans font-semibold">Predict Escrow Vault</span>
+              <span className="text-white font-bold tabular-nums">
+                ${availableUsdc.toFixed(2)} USDC
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                disabled={!account || isDepositing}
+                onClick={() => {
+                  setVaultAmt(walletUsdc > 0 ? Math.min(walletUsdc, 5).toFixed(2) : '5');
+                  setVaultModal('deposit');
+                }}
+                className="py-1.5 rounded bg-[#2B7FFF] hover:bg-[#3C8BFF] text-white text-xs font-bold flex items-center justify-center gap-1 transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                <ArrowDownToLine className="w-3 h-3" />
+                DEPOSIT
+              </button>
+              <button
+                type="button"
+                disabled={!account || isWithdrawing || availableUsdc <= 0.001}
+                onClick={() => {
+                  setVaultAmt(availableUsdc.toFixed(2));
+                  setVaultModal('withdraw');
+                }}
+                className="py-1.5 rounded bg-[#0C0E13] hover:bg-[#141821] text-white text-xs font-bold flex items-center justify-center gap-1 border border-[#232834] transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+              >
+                <ArrowUpFromLine className="w-3 h-3" />
+                WITHDRAW
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-white tracking-tight">Place Binary Option</span>
             <span className="text-[11px] font-mono text-slate-400">
@@ -1235,6 +1328,71 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
         onNotify={onNotify}
         onDeployed={loadBoard}
       />
+
+      {/* Predict Vault Deposit / Withdraw Modal */}
+      {vaultModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="panel-carbon w-full max-w-sm rounded-xl p-5 space-y-4 border border-[#232834] animate-panel-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white">
+                {vaultModal === 'deposit' ? 'Deposit USDC to Predict' : 'Withdraw Predict USDC'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setVaultModal(null)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="panel-carbon-sub rounded-xl p-3 space-y-2">
+              <div className="flex justify-between text-xs text-slate-300 font-mono">
+                <span>{vaultModal === 'deposit' ? 'Wallet USDC' : 'Available Predict Vault'}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVaultAmt(
+                      (vaultModal === 'deposit' ? walletUsdc : availableUsdc).toFixed(2)
+                    )
+                  }
+                  className="inline-flex items-center gap-1 text-[#60A5FA] hover:underline"
+                >
+                  <Wallet className="w-3 h-3" />
+                  MAX {(vaultModal === 'deposit' ? walletUsdc : availableUsdc).toFixed(2)} USDC
+                </button>
+              </div>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={vaultAmt}
+                onChange={(e) => setVaultAmt(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-transparent text-2xl font-mono font-bold text-white outline-none"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={isDepositing || isWithdrawing || !(Number(vaultAmt) > 0)}
+              onClick={() =>
+                vaultModal === 'deposit'
+                  ? handleDepositUsdc(Number(vaultAmt))
+                  : handleWithdrawAvailable(Number(vaultAmt))
+              }
+              className="w-full py-2.5 rounded-xl btn-deepbook font-bold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-45"
+            >
+              {(isDepositing || isWithdrawing) && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>
+                {vaultModal === 'deposit'
+                  ? board?.account?.hasAccount
+                    ? 'Deposit to Predict Vault'
+                    : 'Create Vault & Deposit'
+                  : 'Withdraw to Wallet'}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

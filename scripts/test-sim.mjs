@@ -1619,6 +1619,119 @@ try {
   fail('Serverless Leaderboard Cold-Start On-Chain Indexer', e?.stack || e?.message || String(e));
 }
 
+// ---------------------------------------------------------------------------
+// 20) Atomic 1-TX Vault Creation & Deposit PTBs (Spot CLOB, Margin 4.5x, Predict)
+// ---------------------------------------------------------------------------
+try {
+  const dbExt20 = grpcClient.$extend(deepbook({ network: 'mainnet', address: WALLET }));
+  const dbClient20 = dbExt20.deepbook;
+  const suiPool20 = mainnetPools.SUI_USDC;
+
+  // 20A: Spot CLOB Create + Deposit SUI + Register + Share
+  const spotTx = new Transaction();
+  spotTx.setSender(WALLET);
+  const spotMgr = spotTx.add(dbClient20.balanceManager.createBalanceManagerWithOwner(WALLET));
+  const suiDepositCoin = coinWithBalance({ type: SUI_TYPE, balance: 100_000_000n })(spotTx);
+  spotTx.moveCall({
+    package: DEEPBOOK_PACKAGE_ID,
+    module: 'balance_manager',
+    function: 'deposit',
+    arguments: [spotMgr, suiDepositCoin],
+    typeArguments: [SUI_TYPE],
+  });
+  spotTx.moveCall({
+    package: DEEPBOOK_PACKAGE_ID,
+    module: 'balance_manager',
+    function: 'register_balance_manager',
+    arguments: [spotMgr, spotTx.object(mainnetPackageIds.REGISTRY_ID)],
+  });
+  spotTx.moveCall({
+    package: '0x2',
+    module: 'transfer',
+    function: 'public_share_object',
+    arguments: [spotMgr],
+    typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`],
+  });
+  const spotEff = await simulateGrpcOrGql(spotTx);
+
+  // 20B: Margin 4.5x New Manager + depositDuringInitialization + shareMarginManager
+  const marginTx = new Transaction();
+  marginTx.setSender(WALLET);
+  const { manager: mMgr, initializer: mInit } = dbClient20.marginManager.newMarginManagerWithInitializer('SUI_USDC')(marginTx);
+  marginTx.add(
+    dbClient20.marginManager.depositDuringInitialization({
+      manager: mMgr,
+      poolKey: 'SUI_USDC',
+      coinType: suiPool20.baseCoin,
+      amount: 0.1,
+    })
+  );
+  marginTx.add(dbClient20.marginManager.shareMarginManager('SUI_USDC', mMgr, mInit));
+  const marginEff = await simulateGrpcOrGql(marginTx);
+
+  // 20C: DeepBook Predict Create + Deposit USDC + Share (or Deposit if wrapper exists)
+  const balsRes = await grpcClient.core.listBalances({ owner: WALLET, limit: 20 });
+  const usdcBalNode = (balsRes.balances || []).find(
+    (b) => String(b.coinType || '').toLowerCase() === USDC_TYPE.toLowerCase()
+  );
+  const usdcAtoms = BigInt(usdcBalNode?.balance || '0');
+  const predDepAmt = usdcAtoms >= 100_000n ? 100_000n : usdcAtoms > 10_000n ? 10_000n : 0n;
+  let predStatus = 'SKIPPED_NO_USDC';
+  if (predDepAmt > 0n) {
+    const accCfg = {
+      accountPackageId: PREDICT_MAINNET_CONFIG.packages.account,
+      accountRegistry: PREDICT_MAINNET_CONFIG.objects.accountRegistry,
+      accountPackageIdLatest: PREDICT_MAINNET_CONFIG.packages.accountLatest,
+    };
+    const wrapperId = deriveAccountWrapperId(PREDICT_MAINNET_CONFIG, WALLET);
+    let hasWrapper = false;
+    try {
+      const obj = await grpcClient.core.getObject({ objectId: wrapperId });
+      hasWrapper = Boolean(obj?.object?.objectId);
+    } catch {
+      hasWrapper = false;
+    }
+    const predTx = new Transaction();
+    predTx.setSender(WALLET);
+    const usdcCoin = coinWithBalance({ type: USDC_TYPE, balance: predDepAmt })(predTx);
+    let wrapperTarget = wrapperId;
+    if (!hasWrapper) {
+      wrapperTarget = predTx.add(accountRegistryMoveCalls._new({ config: accCfg }));
+    }
+    const authDep = predTx.add(generateAuth(PREDICT_MAINNET_CONFIG));
+    predTx.add(
+      accountMoveCalls.depositFunds({
+        config: accCfg,
+        arguments: { wrapper: wrapperTarget, auth: authDep, coin: usdcCoin },
+        typeArguments: [PREDICT_MAINNET_CONFIG.quoteCoinType],
+      })
+    );
+    if (!hasWrapper) {
+      predTx.add(accountMoveCalls.shareAccount({ config: accCfg, account: wrapperTarget }));
+    }
+    const predEff = await simulateGrpcOrGql(predTx);
+    predStatus = predEff?.status || JSON.stringify(predEff);
+  }
+
+  if (
+    spotEff?.status === 'SUCCESS' &&
+    marginEff?.status === 'SUCCESS' &&
+    (predStatus === 'SUCCESS' || predStatus === 'SKIPPED_NO_USDC')
+  ) {
+    pass(
+      'Atomic Vault Deposit PTBs (Spot CLOB + Margin + Predict)',
+      `spot=${spotEff.status} margin=${marginEff.status} predict=${predStatus}`
+    );
+  } else {
+    fail(
+      'Atomic Vault Deposit PTBs (Spot CLOB + Margin + Predict)',
+      `spot=${spotEff?.status} margin=${marginEff?.status} predict=${predStatus}`
+    );
+  }
+} catch (e) {
+  fail('Atomic Vault Deposit PTBs (Spot CLOB + Margin + Predict)', e?.stack || e?.message || String(e));
+}
+
 if (failures > 0) {
   console.error(`\n${failures} simulation check(s) failed.`);
   process.exit(1);

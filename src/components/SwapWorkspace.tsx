@@ -12,6 +12,8 @@ import {
   BarChart2,
   Bot,
   Search,
+  ArrowDownToLine,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { POPULAR_TOKENS, type Token } from '../constants';
@@ -33,6 +35,7 @@ import {
 import { useSyncedWalletVolume } from '../onChainVolume';
 import {
   buildCancelDeepBookOrderTx,
+  buildCreateAndDepositManagerTx,
   buildDepositManagerTx,
   buildPlaceDeepBookLimitOrderTx,
   buildPlaceDeepBookMarketOrderTx,
@@ -250,6 +253,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [poolSearch, setPoolSearch] = useState('');
   const [poolQuoteFilter, setPoolQuoteFilter] = useState<'all' | 'usdc' | 'sui' | 'bluechip' | 'margin'>('all');
   const [spotDockTab, setSpotDockTab] = useState<'orders' | 'vault'>('orders');
+  const [showSpotVaultModal, setShowSpotVaultModal] = useState<'deposit' | 'withdraw' | null>(null);
   const poolDropdownRef = useRef<HTMLDivElement>(null);
 
   const marginPools = useMemo(
@@ -834,18 +838,27 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
   const handleDepositManager = async () => {
     const targetManagerId = managerState?.managerId || managerIds[0];
-    if (!account?.address || !targetManagerId) return;
+    if (!account?.address) return;
     const amt = Number(depositAmt);
     if (!Number.isFinite(amt) || amt <= 0) return;
-    const coinKey = depositCoinSide === 'base' ? activePool.baseSymbol : activePool.quoteSymbol;
+    const isBaseSide = depositCoinSide === 'base';
+    const coinKey = isBaseSide ? activePool.baseSymbol : activePool.quoteSymbol;
     setIsVaultBusy(true);
     try {
-      const tx = buildDepositManagerTx({
-        owner: account.address,
-        managerId: targetManagerId,
-        coinKey,
-        amount: amt,
-      });
+      const tx = targetManagerId
+        ? buildDepositManagerTx({
+            owner: account.address,
+            managerId: targetManagerId,
+            coinKey,
+            amount: amt,
+          })
+        : buildCreateAndDepositManagerTx({
+            owner: account.address,
+            coinType: isBaseSide ? activePool.baseCoinId : activePool.quoteCoinId,
+            decimals: isBaseSide ? activePool.baseDecimals : activePool.quoteDecimals,
+            amount: amt,
+            spotReferralId: spotReferrals[activePool.poolName]?.referralId || null,
+          });
       const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
       const digest = extractTxDigest(res);
       setDepositAmt('');
@@ -1946,31 +1959,50 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     </button>
                   </div>
 
-                  {/* Compact BalanceManager Status Link (Full Deposit/Withdraw Dock Below) */}
-                  <div className="bg-[#06070A] border border-[#1E232D] rounded-lg px-2.5 py-2 flex items-center justify-between gap-2 text-xs">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <ShieldCheck className="w-3.5 h-3.5 text-[#60A5FA] shrink-0" />
-                      <div className="truncate">
-                        <div className="text-slate-200 font-semibold truncate">
-                          BalanceManager{' '}
-                          <span className="text-[#8E98A8] font-mono font-normal">
-                            ({managerIds.length > 1 ? `${managerIds.length} Vaults` : managerIds[0] ? `${managerIds[0].slice(0, 6)}...` : '1-Tx Auto'})
-                          </span>
-                        </div>
-                        {managerState && (
+                  {/* Spot CLOB BalanceManager Vault Card (Direct Deposit / Withdraw) */}
+                  <div className="bg-[#06070A] border border-[#1E232D] hover:border-[#2B7FFF]/40 rounded-lg px-2.5 py-2.5 space-y-2 text-xs transition-colors">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#60A5FA] shrink-0" />
+                        <div className="truncate">
+                          <div className="text-slate-200 font-semibold truncate">
+                            BalanceManager Vault{' '}
+                            <span className="text-[#8E98A8] font-mono font-normal">
+                              ({managerIds.length > 1 ? `${managerIds.length} Vaults` : managerIds[0] ? `${managerIds[0].slice(0, 6)}...` : '1-Tx Auto'})
+                            </span>
+                          </div>
                           <div className="text-[11px] font-mono text-[#8E98A8] tabular-nums">
                             Free: {vaultSummary.freeBase.toFixed(3)} {activePool.baseSymbol} · {vaultSummary.freeQuote.toFixed(2)} {activePool.quoteSymbol}
                           </div>
-                        )}
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setSpotDockTab('vault')}
+                        className="px-2 py-0.5 rounded bg-[#0C0E13] hover:bg-[#141821] border border-[#232834] text-[10px] font-mono text-[#8E98A8] hover:text-white shrink-0 transition-colors"
+                      >
+                        Dock ↓
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setSpotDockTab('vault')}
-                      className="px-2 py-1 rounded bg-[#0C0E13] hover:bg-[#141821] border border-[#232834] text-[11px] font-mono text-[#60A5FA] shrink-0 transition-colors"
-                    >
-                      Manage ↓
-                    </button>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowSpotVaultModal('deposit')}
+                        className="py-1.5 rounded btn-deepbook text-[11px] font-bold flex items-center justify-center gap-1"
+                      >
+                        <ArrowDownToLine className="w-3.5 h-3.5" />
+                        <span>DEPOSIT</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!account || (!managerState && managerIds.length === 0) || isVaultBusy}
+                        onClick={() => setShowSpotVaultModal('withdraw')}
+                        className="py-1.5 rounded bg-[#10131A] hover:bg-[#171C26] border border-[#262C3B] text-[11px] font-bold text-slate-200 hover:text-white flex items-center justify-center gap-1 disabled:opacity-45 transition-colors"
+                      >
+                        <ArrowUpFromLine className="w-3.5 h-3.5" />
+                        <span>WITHDRAW</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2086,11 +2118,11 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         />
                         <button
                           type="button"
-                          disabled={isVaultBusy || !depositAmt || !managerState}
+                          disabled={isVaultBusy || !account || !depositAmt}
                           onClick={handleDepositManager}
                           className="px-2.5 py-1.5 rounded bg-[#121620] hover:bg-[#1A202E] border border-[#232938] text-xs font-semibold text-white shrink-0 disabled:opacity-45"
                         >
-                          Deposit
+                          {!managerState && managerIds.length === 0 ? 'Create & Deposit' : 'Deposit'}
                         </button>
                         <button
                           type="button"
@@ -2210,6 +2242,196 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spot CLOB BalanceManager Deposit / Withdraw Modal */}
+      {showSpotVaultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="panel-carbon rounded-xl w-full max-w-md p-5 space-y-4 border border-[#2B7FFF]/35 animate-panel-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {showSpotVaultModal === 'deposit' ? (
+                  <ArrowDownToLine className="w-4 h-4 text-[#2B7FFF]" />
+                ) : (
+                  <ArrowUpFromLine className="w-4 h-4 text-[#08D189]" />
+                )}
+                <h3 className="text-base font-bold text-white">
+                  {showSpotVaultModal === 'deposit'
+                    ? 'Deposit to DeepBook BalanceManager'
+                    : 'Withdraw from BalanceManager'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSpotVaultModal(null)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {showSpotVaultModal === 'deposit' ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-1.5 bg-[#06070A] p-1 rounded-lg border border-[#1E232D]">
+                  <button
+                    type="button"
+                    onClick={() => setDepositCoinSide('quote')}
+                    className={`py-1.5 rounded text-xs font-bold transition-colors ${
+                      depositCoinSide === 'quote'
+                        ? 'bg-[#2B7FFF] text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {activePool.quoteSymbol}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDepositCoinSide('base')}
+                    className={`py-1.5 rounded text-xs font-bold transition-colors ${
+                      depositCoinSide === 'base'
+                        ? 'bg-[#2B7FFF] text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {activePool.baseSymbol}
+                  </button>
+                </div>
+
+                <div className="bg-[#06070A] border border-[#1E232D] rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>
+                      Amount (
+                      {depositCoinSide === 'base' ? activePool.baseSymbol : activePool.quoteSymbol})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!account?.address) return;
+                        const bal =
+                          depositCoinSide === 'base'
+                            ? readBalanceFromMap(
+                                balances,
+                                activePool.baseCoinId,
+                                activePool.baseDecimals
+                              )
+                            : readBalanceFromMap(
+                                balances,
+                                activePool.quoteCoinId,
+                                activePool.quoteDecimals
+                              );
+                        const safe =
+                          depositCoinSide === 'base' && activePool.baseSymbol === 'SUI'
+                            ? Math.max(0, bal - 0.05)
+                            : bal;
+                        if (safe > 0) setDepositAmt(safe.toFixed(4));
+                      }}
+                      className="text-[#60A5FA] hover:text-white font-mono"
+                    >
+                      Wallet:{' '}
+                      {account?.address
+                        ? (depositCoinSide === 'base'
+                            ? readBalanceFromMap(
+                                balances,
+                                activePool.baseCoinId,
+                                activePool.baseDecimals
+                              )
+                            : readBalanceFromMap(
+                                balances,
+                                activePool.quoteCoinId,
+                                activePool.quoteDecimals
+                              )
+                          ).toFixed(4)
+                        : '0.0000'}{' '}
+                      (MAX)
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={depositAmt}
+                    onChange={(e) => setDepositAmt(e.target.value)}
+                    placeholder="10.00"
+                    className="w-full bg-transparent text-xl font-bold font-mono text-white outline-none"
+                  />
+                </div>
+
+                {!managerState && managerIds.length === 0 && (
+                  <div className="text-[11px] font-mono text-[#60A5FA] bg-[#2B7FFF]/10 border border-[#2B7FFF]/30 rounded-lg px-3 py-2">
+                    No BalanceManager detected — this transaction will create, register, and fund your non-custodial vault in 1 atomic signature.
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={isVaultBusy || !account || !depositAmt || Number(depositAmt) <= 0}
+                  onClick={async () => {
+                    await handleDepositManager();
+                    setShowSpotVaultModal(null);
+                  }}
+                  className="w-full py-2.5 rounded-lg btn-deepbook text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-45"
+                >
+                  {isVaultBusy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ArrowDownToLine className="w-4 h-4" />
+                  )}
+                  <span>
+                    {!account
+                      ? 'Connect Wallet to Deposit'
+                      : !managerState && managerIds.length === 0
+                        ? `Create Vault & Deposit ${depositCoinSide === 'base' ? activePool.baseSymbol : activePool.quoteSymbol}`
+                        : `Deposit ${depositCoinSide === 'base' ? activePool.baseSymbol : activePool.quoteSymbol}`}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-[#06070A] border border-[#1E232D] rounded-lg p-3 space-y-1.5 text-xs font-mono tabular-nums">
+                  <div className="flex justify-between text-slate-400">
+                    <span>Free {activePool.baseSymbol}</span>
+                    <span className="text-white font-bold">{vaultSummary.freeBase.toFixed(4)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Free {activePool.quoteSymbol}</span>
+                    <span className="text-white font-bold">{vaultSummary.freeQuote.toFixed(4)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>Unclaimed Settled</span>
+                    <span className="text-[#08D189]">
+                      {vaultSummary.settledBase.toFixed(4)} {activePool.baseSymbol} · {vaultSummary.settledQuote.toFixed(4)} {activePool.quoteSymbol}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={isVaultBusy || (!managerState && managerIds.length === 0)}
+                    onClick={async () => {
+                      await handleWithdrawManagerAll(false);
+                      setShowSpotVaultModal(null);
+                    }}
+                    className="w-full py-2.5 rounded-lg btn-deepbook text-xs font-bold disabled:opacity-45"
+                  >
+                    Withdraw Free &amp; Settled
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isVaultBusy || vaultSummary.openOrders.length === 0}
+                    onClick={async () => {
+                      await handleWithdrawManagerAll(true);
+                      setShowSpotVaultModal(null);
+                    }}
+                    className="w-full py-2.5 rounded-lg bg-[#F0525E]/15 hover:bg-[#F0525E]/25 border border-[#F0525E]/40 text-xs font-bold text-[#F0525E] disabled:opacity-45"
+                  >
+                    Cancel All &amp; Withdraw
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

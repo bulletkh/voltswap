@@ -723,6 +723,69 @@ export async function buildPredictEarlySellTx(params: {
   return { tx: queued.transaction, sellPlan };
 }
 
+export function buildPredictDepositTx(params: {
+  sender: string;
+  amountUsdc: number;
+  hasAccount: boolean;
+  protocol: PredictProtocolStatus;
+}): Transaction {
+  const { sender, amountUsdc, hasAccount, protocol } = params;
+  const tx = new Transaction();
+  tx.setSender(sender);
+
+  const accCfg = {
+    accountPackageId: MAINNET_CONFIG.packages.account,
+    accountRegistry: MAINNET_CONFIG.objects.accountRegistry,
+    accountPackageIdLatest: MAINNET_CONFIG.packages.accountLatest,
+  };
+  const cfg = toGeneratedConfig(MAINNET_CONFIG);
+  let wrapperTarget: any = deriveAccountWrapperId(MAINNET_CONFIG, sender);
+
+  if (!hasAccount) {
+    wrapperTarget = tx.add(
+      protocol.referrerWrapperExists
+        ? accountRegistryMoveCalls.newWithReferrer({
+            config: accCfg,
+            arguments: { referrer: protocol.referrerWrapperId },
+          })
+        : accountRegistryMoveCalls._new({ config: accCfg })
+    );
+  }
+
+  const amountRaw = usdcToRaw(amountUsdc);
+  if (amountRaw > 0n) {
+    const coin = coinWithBalance({
+      type: MAINNET_CONFIG.quoteCoinType,
+      balance: amountRaw,
+      useGasCoin: false,
+    })(tx);
+    const authDep = tx.add(generateAuth(MAINNET_CONFIG));
+    tx.add(
+      accountMoveCalls.depositFunds({
+        config: accCfg,
+        arguments: { wrapper: wrapperTarget, auth: authDep, coin },
+        typeArguments: [MAINNET_CONFIG.quoteCoinType],
+      })
+    );
+  }
+
+  if (!hasAccount && protocol.builderCodeExists && !protocol.builderFeeCutoverActive) {
+    const authBc = tx.add(generateAuth(MAINNET_CONFIG));
+    tx.add(
+      predictAccountMoveCalls.setBuilderCode({
+        config: cfg,
+        arguments: { wrapper: wrapperTarget, auth: authBc, code: protocol.builderCodeId },
+      })
+    );
+  }
+
+  if (!hasAccount) {
+    tx.add(accountMoveCalls.share({ config: accCfg, arguments: { self: wrapperTarget } }));
+  }
+
+  return tx;
+}
+
 export function buildPredictWithdrawTx(sender: string, amountUsdc: number): Transaction {
   const client = createPredictClient();
   const tx = client.predict.tx.withdraw(sender, amountUsdc, { toCoinObject: true });

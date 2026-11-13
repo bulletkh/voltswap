@@ -135,16 +135,17 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-[#000000] text-slate-100 flex flex-col">
+    <div className="min-h-screen w-full overflow-x-hidden volt-hero-surface text-slate-100 flex flex-col">
       {/* Top Institutional DeepBook-Style Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-[#1A1E26] bg-[#000000]/95 backdrop-blur-md">
-        <div className="w-full mx-auto px-3 sm:px-5 h-[52px] flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 border-b border-[#1A1E26] bg-[#000000]/90 backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#2B7FFF]/45 to-transparent" />
+        <div className="w-full mx-auto px-3 sm:px-5 h-[54px] flex items-center justify-between gap-4">
           {/* Left: Brand */}
           <div className="flex items-center gap-6 h-full">
             <button
               type="button"
               onClick={() => setActiveTab('swap')}
-              className="flex items-center text-left hover:opacity-90 transition-opacity shrink-0"
+              className="flex items-center text-left hover:opacity-95 hover:scale-[1.01] transition-all shrink-0"
             >
               <VoltLogo className="w-7 h-7" showWordmark subtitle="PRO" />
             </button>
@@ -158,14 +159,19 @@ export function App() {
                     key={item.id}
                     type="button"
                     onClick={() => setActiveTab(item.id)}
-                    className={`relative h-full px-3.5 text-[13px] font-semibold flex items-center gap-1.5 transition-colors border-b-2 ${
+                    className={`relative h-full px-3.5 text-[13px] font-semibold flex items-center gap-1.5 transition-all ${
                       active
-                        ? 'text-white border-[#2B7FFF]'
-                        : 'text-[#848E9C] hover:text-white border-transparent'
+                        ? 'text-white bg-gradient-to-b from-transparent to-[#2B7FFF]/10'
+                        : 'text-[#848E9C] hover:text-white hover:bg-white/[0.02]'
                     }`}
                   >
-                    <span className={active ? 'text-[#2B7FFF]' : 'text-[#6B7280]'}>{item.icon}</span>
+                    <span className={active ? 'text-[#2B7FFF] drop-shadow-[0_0_8px_rgba(43,127,255,0.6)]' : 'text-[#6B7280]'}>
+                      {item.icon}
+                    </span>
                     <span>{item.label}</span>
+                    {active && (
+                      <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-gradient-to-r from-[#2B7FFF]/60 via-[#60A5FA] to-[#2B7FFF]/60 shadow-[0_0_12px_rgba(43,127,255,0.75)]" />
+                    )}
                   </button>
                 );
               })}
@@ -174,7 +180,7 @@ export function App() {
 
           {/* Right: Network Status, Portfolio Drawer & Wallet */}
           <div className="flex items-center gap-2">
-            <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#090B0E] border border-[#1B1F27] text-[11px] font-mono text-slate-300">
+            <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#090B0E]/90 border border-[#1B1F27] text-[11px] font-mono text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-live-dot" />
               <span>Mainnet</span>
             </div>
@@ -245,45 +251,47 @@ export function App() {
             : 'max-w-[1440px] mx-auto px-3 sm:px-6 py-4'
         }`}
       >
-        {activeTab === 'swap' && (
-          <SwapWorkspace
-            onNotify={notify}
-            onTradeRecorded={(t) => setPnlTrade(t)}
-            onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-          />
-        )}
+        <div key={activeTab} className="animate-panel-in flex-1 flex flex-col min-w-0">
+          {activeTab === 'swap' && (
+            <SwapWorkspace
+              onNotify={notify}
+              onTradeRecorded={(t) => setPnlTrade(t)}
+              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+            />
+          )}
 
-        {activeTab === 'perps' && (
-          <PerpsWorkspace
-            onNotify={notify}
-            onTradeRecorded={(t) => setPnlTrade(t)}
-            onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-          />
-        )}
+          {activeTab === 'perps' && (
+            <PerpsWorkspace
+              onNotify={notify}
+              onTradeRecorded={(t) => setPnlTrade(t)}
+              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+            />
+          )}
 
-        {activeTab === 'predict' && (
-          <PredictWorkspace
-            onNotify={notify}
-            onTradeRecorded={(t) => setPnlTrade(t)}
-            onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-          />
-        )}
+          {activeTab === 'predict' && (
+            <PredictWorkspace
+              onNotify={notify}
+              onTradeRecorded={(t) => setPnlTrade(t)}
+              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+            />
+          )}
 
-        {activeTab === 'earn' && (
-          <EarnWorkspace
-            onNotify={notify}
-            onTradeRecorded={(t) => setPnlTrade(t)}
-            onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-          />
-        )}
+          {activeTab === 'earn' && (
+            <EarnWorkspace
+              onNotify={notify}
+              onTradeRecorded={(t) => setPnlTrade(t)}
+              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+            />
+          )}
 
-        {activeTab === 'tiers' && (
-          <TiersReferralsWorkspace externalVolumeUsd={trackedVolumeUsd} />
-        )}
+          {activeTab === 'tiers' && (
+            <TiersReferralsWorkspace externalVolumeUsd={trackedVolumeUsd} />
+          )}
 
-        {activeTab === 'treasury' && isCreatorWallet && (
-          <TreasuryDashboard currentAccount={account} showNotification={notify} />
-        )}
+          {activeTab === 'treasury' && isCreatorWallet && (
+            <TreasuryDashboard currentAccount={account} showNotification={notify} />
+          )}
+        </div>
       </main>
 
       {/* Clean Institutional Footer */}
