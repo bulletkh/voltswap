@@ -954,6 +954,7 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
   refSharePct?: number;
   spotReferralId?: string | null;
   existingManagerReferralId?: string | null;
+  expireTimestampMs?: number;
 }): Transaction {
   const tx = new Transaction();
   tx.setSender(params.owner);
@@ -979,7 +980,9 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
   const lotAtoms = BigInt(Math.max(1, Math.round(params.pool.lotSize * baseScale)));
   const rawQtyAtoms = BigInt(Math.max(1, Math.round(params.quantity * baseScale)));
   const onChainQty = (rawQtyAtoms / lotAtoms) * lotAtoms || lotAtoms;
-  const expireTs = 1844674407370955161n;
+  const expireTs = params.expireTimestampMs
+    ? BigInt(Math.floor(params.expireTimestampMs))
+    : 1844674407370955161n;
 
   if (params.managerId) {
     const ext = createDeepBookClient(params.owner, params.managerId);
@@ -1006,6 +1009,7 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
         orderType,
         selfMatchingOption: selfMatching,
         payWithDeep: params.payWithDeep ?? false,
+        expiration: expireTs,
       })
     );
   } else {
@@ -1092,6 +1096,7 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
   feeBps?: number;
   spotReferralId?: string | null;
   existingManagerReferralId?: string | null;
+  expireTimestampMs?: number;
 }): Transaction {
   const {
     owner,
@@ -1279,6 +1284,7 @@ export function buildPlaceDeepBookGridTx(params: {
   refSharePct?: number;
   spotReferralId?: string | null;
   existingManagerReferralId?: string | null;
+  expireTimestampMs?: number;
 }): Transaction {
   const {
     owner,
