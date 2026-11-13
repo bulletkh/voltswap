@@ -82,9 +82,9 @@ const TF_SECONDS: Record<ChartTimeframe, number> = {
 const FIB_LEVELS: Array<{ ratio: number; label: string; color: string }> = [
   { ratio: 0, label: '0', color: '#94A3B8' },
   { ratio: 0.236, label: '0.236', color: '#F59E0B' },
-  { ratio: 0.382, label: '0.382', color: '#18C8FF' },
-  { ratio: 0.5, label: '0.5', color: '#00D98B' },
-  { ratio: 0.618, label: '0.618', color: '#38BDF8' },
+  { ratio: 0.382, label: '0.382', color: '#60A5FA' },
+  { ratio: 0.5, label: '0.5', color: '#08D189' },
+  { ratio: 0.618, label: '0.618', color: '#2B7FFF' },
   { ratio: 0.786, label: '0.786', color: '#A78BFA' },
   { ratio: 1, label: '1', color: '#94A3B8' },
 ];
@@ -273,7 +273,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showIndicatorsMenu, setShowIndicatorsMenu] = useState(false);
   const [indicators, setIndicators] = useState<IndicatorState>({
-    ma: true,
+    ma: false,
     ema: false,
     boll: false,
   });
@@ -400,37 +400,37 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
       width: initialW,
       height: initialH,
       layout: {
-        background: { type: ColorType.Solid, color: '#0A1019' },
-        textColor: '#94A3B8',
+        background: { type: ColorType.Solid, color: '#000000' },
+        textColor: '#7B8494',
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.04)' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.045)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.045)' },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          color: 'rgba(24, 200, 255, 0.42)',
+          color: 'rgba(255, 255, 255, 0.28)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#181D25',
+          labelBackgroundColor: '#1E232D',
         },
         horzLine: {
-          color: 'rgba(24, 200, 255, 0.42)',
+          color: 'rgba(255, 255, 255, 0.28)',
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: '#181D25',
+          labelBackgroundColor: '#1E232D',
         },
       },
       rightPriceScale: {
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: '#1A1E26',
         autoScale: true,
         scaleMargins: { top: 0.1, bottom: 0.22 },
       },
       timeScale: {
-        borderColor: 'rgba(255, 255, 255, 0.08)',
+        borderColor: '#1A1E26',
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 8,
@@ -452,17 +452,20 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
     const mainSeries =
       chartType === 'candles'
         ? chart.addSeries(CandlestickSeries, {
-            upColor: '#00D98B',
-            downColor: '#F6465D',
-            borderUpColor: '#00D98B',
-            borderDownColor: '#F6465D',
-            wickUpColor: '#00D98B',
-            wickDownColor: '#F6465D',
+            upColor: '#08D189',
+            downColor: '#F0525E',
+            borderUpColor: '#08D189',
+            borderDownColor: '#F0525E',
+            wickUpColor: '#08D189',
+            wickDownColor: '#F0525E',
+            priceLineColor: '#08D189',
+            priceLineWidth: 1,
+            priceLineStyle: LineStyle.Dotted,
           })
         : chart.addSeries(AreaSeries, {
-            lineColor: '#18C8FF',
-            topColor: 'rgba(24, 200, 255, 0.28)',
-            bottomColor: 'rgba(24, 200, 255, 0.01)',
+            lineColor: '#2B7FFF',
+            topColor: 'rgba(43, 127, 255, 0.24)',
+            bottomColor: 'rgba(43, 127, 255, 0.01)',
             lineWidth: 2,
           });
 
@@ -481,7 +484,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
       crosshairMarkerVisible: false,
     };
 
-    const ma7Series = chart.addSeries(LineSeries, { ...indicatorLineOpts, color: '#18C8FF', lineWidth: 1 });
+    const ma7Series = chart.addSeries(LineSeries, { ...indicatorLineOpts, color: '#2B7FFF', lineWidth: 1 });
     const ma25Series = chart.addSeries(LineSeries, { ...indicatorLineOpts, color: '#F472B6', lineWidth: 1 });
     const ema20Series = chart.addSeries(LineSeries, { ...indicatorLineOpts, color: '#A78BFA', lineWidth: 1 });
     const bollUpperSeries = chart.addSeries(LineSeries, {
@@ -632,7 +635,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
     const volData: HistogramData<UTCTimestamp>[] = cleanCandles.map((c) => ({
       time: c.time as UTCTimestamp,
       value: c.volume,
-      color: c.close >= c.open ? 'rgba(0, 217, 139, 0.28)' : 'rgba(246, 70, 93, 0.28)',
+      color: c.close >= c.open ? 'rgba(8, 209, 137, 0.45)' : 'rgba(240, 82, 94, 0.45)',
     }));
     volumeSeries.setData(volData);
 
@@ -780,63 +783,27 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
   const svgW = containerRef.current?.clientWidth || 800;
 
   const wrapperClass = isFullscreen
-    ? 'fixed inset-0 z-50 flex flex-col w-screen h-screen bg-[#0A1019] p-2 sm:p-4'
-    : 'flex flex-col w-full';
+    ? 'fixed inset-0 z-50 flex flex-col w-screen h-screen bg-[#000000]'
+    : 'flex flex-col w-full bg-[#000000]';
 
   const chartHeightClass = isFullscreen ? 'flex-1 min-h-0' : heightClass;
 
   return (
     <div className={wrapperClass}>
-      {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-white/10">
-        <div className="flex items-center gap-2 text-xs min-w-0">
-          <span className="font-bold text-white tracking-tight truncate">{symbolLabel}</span>
-          <span className="px-2 py-0.5 rounded-md bg-[#18C8FF]/10 border border-[#18C8FF]/25 text-[#18C8FF] font-mono text-[10px] font-semibold">
-            {sourceLabel}
-          </span>
-
-          {displayBar && engineMode === 'volt' && (
-            <div className="hidden sm:flex items-center gap-2 font-mono text-[11px] ml-1.5">
-              <span className="text-slate-500">
-                O <span className={isUp ? 'text-[#00D98B]' : 'text-[#F6465D]'}>{formatPrice(displayBar.open)}</span>
-              </span>
-              <span className="text-slate-500">
-                H <span className={isUp ? 'text-[#00D98B]' : 'text-[#F6465D]'}>{formatPrice(displayBar.high)}</span>
-              </span>
-              <span className="text-slate-500">
-                L <span className={isUp ? 'text-[#00D98B]' : 'text-[#F6465D]'}>{formatPrice(displayBar.low)}</span>
-              </span>
-              <span className="text-slate-500">
-                C <span className={isUp ? 'text-[#00D98B]' : 'text-[#F6465D]'}>{formatPrice(displayBar.close)}</span>
-              </span>
-              {indicators.ma && (
-                <span className="hidden xl:inline-flex items-center gap-1.5 ml-1 text-[10px]">
-                  <span className="text-[#18C8FF]">MA(7)</span>
-                  <span className="text-[#F472B6]">MA(25)</span>
-                </span>
-              )}
-              {indicators.ema && (
-                <span className="hidden xl:inline-block text-[10px] text-[#A78BFA]">EMA(20)</span>
-              )}
-              {indicators.boll && (
-                <span className="hidden xl:inline-block text-[10px] text-amber-400">BOLL(20)</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center flex-wrap gap-1.5">
+      {/* Flush Institutional TradingView-Style Chart Header Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-b border-[#1A1E26] bg-[#000000]">
+        <div className="flex items-center flex-wrap gap-1">
           {/* Timeframes */}
-          <div className="flex items-center bg-[#090E16] p-0.5 rounded-lg border border-white/10">
+          <div className="flex items-center">
             {TIMEFRAMES.map((tf) => (
               <button
                 key={tf}
                 type="button"
                 onClick={() => onTimeframeChange(tf)}
-                className={`px-2 py-1 rounded-md text-[11px] font-mono font-semibold transition-all ${
+                className={`px-2 py-1 text-[11px] font-mono font-semibold transition-colors border-b-2 ${
                   timeframe === tf
-                    ? 'bg-[#18C8FF] text-[#04111D] shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'text-[#2B7FFF] border-[#2B7FFF]'
+                    : 'text-[#848E9C] hover:text-white border-transparent'
                 }`}
               >
                 {tf}
@@ -844,16 +811,18 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
             ))}
           </div>
 
-          {/* Chart Style & Indicators (Volt Built-In Engine) */}
+          <div className="h-4 w-px bg-[#1A1E26] mx-1 hidden sm:block" />
+
+          {/* Chart Style & Indicators */}
           {engineMode === 'volt' && (
             <>
-              <div className="flex items-center bg-[#090E16] p-0.5 rounded-lg border border-white/10">
+              <div className="flex items-center gap-0.5">
                 <button
                   type="button"
                   onClick={() => setChartType('candles')}
                   title="Candlestick Chart"
-                  className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all ${
-                    chartType === 'candles' ? 'bg-white/15 text-[#18C8FF]' : 'text-slate-400 hover:text-white'
+                  className={`p-1.5 rounded text-[11px] font-semibold flex items-center transition-colors ${
+                    chartType === 'candles' ? 'text-white bg-[#131720]' : 'text-[#848E9C] hover:text-white'
                   }`}
                 >
                   <CandlestickChart className="w-3.5 h-3.5" />
@@ -862,8 +831,8 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                   type="button"
                   onClick={() => setChartType('area')}
                   title="Area Line Chart"
-                  className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all ${
-                    chartType === 'area' ? 'bg-white/15 text-[#18C8FF]' : 'text-slate-400 hover:text-white'
+                  className={`p-1.5 rounded text-[11px] font-semibold flex items-center transition-colors ${
+                    chartType === 'area' ? 'text-white bg-[#131720]' : 'text-[#848E9C] hover:text-white'
                   }`}
                 >
                   <Activity className="w-3.5 h-3.5" />
@@ -874,30 +843,30 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowIndicatorsMenu((v) => !v)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all flex items-center gap-1 ${
+                  className={`px-2 py-1 rounded text-[11px] font-semibold transition-colors flex items-center gap-1 ${
                     indicators.ma || indicators.ema || indicators.boll
-                      ? 'bg-[#18C8FF]/10 border-[#18C8FF]/30 text-[#18C8FF]'
-                      : 'bg-[#090E16] border-white/10 text-slate-300 hover:text-white'
+                      ? 'text-[#2B7FFF] bg-[#2B7FFF]/10'
+                      : 'text-[#848E9C] hover:text-white'
                   }`}
                 >
-                  fx Indicators
+                  <span>fx Indicators</span>
                 </button>
                 {showIndicatorsMenu && (
-                  <div className="absolute right-0 mt-1.5 w-44 rounded-xl bg-[#11151C] border border-white/15 shadow-2xl p-2 z-40 space-y-1">
+                  <div className="absolute left-0 mt-1.5 w-44 rounded-lg bg-[#090B10] border border-[#232834] shadow-2xl p-1.5 z-40 space-y-0.5">
                     <button
                       type="button"
                       onClick={() => setIndicators((p) => ({ ...p, ma: !p.ma }))}
-                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5"
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs hover:bg-white/[0.05]"
                     >
                       <span className="text-slate-200 font-medium">MA (7 / 25)</span>
-                      <span className={indicators.ma ? 'text-[#18C8FF] font-bold' : 'text-slate-500'}>
+                      <span className={indicators.ma ? 'text-[#2B7FFF] font-bold' : 'text-slate-500'}>
                         {indicators.ma ? 'ON' : 'OFF'}
                       </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setIndicators((p) => ({ ...p, ema: !p.ema }))}
-                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5"
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs hover:bg-white/[0.05]"
                     >
                       <span className="text-slate-200 font-medium">EMA (20)</span>
                       <span className={indicators.ema ? 'text-[#A78BFA] font-bold' : 'text-slate-500'}>
@@ -907,7 +876,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                     <button
                       type="button"
                       onClick={() => setIndicators((p) => ({ ...p, boll: !p.boll }))}
-                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5"
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs hover:bg-white/[0.05]"
                     >
                       <span className="text-slate-200 font-medium">BOLL (20, 2)</span>
                       <span className={indicators.boll ? 'text-amber-400 font-bold' : 'text-slate-500'}>
@@ -917,29 +886,30 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                   </div>
                 )}
               </div>
-
-              <button
-                type="button"
-                onClick={forceAutoFit}
-                title="Auto-Fit Price & Time Scale"
-                className="px-2 py-1 rounded-lg bg-[#090E16] border border-white/10 text-slate-300 hover:text-[#18C8FF] hover:border-[#18C8FF]/35 text-[11px] font-semibold flex items-center gap-1 transition-all"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span className="hidden md:inline">Auto</span>
-              </button>
             </>
           )}
+        </div>
 
-          {/* Optional Native TradingView Mode when pair exists on TradingView */}
+        <div className="flex items-center gap-1.5">
+          {engineMode === 'volt' && (
+            <button
+              type="button"
+              onClick={forceAutoFit}
+              title="Auto-Fit Price & Time Scale"
+              className="px-2 py-1 rounded text-[#848E9C] hover:text-white text-[11px] font-mono flex items-center gap-1 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span className="hidden md:inline">auto</span>
+            </button>
+          )}
+
           {resolvedTvSymbol && (
-            <div className="flex items-center bg-[#090E16] p-0.5 rounded-lg border border-white/10">
+            <div className="flex items-center bg-[#090B0E] p-0.5 rounded border border-[#1B1F27]">
               <button
                 type="button"
                 onClick={() => setEngineMode('volt')}
-                className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
-                  engineMode === 'volt'
-                    ? 'bg-white/15 text-white'
-                    : 'text-slate-400 hover:text-white'
+                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                  engineMode === 'volt' ? 'bg-[#1D2330] text-white' : 'text-[#848E9C] hover:text-white'
                 }`}
               >
                 Live
@@ -947,10 +917,8 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
               <button
                 type="button"
                 onClick={() => setEngineMode('tradingview')}
-                className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
-                  engineMode === 'tradingview'
-                    ? 'bg-[#18C8FF] text-[#04111D]'
-                    : 'text-slate-400 hover:text-white'
+                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                  engineMode === 'tradingview' ? 'bg-[#2B7FFF] text-white' : 'text-[#848E9C] hover:text-white'
                 }`}
               >
                 TradingView
@@ -962,19 +930,19 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
             type="button"
             onClick={() => setIsFullscreen((v) => !v)}
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Workstation'}
-            className="p-1.5 rounded-lg bg-[#090E16] border border-white/10 text-slate-300 hover:text-white hover:border-white/25 transition-all"
+            className="p-1.5 rounded text-[#848E9C] hover:text-white transition-colors"
           >
             {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
         </div>
       </div>
 
-      {/* Main Canvas Row: Left Vertical Drawing Toolbar + Chart */}
-      <div className={`relative w-full mt-2 flex gap-1.5 ${chartHeightClass}`}>
+      {/* Flush Main Canvas Row: Left Drawing Rail + Pure Black Chart */}
+      <div className={`relative w-full flex ${chartHeightClass}`}>
         {engineMode === 'volt' ? (
           <>
-            {/* Left Vertical Drawing Toolbar */}
-            <div className="w-9 shrink-0 rounded-xl bg-[#090E16] border border-white/10 py-1.5 flex flex-col items-center justify-between select-none">
+            {/* Flush Vertical Drawing Toolbar */}
+            <div className="w-9 shrink-0 bg-[#000000] border-r border-[#1A1E26] py-2 flex flex-col items-center justify-between select-none">
               <div className="flex flex-col items-center gap-1">
                 {(
                   [
@@ -997,10 +965,10 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                         setDraftDrawing(null);
                         setActiveTool(tool.id);
                       }}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                      className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${
                         active
-                          ? 'bg-[#18C8FF] text-[#04111D] shadow-[0_0_10px_rgba(24, 200, 255,0.4)]'
-                          : 'text-slate-400 hover:text-white hover:bg-white/10'
+                          ? 'bg-[#2B7FFF]/20 text-[#2B7FFF]'
+                          : 'text-[#7B8494] hover:text-white hover:bg-white/[0.06]'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
@@ -1009,7 +977,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                 })}
               </div>
 
-              <div className="flex flex-col items-center gap-1 pt-2 border-t border-white/10">
+              <div className="flex flex-col items-center gap-1 pt-2 border-t border-[#1A1E26]">
                 <button
                   type="button"
                   title="Undo Last Drawing"
@@ -1021,7 +989,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                     }
                     setDrawings((prev) => prev.slice(0, -1));
                   }}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 transition-all"
+                  className="w-7 h-7 rounded flex items-center justify-center text-[#7B8494] hover:text-white hover:bg-white/[0.06] disabled:opacity-30 transition-colors"
                 >
                   <Undo2 className="w-3.5 h-3.5" />
                 </button>
@@ -1033,15 +1001,47 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                     setDraftDrawing(null);
                     setDrawings([]);
                   }}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-[#F6465D] hover:bg-[#F6465D]/10 disabled:opacity-30 transition-all"
+                  className="w-7 h-7 rounded flex items-center justify-center text-[#7B8494] hover:text-[#F0525E] hover:bg-[#F0525E]/10 disabled:opacity-30 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* Chart Viewport + Synchronized SVG Drawing Layer */}
-            <div className="relative flex-1 min-w-0 h-full rounded-xl overflow-hidden bg-[#0A1019] border border-white/[0.06]">
+            {/* Chart Viewport + In-Canvas DeepBook Legend + SVG Overlay */}
+            <div className="relative flex-1 min-w-0 h-full overflow-hidden bg-[#000000]">
+              {/* In-canvas top-left TradingView legend matching DeepBook reference */}
+              <div className="pointer-events-none absolute top-2 left-3 right-16 z-10 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-mono">
+                <span className="text-slate-200 font-semibold">
+                  {symbolLabel} · {timeframe} · {sourceLabel}
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#08D189]" />
+                {displayBar && (
+                  <span className="hidden sm:inline-flex items-center gap-2">
+                    <span className="text-[#7B8494]">
+                      O<span className={isUp ? 'text-[#08D189]' : 'text-[#F0525E]'}>{formatPrice(displayBar.open)}</span>
+                    </span>
+                    <span className="text-[#7B8494]">
+                      H<span className={isUp ? 'text-[#08D189]' : 'text-[#F0525E]'}>{formatPrice(displayBar.high)}</span>
+                    </span>
+                    <span className="text-[#7B8494]">
+                      L<span className={isUp ? 'text-[#08D189]' : 'text-[#F0525E]'}>{formatPrice(displayBar.low)}</span>
+                    </span>
+                    <span className="text-[#7B8494]">
+                      C<span className={isUp ? 'text-[#08D189]' : 'text-[#F0525E]'}>{formatPrice(displayBar.close)}</span>
+                    </span>
+                  </span>
+                )}
+                {indicators.ma && (
+                  <span className="hidden xl:inline-flex items-center gap-1.5 text-[10px]">
+                    <span className="text-[#2B7FFF]">MA7</span>
+                    <span className="text-[#F472B6]">MA25</span>
+                  </span>
+                )}
+                {indicators.ema && <span className="hidden xl:inline text-[10px] text-[#A78BFA]">EMA20</span>}
+                {indicators.boll && <span className="hidden xl:inline text-[10px] text-amber-400">BOLL20</span>}
+              </div>
+
               <div
                 ref={containerRef}
                 onDoubleClick={forceAutoFit}
@@ -1069,7 +1069,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                           y1={p1.y}
                           x2={svgW}
                           y2={p1.y}
-                          stroke="#18C8FF"
+                          stroke="#2B7FFF"
                           strokeWidth={1.5}
                           strokeDasharray="5 4"
                         />
@@ -1079,12 +1079,12 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                           width={74}
                           height={18}
                           rx={4}
-                          fill="#18C8FF"
+                          fill="#2B7FFF"
                         />
                         <text
                           x={Math.max(8, svgW - 135)}
                           y={p1.y + 3}
-                          fill="#04111D"
+                          fill="#FFFFFF"
                           fontSize={10}
                           fontWeight="bold"
                           fontFamily="JetBrains Mono, monospace"
@@ -1106,11 +1106,11 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                           y1={p1.y}
                           x2={p2.x}
                           y2={p2.y}
-                          stroke="#18C8FF"
+                          stroke="#2B7FFF"
                           strokeWidth={2}
                         />
-                        <circle cx={p1.x} cy={p1.y} r={3.5} fill="#18C8FF" stroke="#04111D" />
-                        <circle cx={p2.x} cy={p2.y} r={3.5} fill="#18C8FF" stroke="#04111D" />
+                        <circle cx={p1.x} cy={p1.y} r={3.5} fill="#2B7FFF" stroke="#000000" />
+                        <circle cx={p2.x} cy={p2.y} r={3.5} fill="#2B7FFF" stroke="#000000" />
                       </g>
                     );
                   }
@@ -1133,11 +1133,11 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                           y1={p1.y}
                           x2={ex}
                           y2={ey}
-                          stroke="#38BDF8"
+                          stroke="#60A5FA"
                           strokeWidth={1.75}
                         />
-                        <circle cx={p1.x} cy={p1.y} r={3.5} fill="#38BDF8" stroke="#04111D" />
-                        <circle cx={p2.x} cy={p2.y} r={3.5} fill="#38BDF8" stroke="#04111D" />
+                        <circle cx={p1.x} cy={p1.y} r={3.5} fill="#60A5FA" stroke="#000000" />
+                        <circle cx={p2.x} cy={p2.y} r={3.5} fill="#60A5FA" stroke="#000000" />
                       </g>
                     );
                   }
@@ -1153,7 +1153,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                           y={Math.min(p1.y, p2.y)}
                           width={Math.max(maxX - minX, 20)}
                           height={Math.max(Math.abs(p2.y - p1.y), 2)}
-                          fill="rgba(24, 200, 255, 0.04)"
+                          fill="rgba(43, 127, 255, 0.05)"
                         />
                         {FIB_LEVELS.map((lv) => {
                           const lvPrice = d.p1.price + priceSpan * lv.ratio;
@@ -1193,8 +1193,8 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                     const pct = d.p1.price > 0 ? ((d.p2.price - d.p1.price) / d.p1.price) * 100 : 0;
                     const diff = d.p2.price - d.p1.price;
                     const pos = pct >= 0;
-                    const strokeCol = pos ? '#00D98B' : '#F6465D';
-                    const fillCol = pos ? 'rgba(0, 217, 139, 0.14)' : 'rgba(246, 70, 93, 0.14)';
+                    const strokeCol = pos ? '#08D189' : '#F0525E';
+                    const fillCol = pos ? 'rgba(8, 209, 137, 0.14)' : 'rgba(240, 82, 94, 0.14)';
                     const labelText = `${pos ? '+' : ''}${pct.toFixed(2)}% (${pos ? '+' : ''}${formatPrice(diff)})`;
                     return (
                       <g key={d.id}>
@@ -1235,7 +1235,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
 
               {/* Active drawing hint pill */}
               {activeTool !== 'cursor' && (
-                <div className="pointer-events-none absolute top-2 left-2 z-20 px-2.5 py-1 rounded-lg bg-[#18C8FF] text-[#04111D] text-[11px] font-bold shadow">
+                <div className="pointer-events-none absolute top-8 left-3 z-20 px-2.5 py-1 rounded bg-[#2B7FFF] text-white text-[11px] font-bold shadow">
                   {activeTool === 'hline'
                     ? 'Click chart to place level'
                     : draftDrawing
@@ -1245,8 +1245,8 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
               )}
 
               {(isLoading || cleanCandles.length === 0) && (
-                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#0A1019]/65 backdrop-blur-[1px]">
-                  <div className="px-3 py-1.5 rounded-lg bg-[#11151C] border border-white/15 text-xs text-slate-300 font-mono">
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#000000]/75 backdrop-blur-[1px]">
+                  <div className="px-3 py-1.5 rounded bg-[#0A0C10] border border-[#1E232D] text-xs text-slate-300 font-mono">
                     {isLoading ? 'Loading market candles...' : 'Waiting for market candles...'}
                   </div>
                 </div>
@@ -1255,7 +1255,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
           </>
         ) : (
           /* Official TradingView Embedded Advanced Widget */
-          <div className="relative flex-1 min-w-0 h-full rounded-xl overflow-hidden bg-[#0A1019] border border-white/10">
+          <div className="relative flex-1 min-w-0 h-full overflow-hidden bg-[#000000]">
             <iframe
               title={`TradingView ${resolvedTvSymbol}`}
               className="w-full h-full border-0"
@@ -1263,7 +1263,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                 resolvedTvSymbol || 'BINANCE:BTCUSDT'
               )}&interval=${encodeURIComponent(
                 TV_INTERVAL_MAP[timeframe] || '15'
-              )}&hidesidetoolbar=0&symboledit=0&saveimage=1&toolbarbg=0A1019&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies=[]&locale=en`}
+              )}&hidesidetoolbar=0&symboledit=0&saveimage=1&toolbarbg=000000&theme=dark&style=1&timezone=Etc%2FUTC&withdateranges=1&showpopupbutton=1&studies=[]&locale=en`}
             />
           </div>
         )}

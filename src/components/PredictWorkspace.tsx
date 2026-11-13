@@ -551,31 +551,31 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
   );
 
   return (
-    <div className="max-w-[1440px] mx-auto px-3 sm:px-6 pt-3 pb-10 space-y-4">
+    <div className="max-w-[1440px] mx-auto px-3 sm:px-6 pt-4 pb-10 space-y-4 animate-panel-in">
       {/* Top Market & Expiry Strip */}
-      <div className="panel-carbon rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 border border-white/[0.1]">
+      <div className="bg-[#06070A] rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 border border-[#1B1F27]">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/40 flex items-center justify-center">
-              <Target className="w-4 h-4 text-[#18C8FF]" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#2B7FFF]/15 border border-[#2B7FFF]/45 flex items-center justify-center">
+              <Target className="w-4 h-4 text-[#60A5FA]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">BTC / USD Predict</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#00E599]/15 text-[#00E599] border border-[#00E599]/30">
+                <span className="text-sm font-bold text-white tracking-tight">BTC / USD Predict</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#08D189]/12 text-[#08D189] border border-[#08D189]/30">
                   DeepBook v3 Native
                 </span>
               </div>
               <div className="text-[11px] text-slate-400">
-                Pyth Lazer + Block-Scholes · Mainnet Entry Band 15%–50%
+                Pyth Lazer + Black-Scholes · Mainnet Entry Band 15%–50%
               </div>
             </div>
           </div>
 
-          <div className="h-7 w-px bg-white/10 hidden sm:block" />
+          <div className="h-7 w-px bg-[#1A1E26] hidden sm:block" />
 
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400">BTC Forward</span>
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">BTC Forward</span>
             <span className="text-base font-mono font-bold text-white tabular-nums">
               {forward > 0 ? `$${forward.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--'}
             </span>
@@ -594,13 +594,13 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                     strikeInitializedRef.current = '';
                     setSelectedMarketId(item.market.id);
                   }}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-mono border transition-all flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-all flex items-center gap-1.5 ${
                     isSelected
-                      ? 'bg-[#18C8FF]/15 border-[#18C8FF] text-white'
-                      : 'bg-[#0A1019] border-white/[0.08] text-slate-300 hover:border-white/25'
+                      ? 'bg-[#2B7FFF]/18 border-[#2B7FFF] text-white'
+                      : 'bg-[#000000] border-[#1A1E26] text-slate-400 hover:text-white hover:border-[#2B7FFF]/40'
                   }`}
                 >
-                  <Clock className="w-3 h-3 text-[#18C8FF]" />
+                  <Clock className="w-3 h-3 text-[#60A5FA]" />
                   <span className="font-semibold">{formatWindowLabel(item, nowMs)}</span>
                   <span className="text-[10px] text-slate-400 tabular-nums">
                     {formatCountdown(remMs)}
@@ -612,9 +612,9 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
         </div>
 
         {/* Account Balance & Refresh */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {account && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0A1019] border border-white/[0.1] text-xs font-mono">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#000000] border border-[#1A1E26] text-xs font-mono">
               <span className="text-slate-400">Predict Vault:</span>
               <span className="text-white font-semibold tabular-nums">
                 ${availableUsdc.toFixed(2)}
@@ -627,7 +627,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                   type="button"
                   disabled={isWithdrawing}
                   onClick={handleWithdrawAvailable}
-                  className="ml-1 px-2 py-0.5 rounded-lg bg-[#00E599]/15 border border-[#00E599]/35 text-[#00E599] hover:bg-[#00E599]/25 text-[11px] font-sans font-semibold inline-flex items-center gap-1"
+                  className="ml-1 px-2 py-0.5 rounded bg-[#08D189]/15 border border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/25 text-[11px] font-sans font-semibold inline-flex items-center gap-1"
                 >
                   {isWithdrawing ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -642,7 +642,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           <button
             type="button"
             onClick={() => setIsAiCopilotOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 text-xs font-bold transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2B7FFF]/12 border border-[#2B7FFF]/40 text-[#60A5FA] hover:bg-[#2B7FFF]/20 text-xs font-semibold transition-colors"
           >
             <Bot className="w-3.5 h-3.5" />
             <span>AI Copilot</span>
@@ -650,7 +650,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           <button
             type="button"
             onClick={loadBoard}
-            className="p-2 rounded-xl bg-[#0A1019] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#18C8FF]/50"
+            className="p-2 rounded-lg bg-[#000000] border border-[#1A1E26] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
             title="Refresh Predict markets"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingBoard ? 'animate-spin' : ''}`} />
@@ -662,7 +662,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {/* Left: Chart + Strike Probability Ladder + Open/Orders */}
         <div className="lg:col-span-8 space-y-4">
-          <div className="panel-carbon rounded-2xl overflow-hidden border border-white/[0.1]">
+          <div className="bg-[#000000] rounded-xl overflow-hidden border border-[#1B1F27]">
             <ProCandleChart
               symbolLabel="BTC/USD"
               sourceLabel="Pyth Forward + Binance Feed"
@@ -670,17 +670,17 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               timeframe={timeframe}
               onTimeframeChange={setTimeframe}
               isLoading={candlesLoading}
-              heightClass="h-[290px]"
+              heightClass="h-[310px]"
               livePrice={forward}
               tvSymbol="BINANCE:BTCUSDT"
             />
           </div>
 
           {/* Interactive Strike Odds Ladder */}
-          <div className="panel-carbon rounded-2xl p-4 border border-white/[0.1] space-y-3">
+          <div className="bg-[#06070A] rounded-xl p-4 border border-[#1B1F27] space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#18C8FF]" />
+                <Sparkles className="w-4 h-4 text-[#60A5FA]" />
                 <span className="text-sm font-bold text-white">
                   Live Option Strike Ladder
                 </span>
@@ -692,7 +692,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 <div className="text-[11px] font-mono text-slate-300 flex items-center gap-3">
                   <span>Pool Cash: ${selectedMarket.spareCashUsdc.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                   {selectedMarket.referencePrice && (
-                    <span className="text-[#18C8FF]">
+                    <span className="text-[#60A5FA]">
                       Anchor: ${selectedMarket.referencePrice.toLocaleString()}
                     </span>
                   )}
@@ -702,11 +702,11 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
 
             {isLoadingLadder && ladder.length === 0 ? (
               <div className="py-6 flex items-center justify-center text-xs text-slate-400 gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-[#18C8FF]" />
+                <Loader2 className="w-4 h-4 animate-spin text-[#60A5FA]" />
                 Loading live Black-Scholes strike probabilities...
               </div>
             ) : ladder.length === 0 ? (
-              <div className="py-5 text-center text-xs text-slate-400">
+              <div className="py-5 text-center text-xs text-slate-500">
                 No active Predict expiry markets returned right now. Wait a few seconds for the next window roll.
               </div>
             ) : (
@@ -716,10 +716,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                   return (
                     <div
                       key={row.strike}
-                      className={`rounded-xl p-2.5 border bg-[#0A1019] transition-all ${
+                      className={`rounded-lg p-2.5 border bg-[#000000] transition-all ${
                         isStrikeSelected
-                          ? 'border-[#18C8FF] shadow-[0_0_14px_rgba(24,200,255,0.12)]'
-                          : 'border-white/[0.08]'
+                          ? 'border-[#2B7FFF] bg-[#0B1528]/40'
+                          : 'border-[#1A1E26] hover:border-[#2B7FFF]/35'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
@@ -739,10 +739,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                             setSide('up');
                             setStrikeInput(String(row.strike));
                           }}
-                          className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-mono border transition-colors ${
+                          className={`px-2 py-1.5 rounded text-left text-[11px] font-mono border transition-colors ${
                             row.upInBand
-                              ? 'bg-[#00E599]/10 border-[#00E599]/35 text-[#00E599] hover:bg-[#00E599]/20'
-                              : 'bg-white/[0.02] border-white/[0.06] text-slate-500 hover:text-slate-300'
+                              ? 'bg-[#08D189]/12 border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/20'
+                              : 'bg-[#06070A] border-[#1A1E26] text-slate-500 hover:text-slate-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -758,10 +758,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                             setSide('down');
                             setStrikeInput(String(row.strike));
                           }}
-                          className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-mono border transition-colors ${
+                          className={`px-2 py-1.5 rounded text-left text-[11px] font-mono border transition-colors ${
                             row.downInBand
-                              ? 'bg-rose-500/10 border-rose-500/35 text-rose-300 hover:bg-rose-500/20'
-                              : 'bg-white/[0.02] border-white/[0.06] text-slate-500 hover:text-slate-300'
+                              ? 'bg-[#F0525E]/12 border-[#F0525E]/35 text-[#F0525E] hover:bg-[#F0525E]/20'
+                              : 'bg-[#06070A] border-[#1A1E26] text-slate-500 hover:text-slate-300'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -779,15 +779,15 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           </div>
 
           {/* Orders & Positions */}
-          <div className="panel-carbon rounded-2xl p-4 border border-white/[0.1] space-y-3">
-            <div className="flex items-center gap-2 border-b border-white/[0.08] pb-2.5">
+          <div className="bg-[#06070A] rounded-xl p-4 border border-[#1B1F27] space-y-3">
+            <div className="flex items-center gap-4 border-b border-[#1A1E26] pb-2">
               <button
                 type="button"
                 onClick={() => setBottomTab('orders')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`pb-1.5 text-xs font-semibold transition-colors border-b-2 -mb-[9px] ${
                   bottomTab === 'orders'
-                    ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'border-[#2B7FFF] text-white'
+                    : 'border-transparent text-slate-400 hover:text-white'
                 }`}
               >
                 Queued & Settled Orders ({board?.orderRecords.length || 0})
@@ -795,10 +795,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               <button
                 type="button"
                 onClick={() => setBottomTab('positions')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                className={`pb-1.5 text-xs font-semibold transition-colors border-b-2 -mb-[9px] ${
                   bottomTab === 'positions'
-                    ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'border-[#2B7FFF] text-white'
+                    : 'border-transparent text-slate-400 hover:text-white'
                 }`}
               >
                 Open Positions ({board?.positions.length || 0})
@@ -806,12 +806,12 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
             </div>
 
             {!account ? (
-              <div className="py-5 text-center text-xs text-slate-400">
+              <div className="py-5 text-center text-xs text-slate-500">
                 Connect your Sui wallet to view Predict orders, early-sell controls, and claimable USDC.
               </div>
             ) : bottomTab === 'orders' ? (
               (board?.orderRecords.length || 0) === 0 ? (
-                <div className="py-5 text-center text-xs text-slate-400">
+                <div className="py-5 text-center text-xs text-slate-500">
                   No recent DeepBook Predict orders found for this wallet.
                 </div>
               ) : (
@@ -840,16 +840,16 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                     return (
                       <div
                         key={`${rec.marketId}:${rec.recordId.toString()}`}
-                        className="rounded-xl bg-[#0A1019] border border-white/[0.08] px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"
+                        className="rounded-lg bg-[#000000] border border-[#1A1E26] px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"
                       >
                         <div className="flex items-center gap-2.5">
                           <span
-                            className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                            className={`px-2 py-0.5 rounded font-bold text-[10px] ${
                               rec.sideLabel === 'UP'
-                                ? 'bg-[#00E599]/15 text-[#00E599]'
+                                ? 'bg-[#08D189]/15 text-[#08D189]'
                                 : rec.sideLabel === 'DOWN'
-                                  ? 'bg-rose-500/15 text-rose-300'
-                                  : 'bg-[#18C8FF]/15 text-[#18C8FF]'
+                                  ? 'bg-[#F0525E]/15 text-[#F0525E]'
+                                  : 'bg-[#2B7FFF]/15 text-[#60A5FA]'
                             }`}
                           >
                             {rec.sideLabel}
@@ -871,7 +871,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                               type="button"
                               disabled={busyRecordKey === sellKey}
                               onClick={() => handleRecordAction(rec, 'sell')}
-                              className="px-2.5 py-1 rounded-lg bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#18C8FF] hover:bg-[#18C8FF]/25 font-semibold inline-flex items-center gap-1"
+                              className="px-2.5 py-1 rounded bg-[#2B7FFF]/15 border border-[#2B7FFF]/45 text-[#60A5FA] hover:bg-[#2B7FFF]/25 font-semibold inline-flex items-center gap-1"
                             >
                               {busyRecordKey === sellKey && <Loader2 className="w-3 h-3 animate-spin" />}
                               Early Sell
@@ -882,7 +882,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                               type="button"
                               disabled={busyRecordKey === parkedKey}
                               onClick={() => handleRecordAction(rec, 'parked')}
-                              className="px-2.5 py-1 rounded-lg bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 font-semibold inline-flex items-center gap-1"
+                              className="px-2.5 py-1 rounded bg-[#08D189]/15 border border-[#08D189]/40 text-[#08D189] hover:bg-[#08D189]/25 font-semibold inline-flex items-center gap-1"
                             >
                               {busyRecordKey === parkedKey && <Loader2 className="w-3 h-3 animate-spin" />}
                               Claim Parked
@@ -893,7 +893,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                               type="button"
                               disabled={busyRecordKey === refundKey}
                               onClick={() => handleRecordAction(rec, 'refund')}
-                              className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 hover:bg-amber-500/25 font-semibold inline-flex items-center gap-1"
+                              className="px-2.5 py-1 rounded bg-amber-500/15 border border-amber-400/40 text-amber-200 hover:bg-amber-500/25 font-semibold inline-flex items-center gap-1"
                             >
                               {busyRecordKey === refundKey && <Loader2 className="w-3 h-3 animate-spin" />}
                               Refund
@@ -906,7 +906,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 </div>
               )
             ) : (board?.positions.length || 0) === 0 ? (
-              <div className="py-5 text-center text-xs text-slate-400">
+              <div className="py-5 text-center text-xs text-slate-500">
                 No active open options held in your Predict account.
               </div>
             ) : (
@@ -914,12 +914,12 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 {board!.positions.map((pos) => (
                   <div
                     key={`${pos.marketId}:${pos.orderId.toString()}`}
-                    className="rounded-xl bg-[#0A1019] border border-white/[0.08] px-3 py-2 flex items-center justify-between text-xs font-mono"
+                    className="rounded-lg bg-[#000000] border border-[#1A1E26] px-3 py-2 flex items-center justify-between text-xs font-mono"
                   >
                     <span className="text-slate-300">
                       Market {pos.marketId.slice(0, 8)}...{pos.marketId.slice(-6)}
                     </span>
-                    <span className="text-[#00E599]">Order #{pos.orderId.toString()}</span>
+                    <span className="text-[#08D189]">Order #{pos.orderId.toString()}</span>
                   </div>
                 ))}
               </div>
@@ -928,23 +928,23 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
         </div>
 
         {/* Right: Order Ticket */}
-        <div className="lg:col-span-4 panel-carbon rounded-2xl p-4 border border-white/[0.1] space-y-4">
+        <div className="lg:col-span-4 bg-[#06070A] rounded-xl p-4 border border-[#1B1F27] space-y-3.5 lg:sticky lg:top-16">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-white">Place Binary Option</span>
+            <span className="text-sm font-bold text-white tracking-tight">Place Binary Option</span>
             <span className="text-[11px] font-mono text-slate-400">
               Wallet: {walletUsdc.toFixed(2)} USDC
             </span>
           </div>
 
           {/* Direction Selector */}
-          <div className="grid grid-cols-3 gap-1.5 bg-[#0A1019] p-1 rounded-xl border border-white/[0.08]">
+          <div className="grid grid-cols-3 gap-1 bg-[#000000] p-1 rounded-lg border border-[#1A1E26]">
             <button
               type="button"
               onClick={() => setSide('up')}
-              className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
+              className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 transition-all border ${
                 side === 'up'
-                  ? 'bg-[#00E599] text-[#05120D]'
-                  : 'text-slate-300 hover:text-white'
+                  ? 'bg-[#08D189]/18 border-[#08D189]/50 text-[#08D189]'
+                  : 'border-transparent text-slate-400 hover:text-white'
               }`}
             >
               <TrendingUp className="w-3.5 h-3.5" />
@@ -953,10 +953,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
             <button
               type="button"
               onClick={() => setSide('down')}
-              className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
+              className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 transition-all border ${
                 side === 'down'
-                  ? 'bg-rose-500 text-white'
-                  : 'text-slate-300 hover:text-white'
+                  ? 'bg-[#F0525E]/18 border-[#F0525E]/50 text-[#F0525E]'
+                  : 'border-transparent text-slate-400 hover:text-white'
               }`}
             >
               <TrendingDown className="w-3.5 h-3.5" />
@@ -965,10 +965,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
             <button
               type="button"
               onClick={() => setSide('range')}
-              className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
+              className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 transition-all border ${
                 side === 'range'
-                  ? 'bg-[#18C8FF] text-[#04111A]'
-                  : 'text-slate-300 hover:text-white'
+                  ? 'bg-[#2B7FFF]/18 border-[#2B7FFF]/50 text-[#60A5FA]'
+                  : 'border-transparent text-slate-400 hover:text-white'
               }`}
             >
               RANGE
@@ -977,7 +977,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
 
           {/* Strike Input(s) */}
           {side !== 'range' ? (
-            <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-3 space-y-2">
+            <div className="rounded-lg bg-[#000000] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 p-3 space-y-2 transition-colors">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-400">
                   Target Strike ({side === 'up' ? 'BTC finishes >' : 'BTC finishes <='})
@@ -985,7 +985,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={handleBestOtmStrike}
-                  className="text-[#18C8FF] hover:underline font-semibold"
+                  className="text-[#60A5FA] hover:underline font-semibold"
                 >
                   Best OTM (~2.4x)
                 </button>
@@ -994,7 +994,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => handleStepStrike(-1)}
-                  className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:text-white text-xs font-mono"
+                  className="px-2.5 py-1.5 rounded bg-[#0C0E13] border border-[#1A1E26] text-slate-300 hover:text-white text-xs font-mono"
                 >
                   -
                 </button>
@@ -1008,7 +1008,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => handleStepStrike(1)}
-                  className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:text-white text-xs font-mono"
+                  className="px-2.5 py-1.5 rounded bg-[#0C0E13] border border-[#1A1E26] text-slate-300 hover:text-white text-xs font-mono"
                 >
                   +
                 </button>
@@ -1016,7 +1016,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-2.5 space-y-1">
+              <div className="rounded-lg bg-[#000000] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 p-2.5 space-y-1">
                 <span className="text-[11px] text-slate-400">Lower Strike ($)</span>
                 <input
                   type="number"
@@ -1025,7 +1025,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                   className="w-full bg-transparent text-white font-mono font-bold text-sm focus:outline-none"
                 />
               </div>
-              <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-2.5 space-y-1">
+              <div className="rounded-lg bg-[#000000] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 p-2.5 space-y-1">
                 <span className="text-[11px] text-slate-400">Upper Strike ($)</span>
                 <input
                   type="number"
@@ -1038,10 +1038,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           )}
 
           {/* Budget Amount */}
-          <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-3 space-y-2.5">
+          <div className="rounded-lg bg-[#000000] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 p-3 space-y-2 transition-colors">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400">Budget (USDC)</span>
-              <span className="text-slate-300 font-mono">
+              <span className="text-slate-400 font-mono">
                 Min ${PREDICT_ORDER_USD_MIN.toFixed(2)}
               </span>
             </div>
@@ -1054,16 +1054,16 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               className="w-full bg-transparent text-white font-mono font-bold text-xl focus:outline-none tabular-nums"
               placeholder="2.00"
             />
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-5 gap-1">
               {['1.5', '2', '5', '10', '25'].map((v) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setAmountInput(v)}
-                  className={`py-1 rounded-lg text-[11px] font-mono border transition-colors ${
+                  className={`py-1 rounded text-[11px] font-mono border transition-colors ${
                     amountInput === v
-                      ? 'bg-[#18C8FF]/15 border-[#18C8FF]/50 text-[#18C8FF]'
-                      : 'bg-white/[0.03] border-white/[0.08] text-slate-300 hover:border-white/25'
+                      ? 'bg-[#2B7FFF]/18 border-[#2B7FFF]/50 text-[#60A5FA] font-semibold'
+                      : 'bg-[#0C0E13] border-[#1A1E26] text-slate-400 hover:text-white'
                   }`}
                 >
                   ${v}
@@ -1073,7 +1073,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           </div>
 
           {/* Slippage Toggle */}
-          <div className="flex items-center justify-between text-xs px-1">
+          <div className="flex items-center justify-between text-xs px-0.5">
             <span className="text-slate-400">Fill Slippage Guard</span>
             <div className="flex items-center gap-1">
               {(['auto', 2, 5] as const).map((s) => (
@@ -1081,10 +1081,10 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                   key={String(s)}
                   type="button"
                   onClick={() => setSlippageCents(s)}
-                  className={`px-2 py-0.5 rounded-md font-mono text-[11px] border ${
+                  className={`px-2 py-0.5 rounded font-mono text-[11px] border ${
                     slippageCents === s
-                      ? 'bg-[#18C8FF]/15 border-[#18C8FF]/50 text-[#18C8FF]'
-                      : 'border-white/[0.08] text-slate-400 hover:text-white'
+                      ? 'bg-[#2B7FFF]/18 border-[#2B7FFF]/50 text-[#60A5FA]'
+                      : 'border-[#1A1E26] text-slate-400 hover:text-white'
                   }`}
                 >
                   {s === 'auto' ? 'Auto' : `${s}c`}
@@ -1094,7 +1094,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           </div>
 
           {/* Live Quote Details */}
-          <div className="rounded-xl bg-[#0A1019] border border-white/[0.08] p-3 space-y-2 text-xs">
+          <div className="rounded-lg bg-[#000000] border border-[#1A1E26] p-3 space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Implied Odds / Contract</span>
               <span className="font-mono font-semibold text-white">
@@ -1107,7 +1107,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Potential Win Payout</span>
-              <span className="font-mono font-bold text-[#00E599]">
+              <span className="font-mono font-bold text-[#08D189]">
                 {quotePlan
                   ? `$${quotePlan.potentialPayout.toFixed(2)} (${quotePlan.payoutMultiple.toFixed(2)}x)`
                   : '--'}
@@ -1125,23 +1125,23 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 ${(quotePlan?.orderFee ?? 0.02).toFixed(2)} USDC
               </span>
             </div>
-            <div className="flex items-center justify-between pt-1 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between pt-1.5 border-t border-[#1A1E26]">
               <span className="text-slate-400">Wallet Shortfall (1-Tx Deposit)</span>
-              <span className="font-mono text-[#18C8FF]">
+              <span className="font-mono text-[#60A5FA]">
                 {shortfallUsd > 0 ? `$${shortfallUsd.toFixed(2)} USDC` : '$0.00 (Covered by Vault)'}
               </span>
             </div>
           </div>
 
           {quoteError && (
-            <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-[11px] text-rose-200 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+            <div className="rounded-lg bg-[#F0525E]/10 border border-[#F0525E]/35 px-3 py-2 text-[11px] text-[#F0525E] flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#F0525E]" />
               <span>{quoteError}</span>
             </div>
           )}
 
           {!quoteError && quotePlan && !quotePlan.accepting && !isVaultFundingOnly && (
-            <div className="rounded-xl bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
+            <div className="rounded-lg bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
               <span>
                 Refused ({quotePlan.refusal || 'limits'}): Mainnet Predict admits strikes inside the 15%–50% probability band with min $1.00 premium.
@@ -1150,7 +1150,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           )}
 
           {!quoteError && account && canSubmitPredict && shortfallUsd > walletUsdc + 0.0001 && (
-            <div className="rounded-xl bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
+            <div className="rounded-lg bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
               <span>
                 Insufficient wallet USDC: need ${shortfallUsd.toFixed(2)} USDC for this 1-tx deposit (wallet holds ${walletUsdc.toFixed(2)} USDC).
@@ -1166,12 +1166,12 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               (Boolean(account) && (!canSubmitPredict || shortfallUsd > walletUsdc + 0.0001))
             }
             onClick={handlePlaceBet}
-            className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            className={`w-full py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
               side === 'up'
-                ? 'bg-[#00E599] text-[#05120D] hover:brightness-110'
+                ? 'bg-[#08D189] hover:bg-[#0DE295] text-[#05120D]'
                 : side === 'down'
-                  ? 'bg-rose-500 text-white hover:brightness-110'
-                  : 'bg-[#18C8FF] text-[#04111A] hover:brightness-110'
+                  ? 'bg-[#F0525E] hover:bg-[#FF6370] text-white'
+                  : 'btn-deepbook'
             } disabled:opacity-45 disabled:cursor-not-allowed`}
           >
             {isSubmitting ? (
@@ -1205,9 +1205,9 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           />
 
           {/* Native Monetization Status */}
-          <div className="rounded-xl bg-[#0A1019]/80 border border-white/[0.06] px-3 py-2 text-[11px] text-slate-400 flex items-center justify-between">
+          <div className="rounded-lg bg-[#000000] border border-[#1A1E26] px-3 py-2 text-[11px] text-slate-400 flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#00E599]" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#08D189]" />
               {board?.protocol.builderFeeCutoverActive && board?.protocol.builderCodeExists
                 ? `Volt BuilderCode Active (${PREDICT_BUILDER_FEE_PCT}%)`
                 : board?.protocol.referrerWrapperExists

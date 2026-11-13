@@ -109,22 +109,22 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen text-slate-100 flex flex-col">
-      {/* Top Volt Obsidian Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#090E16]/92 backdrop-blur-md">
-        <div className="w-full mx-auto px-3 sm:px-5 lg:px-6 h-16 flex items-center justify-between gap-4">
-          {/* Brand */}
-          <div className="flex items-center gap-7">
+    <div className="min-h-screen bg-[#000000] text-slate-100 flex flex-col">
+      {/* Top Institutional DeepBook-Style Navigation Bar */}
+      <header className="sticky top-0 z-40 border-b border-[#1A1E26] bg-[#000000]/95 backdrop-blur-md">
+        <div className="w-full mx-auto px-3 sm:px-5 h-[52px] flex items-center justify-between gap-4">
+          {/* Left: Brand */}
+          <div className="flex items-center gap-6 h-full">
             <button
               type="button"
               onClick={() => setActiveTab('swap')}
-              className="flex items-center text-left hover:opacity-95 transition-opacity"
+              className="flex items-center text-left hover:opacity-90 transition-opacity shrink-0"
             >
-              <VoltLogo className="w-9 h-9" showWordmark subtitle="SUI PRO" />
+              <VoltLogo className="w-7 h-7" showWordmark subtitle="PRO" />
             </button>
 
-            {/* Primary Nav */}
-            <nav className="hidden md:flex items-center gap-1.5">
+            {/* Primary Institutional Nav */}
+            <nav className="hidden md:flex items-center gap-1 h-full">
               {navItems.map((item) => {
                 const active = activeTab === item.id;
                 return (
@@ -132,13 +132,13 @@ export function App() {
                     key={item.id}
                     type="button"
                     onClick={() => setActiveTab(item.id)}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
+                    className={`relative h-full px-3.5 text-[13px] font-semibold flex items-center gap-1.5 transition-colors border-b-2 ${
                       active
-                        ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40 shadow-[0_0_20px_rgba(24, 200, 255,0.14)]'
-                        : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
+                        ? 'text-white border-[#2B7FFF]'
+                        : 'text-[#848E9C] hover:text-white border-transparent'
                     }`}
                   >
-                    {item.icon}
+                    <span className={active ? 'text-[#2B7FFF]' : 'text-[#6B7280]'}>{item.icon}</span>
                     <span>{item.label}</span>
                   </button>
                 );
@@ -146,15 +146,19 @@ export function App() {
             </nav>
           </div>
 
-          {/* Right Wallet & Portfolio Controls */}
-          <div className="flex items-center gap-2.5">
+          {/* Right: Network Status, Portfolio Drawer & Wallet */}
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#090B0E] border border-[#1B1F27] text-[11px] font-mono text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-live-dot" />
+              <span>Mainnet</span>
+            </div>
             {account && (
               <button
                 type="button"
                 onClick={() => setPortfolioOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-[#101722] hover:bg-[#171B22] border border-white/[0.12] text-sm font-semibold text-white inline-flex items-center gap-2 transition-colors"
+                className="px-3 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#1E232E] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
               >
-                <Wallet className="w-4 h-4 text-[#18C8FF]" />
+                <Wallet className="w-3.5 h-3.5 text-[#2B7FFF]" />
                 <span className="hidden sm:inline">Portfolio</span>
               </button>
             )}
@@ -163,7 +167,7 @@ export function App() {
         </div>
 
         {/* Mobile Tab Strip */}
-        <div className="md:hidden border-t border-white/[0.08] px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="md:hidden border-t border-[#1A1E26] px-2.5 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar bg-[#050608]">
           {navItems.map((item) => {
             const active = activeTab === item.id;
             return (
@@ -171,10 +175,10 @@ export function App() {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors ${
                   active
-                    ? 'bg-[#18C8FF]/20 text-[#18C8FF] border border-[#18C8FF]/40'
-                    : 'text-slate-300 border border-transparent'
+                    ? 'bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/40'
+                    : 'text-[#848E9C] border border-transparent'
                 }`}
               >
                 {item.icon}
@@ -185,8 +189,14 @@ export function App() {
         </div>
       </header>
 
-      {/* Main Widescreen Workspace */}
-      <main className="flex-1 w-full mx-auto px-3 sm:px-5 lg:px-6 py-4">
+      {/* Main Workspace */}
+      <main
+        className={`flex-1 w-full flex flex-col ${
+          activeTab === 'swap' || activeTab === 'perps'
+            ? ''
+            : 'max-w-[1440px] mx-auto px-3 sm:px-6 py-4'
+        }`}
+      >
         {activeTab === 'swap' && (
           <SwapWorkspace
             onNotify={notify}
@@ -228,30 +238,30 @@ export function App() {
         )}
       </main>
 
-      {/* Minimal Cetus Footer */}
-      <footer className="border-t border-white/[0.08] py-3.5 px-4 sm:px-6 text-xs font-mono text-slate-400">
+      {/* Clean Institutional Footer */}
+      <footer className="border-t border-[#1A1E26] bg-[#000000] py-2.5 px-4 sm:px-5 text-[11px] font-mono text-[#7B8494]">
         <div className="w-full mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <span className="text-white font-semibold">Volt Protocol</span>
             <span>Cetus Aggregator · DeepBook v3 CLOB &amp; Margin · Aftermath Perps</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#18C8FF]" />
-            <span className="text-slate-200">Non-custodial Sui Move Execution</span>
+            <Sparkles className="w-3 h-3 text-[#2B7FFF]" />
+            <span className="text-slate-300">Non-custodial Sui Move Execution</span>
           </div>
         </div>
       </footer>
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] panel-carbon rounded-2xl p-4 shadow-2xl border border-[#18C8FF]/25 animate-slide-up">
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] bg-[#090B10] rounded-lg p-4 shadow-2xl border border-[#2B7FFF]/35 animate-slide-up">
           <div className="flex items-start gap-3">
             {toast.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-[#00E599] shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-[#08D189] shrink-0 mt-0.5" />
             ) : toast.type === 'error' ? (
-              <AlertCircle className="w-5 h-5 text-[#FF4D6A] shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[#F0525E] shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-[#18C8FF] shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[#2B7FFF] shrink-0 mt-0.5" />
             )}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold text-white">{toast.title}</div>
@@ -261,7 +271,7 @@ export function App() {
                   href={toast.actionUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-mono text-[#18C8FF] hover:underline mt-1.5"
+                  className="inline-flex items-center gap-1 text-xs font-mono text-[#60A5FA] hover:underline mt-1.5"
                 >
                   <span>{toast.actionLabel}</span>
                   <ExternalLink className="w-3.5 h-3.5" />

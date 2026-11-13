@@ -147,20 +147,20 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
 
   return (
     <div
-      className={`rounded-xl border px-3 py-2.5 text-xs transition-colors ${
+      className={`rounded-lg border px-3 py-2.5 text-xs transition-colors ${
         isActive
-          ? 'bg-[#00E599]/10 border-[#00E599]/35'
-          : 'bg-[#0A1019] border-white/[0.08]'
+          ? 'bg-[#08D189]/10 border-[#08D189]/35'
+          : 'bg-[#000000] border-[#1A1E26]'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <KeyRound className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#00E599]' : 'text-[#18C8FF]'}`} />
+          <KeyRound className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-[#08D189]' : 'text-[#60A5FA]'}`} />
           <div className="min-w-0">
             <div className="font-semibold text-white truncate">
               {isActive ? '1-Click Session Active' : '1-Click Trading Session'}
             </div>
-            <div className="text-[10px] font-mono text-slate-400">
+            <div className="text-[10px] font-mono text-[#6B7280]">
               {isActive
                 ? `${minsRemaining >= 60 ? `${Math.floor(minsRemaining / 60)}h ${minsRemaining % 60}m` : `${minsRemaining}m`} left · ${sessionStatus?.sessionGasSui.toFixed(3)} SUI gas`
                 : 'Sign once to bet without wallet popups'}
@@ -171,10 +171,10 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 border ${
+          className={`px-2.5 py-1 rounded text-[11px] font-semibold inline-flex items-center gap-1 border transition-colors ${
             isActive
-              ? 'border-[#00E599]/35 bg-[#00E599]/15 text-[#00E599]'
-              : 'border-[#18C8FF]/35 bg-[#18C8FF]/15 text-[#9CE7FF]'
+              ? 'border-[#08D189]/35 bg-[#08D189]/15 text-[#08D189]'
+              : 'border-[#2B7FFF]/35 bg-[#2B7FFF]/15 text-[#60A5FA]'
           }`}
         >
           <span>{isActive ? 'Manage' : 'Enable'}</span>
@@ -183,19 +183,19 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
       </div>
 
       {expanded && (
-        <div className="mt-2.5 pt-2.5 border-t border-white/[0.08] space-y-2.5">
+        <div className="mt-2.5 pt-2.5 border-t border-[#1A1E26] space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-slate-300">Session Window</span>
-            <div className="inline-flex rounded-lg p-0.5 bg-[#060B12] border border-white/[0.08]">
+            <span className="text-[11px] text-[#9CA3AF]">Session Window</span>
+            <div className="inline-flex rounded-lg p-0.5 bg-[#000000] border border-[#1A1E26]">
               {DURATION_OPTIONS.map((opt) => (
                 <button
                   key={opt.label}
                   type="button"
                   onClick={() => setDurationMs(opt.ms)}
-                  className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold ${
+                  className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold transition-colors ${
                     durationMs === opt.ms
-                      ? 'bg-[#18C8FF]/20 text-[#9CE7FF]'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-[#2B7FFF]/20 text-[#60A5FA]'
+                      : 'text-[#6B7280] hover:text-white'
                   }`}
                 >
                   {opt.label}
@@ -205,18 +205,18 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
           </div>
 
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-slate-300">Vault USDC Top-Up</span>
+            <span className="text-[11px] text-[#9CA3AF]">Vault USDC Top-Up</span>
             <input
               type="number"
               min="0"
               step="1"
               value={depositInput}
               onChange={(e) => setDepositInput(e.target.value)}
-              className="w-24 px-2 py-1 rounded-lg bg-[#060B12] border border-white/[0.1] text-right text-xs font-mono text-white outline-none focus:border-[#18C8FF]"
+              className="w-24 px-2 py-1 rounded-lg bg-[#000000] border border-[#1A1E26] text-right text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
             />
           </div>
 
-          <div className="text-[10px] text-slate-400 leading-relaxed">
+          <div className="text-[10px] text-[#6B7280] leading-relaxed">
             Ephemeral Ed25519 key stays strictly inside your browser; DeepBook Sessions{' '}
             <span className="text-slate-200 font-semibold">cannot withdraw funds</span> and
             auto-expires on-chain.
@@ -228,7 +228,7 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
               type="button"
               disabled={isBusy || !protocol}
               onClick={handleAuthorize}
-              className="flex-1 py-1.5 px-3 rounded-lg bg-[#18C8FF] hover:bg-[#3BD1FF] text-[#050A12] font-bold text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+              className="flex-1 py-1.5 px-3 rounded-lg btn-deepbook text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
               <span>{isActive ? 'Extend / Top-Up' : 'Authorize 1-Click'}</span>
@@ -238,7 +238,7 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
                 type="button"
                 disabled={isBusy}
                 onClick={handleRevoke}
-                className="py-1.5 px-2.5 rounded-lg bg-rose-500/15 border border-rose-400/35 text-rose-300 hover:bg-rose-500/25 font-semibold text-xs inline-flex items-center gap-1 disabled:opacity-50"
+                className="py-1.5 px-2.5 rounded-lg bg-[#F0525E]/15 border border-[#F0525E]/35 text-[#F0525E] hover:bg-[#F0525E]/25 font-semibold text-xs inline-flex items-center gap-1 disabled:opacity-50 transition-colors"
               >
                 <ShieldOff className="w-3.5 h-3.5" />
                 <span>Revoke</span>

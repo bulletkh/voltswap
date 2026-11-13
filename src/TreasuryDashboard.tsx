@@ -374,29 +374,26 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-8 space-y-7 animate-fade-in text-white font-sans">
-      {/* Hero Treasury Card */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#121622] via-[#0d1019] to-[#080a10] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-volt/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-volt/15 border border-volt/30 text-[#18C8FF] font-mono text-xs font-bold uppercase tracking-wider">
+    <div className="w-full max-w-7xl mx-auto px-4 py-7 space-y-5 animate-panel-in text-white font-sans">
+      {/* Hero Treasury Panel */}
+      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl overflow-hidden">
+        <div className="p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 border-b border-[#1A1E26]">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#2B7FFF]/12 border border-[#2B7FFF]/35 text-[#60A5FA] font-mono text-[11px] font-bold uppercase tracking-wider">
               <ShieldCheck className="w-3.5 h-3.5" />
               Real-Time Protocol Treasury · Zero Simulations
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
               Volt Protocol Treasury
             </h1>
-            <p className="text-sm text-gray-400 max-w-2xl font-sans">
+            <p className="text-xs sm:text-sm text-slate-400 max-w-2xl">
               Transparent on-chain accounting of VoltSwap protocol reserves and verified routing fees on the Sui blockchain. All metrics are sourced directly from on-chain smart contracts without simulations.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-mono font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="flex items-center gap-2.5">
+            <div className="px-3 py-1.5 rounded-lg bg-[#08D189]/10 border border-[#08D189]/30 text-[#08D189] text-xs font-mono font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#08D189] animate-live-dot" />
               Live Mainnet RPC
             </div>
 
@@ -406,149 +403,147 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                 playClickSound();
               }}
               disabled={isRefreshing}
-              className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
+              className="p-2 rounded-lg bg-[#000000] hover:bg-[#0C0E13] border border-[#1A1E26] text-slate-300 hover:text-white hover:border-[#2B7FFF]/50 transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
               title="Refresh Live Balances & Ledger"
             >
-              <RefreshCw className={`w-4 h-4 text-[#18C8FF] ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 text-[#60A5FA] ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* Real Metrics Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+        {/* Joined Real Metrics Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#1A1E26] bg-[#000000]">
           {/* Card 1: Live Vault Net Worth */}
-          <div className="bg-[#151926]/80 border border-white/5 rounded-2xl p-4.5 space-y-1">
-            <div className="text-gray-400 text-xs font-mono uppercase flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5 text-[#18C8FF]" /> Live Treasury Net Worth
+          <div className="p-5 space-y-1">
+            <div className="text-slate-400 text-[11px] font-mono uppercase flex items-center gap-1.5">
+              <Wallet className="w-3.5 h-3.5 text-[#60A5FA]" /> Live Treasury Net Worth
             </div>
-            <div className="text-2xl font-black text-white font-mono flex items-center gap-2">
+            <div className="text-2xl font-bold text-white font-mono tabular-nums flex items-center gap-2">
               {isLoadingBalance ? (
-                <span className="text-gray-500 animate-pulse">Querying RPC...</span>
+                <span className="text-slate-500 animate-pulse">Querying RPC...</span>
               ) : (
                 `$${netWorthUsd.toFixed(3)} USD`
               )}
             </div>
-            <div className="text-xs text-[#18C8FF] font-mono flex items-center gap-1.5">
+            <div className="text-xs text-[#60A5FA] font-mono flex items-center gap-1.5">
               <span>≈ {netWorthSui.toFixed(3)} SUI</span>
-              <span className="text-gray-500">•</span>
-              <span className="text-gray-400">100% On-Chain</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-400">100% On-Chain</span>
             </div>
           </div>
 
           {/* Card 2: Real Collected Protocol Revenue */}
-          <div className="bg-[#151926]/80 border border-white/5 rounded-2xl p-4.5 space-y-1">
-            <div className="text-gray-400 text-xs font-mono uppercase flex items-center gap-1.5">
-              <Coins className="w-3.5 h-3.5 text-emerald-400" /> Total Fees Earned (USD)
+          <div className="p-5 space-y-1">
+            <div className="text-slate-400 text-[11px] font-mono uppercase flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-[#08D189]" /> Total Fees Earned (USD)
             </div>
-            <div className="text-2xl font-black text-emerald-400 font-mono">
+            <div className="text-2xl font-bold text-[#08D189] font-mono tabular-nums">
               ${totalFeesEarnedUsd.toFixed(4)}
             </div>
-            <div className="text-xs text-gray-400 font-mono flex items-center gap-1">
-              <span className="text-emerald-400 font-bold">100% Real</span> On-Chain Revenue
+            <div className="text-xs text-slate-400 font-mono flex items-center gap-1">
+              <span className="text-[#08D189] font-bold">100% Real</span> On-Chain Revenue
             </div>
           </div>
 
           {/* Card 3: Real DEX & Perps Volume Processed */}
-          <div className="bg-[#151926]/80 border border-white/5 rounded-2xl p-4.5 space-y-1">
-            <div className="text-gray-400 text-xs font-mono uppercase flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-cyan-400" /> Verified Total Volume
+          <div className="p-5 space-y-1">
+            <div className="text-slate-400 text-[11px] font-mono uppercase flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-[#60A5FA]" /> Verified Total Volume
             </div>
-            <div className="text-2xl font-black text-white font-mono">
+            <div className="text-2xl font-bold text-white font-mono tabular-nums">
               ${totalVolumeUsd.toFixed(2)} USD
             </div>
-            <div className="text-xs text-gray-400 font-mono">
+            <div className="text-xs text-slate-400 font-mono">
               {recordedSwaps.length} Executed Transactions
             </div>
           </div>
 
           {/* Card 4: Live Oracle Price */}
-          <div className="bg-[#151926]/80 border border-white/5 rounded-2xl p-4.5 space-y-1">
-            <div className="text-gray-400 text-xs font-mono uppercase flex items-center gap-1.5">
+          <div className="p-5 space-y-1">
+            <div className="text-slate-400 text-[11px] font-mono uppercase flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-amber-400" /> SUI Oracle Index
             </div>
-            <div className="text-2xl font-black text-white font-mono">
+            <div className="text-2xl font-bold text-white font-mono tabular-nums">
               ${suiPriceUsd.toFixed(4)}
             </div>
-            <div className="text-xs text-emerald-400 font-mono">
+            <div className="text-xs text-[#08D189] font-mono">
               Live Binance WebSocket Sync
             </div>
           </div>
         </div>
 
         {/* Live Multi-Coin Vault Holdings Strip */}
-        <div className="mt-6 pt-5 border-t border-white/5">
-          <div className="text-xs font-mono text-gray-400 mb-3 flex items-center justify-between">
+        <div className="p-5 border-t border-[#1A1E26] bg-[#06070A]">
+          <div className="text-xs font-mono text-slate-400 mb-3 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-[#18C8FF]" />
+              <Layers className="w-3.5 h-3.5 text-[#60A5FA]" />
               On-Chain Protocol Vault Holdings:
             </span>
-            <span className="text-gray-500 text-xs">Synced via Suiscan & Sui GraphQL</span>
+            <span className="text-slate-500 text-xs">Synced via Suiscan &amp; Sui GraphQL</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#0A1019] border border-white/5 rounded-xl p-3 font-mono">
-              <div className="text-xs text-gray-400 flex items-center justify-between">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+              <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>SUI</span>
-                <span className="text-[#18C8FF] font-bold">${(treasurySuiBalance * suiPriceUsd).toFixed(2)}</span>
+                <span className="text-[#60A5FA] font-bold">${(treasurySuiBalance * suiPriceUsd).toFixed(2)}</span>
               </div>
-              <div className="text-sm font-bold text-white mt-1">
+              <div className="text-sm font-bold text-white mt-1 tabular-nums">
                 {treasurySuiBalance.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SUI
               </div>
             </div>
 
-            <div className="bg-[#0A1019] border border-white/5 rounded-xl p-3 font-mono">
-              <div className="text-xs text-gray-400 flex items-center justify-between">
+            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+              <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>USDC</span>
-                <span className="text-emerald-400 font-bold">${usdcBalance.toFixed(2)}</span>
+                <span className="text-[#08D189] font-bold">${usdcBalance.toFixed(2)}</span>
               </div>
-              <div className="text-sm font-bold text-white mt-1">
+              <div className="text-sm font-bold text-white mt-1 tabular-nums">
                 {usdcBalance.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} USDC
               </div>
             </div>
 
-            <div className="bg-[#0A1019] border border-white/5 rounded-xl p-3 font-mono">
-              <div className="text-xs text-gray-400 flex items-center justify-between">
+            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+              <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>VOLT Token</span>
-                <span className="text-cyan-400 font-bold">Genesis</span>
+                <span className="text-[#60A5FA] font-bold">Genesis</span>
               </div>
-              <div className="text-sm font-bold text-white mt-1">
+              <div className="text-sm font-bold text-white mt-1 tabular-nums">
                 100,000,000 VOLT
               </div>
             </div>
 
-            <div className="bg-[#0A1019] border border-white/5 rounded-xl p-3 font-mono">
-              <div className="text-xs text-gray-400 flex items-center justify-between">
+            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+              <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>HAEDAL</span>
                 <span className="text-purple-400 font-bold">Rewards</span>
               </div>
-              <div className="text-sm font-bold text-white mt-1">
+              <div className="text-sm font-bold text-white mt-1 tabular-nums">
                 {haedalBalance.toFixed(4)} HAEDAL
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Treasury Vault Address & Suiscan Link */}
-        <div className="mt-5 pt-4 border-t border-white/5 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400">Treasury Vault:</span>
-            <code className="bg-[#0A1019] px-2.5 py-1 rounded-lg text-[#18C8FF] border border-white/5 select-all">
-              {VOLT_TREASURY_ADDRESS}
-            </code>
-            <button
-              onClick={copyAddress}
-              className="p-1 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-              title="Copy Address"
-            >
-              {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-            </button>
-          </div>
+          {/* Treasury Vault Address & Suiscan Link */}
+          <div className="mt-4 pt-3.5 border-t border-[#1A1E26] flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">Treasury Vault:</span>
+              <code className="bg-[#000000] px-2.5 py-1 rounded text-[#60A5FA] border border-[#1A1E26] select-all">
+                {VOLT_TREASURY_ADDRESS}
+              </code>
+              <button
+                onClick={copyAddress}
+                className="p-1 rounded hover:bg-white/[0.06] text-slate-400 hover:text-white transition-colors cursor-pointer"
+                title="Copy Address"
+              >
+                {copied ? <CheckCircle2 className="w-4 h-4 text-[#08D189]" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
 
-          <div className="flex items-center gap-3">
             <a
               href={`https://suiscan.xyz/mainnet/account/${VOLT_TREASURY_ADDRESS}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-bold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[#60A5FA] hover:underline font-bold transition-colors cursor-pointer"
             >
               Suiscan Vault Explorer <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -556,93 +551,93 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
       </div>
 
-      {/* Stream Breakdown Cards (Authentic Data) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {/* Stream Breakdown Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Stream 1: Market DEX Swaps */}
-        <div className="bg-[#101722] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-volt/10 border border-volt/20 flex items-center justify-center text-[#18C8FF]">
-              <Zap className="w-5 h-5 fill-volt" />
+            <div className="w-9 h-9 rounded-lg bg-[#2B7FFF]/12 border border-[#2B7FFF]/35 flex items-center justify-center text-[#60A5FA]">
+              <Zap className="w-4 h-4" />
             </div>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/30">
+            <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-[#2B7FFF]/12 text-[#60A5FA] border border-[#2B7FFF]/30">
               0.03% - 0.25% VIP Fee
             </span>
           </div>
           <div>
-            <h3 className="font-bold text-base text-white">Market DEX Aggregator</h3>
-            <p className="text-xs text-gray-400 mt-1">
+            <h3 className="font-bold text-sm text-white">Market DEX Aggregator</h3>
+            <p className="text-xs text-slate-400 mt-1">
               Swap routing across Cetus CLMM and DeepBook v3 liquidity pools.
             </p>
           </div>
-          <div className="space-y-1.5 pt-3 border-t border-white/5 font-mono text-xs">
-            <div className="flex justify-between text-gray-400">
+          <div className="space-y-1.5 pt-3 border-t border-[#1A1E26] font-mono text-xs">
+            <div className="flex justify-between text-slate-400">
               <span>Swaps Executed:</span>
               <span className="font-bold text-white">{marketSwapsCount}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
+            <div className="flex justify-between text-slate-400">
               <span>Gateway Status:</span>
-              <span className="text-emerald-400 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active
+              <span className="text-[#08D189] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-live-dot" /> Active
               </span>
             </div>
           </div>
         </div>
 
-        {/* Stream 2: Bluefin Perps Clearing */}
-        <div className="bg-[#101722] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
+        {/* Stream 2: Aftermath Perps Clearing */}
+        <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-              <TrendingUp className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-lg bg-amber-500/12 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <TrendingUp className="w-4 h-4" />
             </div>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/25">
               0.05% Volume Fee
             </span>
           </div>
           <div>
-            <h3 className="font-bold text-base text-white">Bluefin Perps Clearing</h3>
-            <p className="text-xs text-gray-400 mt-1">
-              Perpetual margin trading up to 50x on Bluefin CLOB with protocol fee routing.
+            <h3 className="font-bold text-sm text-white">Perpetuals Clearing</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Perpetual margin trading on Sui orderbooks with non-custodial protocol fee routing.
             </p>
           </div>
-          <div className="space-y-1.5 pt-3 border-t border-white/5 font-mono text-xs">
-            <div className="flex justify-between text-gray-400">
+          <div className="space-y-1.5 pt-3 border-t border-[#1A1E26] font-mono text-xs">
+            <div className="flex justify-between text-slate-400">
               <span>Positions Opened:</span>
               <span className="font-bold text-white">{perpsCount}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
+            <div className="flex justify-between text-slate-400">
               <span>Gateway Status:</span>
-              <span className="text-emerald-400 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active
+              <span className="text-[#08D189] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-live-dot" /> Active
               </span>
             </div>
           </div>
         </div>
 
         {/* Stream 3: DeepBook Limit Orders */}
-        <div className="bg-[#101722] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-              <Target className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-lg bg-[#08D189]/12 border border-[#08D189]/30 flex items-center justify-center text-[#08D189]">
+              <Target className="w-4 h-4" />
             </div>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <span className="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-[#08D189]/10 text-[#08D189] border border-[#08D189]/25">
               0.00% Maker Fee
             </span>
           </div>
           <div>
-            <h3 className="font-bold text-base text-white">DeepBook v3 Limit CLOB</h3>
-            <p className="text-xs text-gray-400 mt-1">
+            <h3 className="font-bold text-sm text-white">DeepBook v3 Limit CLOB</h3>
+            <p className="text-xs text-slate-400 mt-1">
               On-chain central limit order book orders executed with zero slippage.
             </p>
           </div>
-          <div className="space-y-1.5 pt-3 border-t border-white/5 font-mono text-xs">
-            <div className="flex justify-between text-gray-400">
+          <div className="space-y-1.5 pt-3 border-t border-[#1A1E26] font-mono text-xs">
+            <div className="flex justify-between text-slate-400">
               <span>Orders Placed:</span>
               <span className="font-bold text-white">{limitSwapsCount}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
+            <div className="flex justify-between text-slate-400">
               <span>Gateway Status:</span>
-              <span className="text-emerald-400 font-bold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active
+              <span className="text-[#08D189] font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-live-dot" /> Active
               </span>
             </div>
           </div>
@@ -650,132 +645,132 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       </div>
 
       {/* REAL ON-CHAIN TRANSACTION LEDGER */}
-      <div className="bg-[#101722] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
+      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl overflow-hidden">
+        <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1A1E26] bg-[#000000]">
           <div>
-            <h2 className="text-lg font-black text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-[#18C8FF]" />
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#60A5FA]" />
               On-Chain Verified Transactions Ledger
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Chronological record of verified trades executed through Volt Protocol smart contracts on Sui.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-lg bg-[#0A1019] border border-white/5 text-xs font-mono text-gray-300">
-              Total Transactions: <strong className="text-[#18C8FF]">{recordedSwaps.length}</strong>
-            </span>
-          </div>
+          <span className="px-2.5 py-1 rounded bg-[#06070A] border border-[#1A1E26] text-xs font-mono text-slate-300">
+            Total Transactions: <strong className="text-[#60A5FA]">{recordedSwaps.length}</strong>
+          </span>
         </div>
 
-        {recordedSwaps.length === 0 ? (
-          <div className="py-12 text-center text-xs text-gray-500 font-mono space-y-2">
-            <Clock className="w-8 h-8 text-gray-600 mx-auto" />
-            <p>On-chain ledger is awaiting first transactions.</p>
-            <p className="text-gray-600 text-xs">Each executed trade will automatically appear here with a verifiable Suiscan explorer link.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead>
-                <tr className="border-b border-white/5 text-gray-400 text-xs">
-                  <th className="py-3 px-3">Time</th>
-                  <th className="py-3 px-3">Trader</th>
-                  <th className="py-3 px-3">Pair</th>
-                  <th className="py-3 px-3">Mode</th>
-                  <th className="py-3 px-3">Volume ($)</th>
-                  <th className="py-3 px-3">Protocol Fee ($)</th>
-                  <th className="py-3 px-3 text-right">Suiscan</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {recordedSwaps.map((item, idx) => {
-                  const feeRate = typeof item.feeRate === 'number' ? item.feeRate : parseFloat(item.feeRate || '0') || 0.0016;
-                  const vol = typeof item.volumeUsd === 'number' ? item.volumeUsd : parseFloat(item.volumeUsd || '0') || 0;
-                  const feeUsd = vol * feeRate;
-                  const timeFormatted = typeof item.timestamp === 'number'
-                    ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        <div className="p-5">
+          {recordedSwaps.length === 0 ? (
+            <div className="py-10 text-center text-xs text-slate-500 font-mono space-y-2">
+              <Clock className="w-8 h-8 text-slate-600 mx-auto" />
+              <p>On-chain ledger is awaiting first transactions.</p>
+              <p className="text-slate-600 text-xs">Each executed trade will automatically appear here with a verifiable Suiscan explorer link.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-[#1A1E26] text-slate-400 text-xs">
+                    <th className="py-2.5 px-3">Time</th>
+                    <th className="py-2.5 px-3">Trader</th>
+                    <th className="py-2.5 px-3">Pair</th>
+                    <th className="py-2.5 px-3">Mode</th>
+                    <th className="py-2.5 px-3">Volume ($)</th>
+                    <th className="py-2.5 px-3">Protocol Fee ($)</th>
+                    <th className="py-2.5 px-3 text-right">Suiscan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1A1E26]/70">
+                  {recordedSwaps.map((item, idx) => {
+                    const feeRate = typeof item.feeRate === 'number' ? item.feeRate : parseFloat(item.feeRate || '0') || 0.0016;
+                    const vol = typeof item.volumeUsd === 'number' ? item.volumeUsd : parseFloat(item.volumeUsd || '0') || 0;
+                    const feeUsd = vol * feeRate;
+                    const timeFormatted = typeof item.timestamp === 'number'
+                      ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      : new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                  const fullTraderAddr = item.address || currentAccount?.address || '0x7ef65a3b007b79e3b8d9a29f2d5e8584b589186b3a9483b7519c53088c317b93';
+                    const fullTraderAddr = item.address || currentAccount?.address || '0x7ef65a3b007b79e3b8d9a29f2d5e8584b589186b3a9483b7519c53088c317b93';
 
-                  return (
-                    <tr key={item.digest || idx} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-3 text-gray-400 whitespace-nowrap">{timeFormatted}</td>
-                      <td className="py-3 px-3 text-gray-300">
-                        <div className="flex items-center gap-1.5 max-w-[320px] sm:max-w-none">
-                          <code className="text-xs font-mono text-cyan-300 bg-[#0A1019] px-2 py-0.5 rounded border border-white/10 select-all break-all">
-                            {fullTraderAddr}
-                          </code>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(fullTraderAddr);
-                              playClickSound();
-                            }}
-                            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0"
-                            title="Copy full address"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
+                    return (
+                      <tr key={item.digest || idx} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">{timeFormatted}</td>
+                        <td className="py-2.5 px-3 text-slate-300">
+                          <div className="flex items-center gap-1.5 max-w-[320px] sm:max-w-none">
+                            <code className="text-xs font-mono text-[#60A5FA] bg-[#000000] px-2 py-0.5 rounded border border-[#1A1E26] select-all break-all">
+                              {fullTraderAddr}
+                            </code>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(fullTraderAddr);
+                                playClickSound();
+                              }}
+                              className="p-1 rounded hover:bg-white/[0.06] text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                              title="Copy full address"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            <a
+                              href={`https://suiscan.xyz/mainnet/account/${fullTraderAddr}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1 rounded hover:bg-white/[0.06] text-slate-400 hover:text-[#60A5FA] transition-colors shrink-0"
+                              title="Open wallet in Suiscan"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-white whitespace-nowrap">
+                          {item.fromAmount} {item.fromToken} ➔ {item.toToken}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                            String(item.swapMode).toLowerCase().includes('perp')
+                              ? 'bg-amber-500/12 text-amber-400 border border-amber-500/30'
+                              : String(item.swapMode).toLowerCase().includes('plus')
+                              ? 'bg-[#08D189]/12 text-[#08D189] border border-[#08D189]/30'
+                              : String(item.swapMode).toLowerCase().includes('limit')
+                              ? 'bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35'
+                              : 'bg-[#2B7FFF]/12 text-[#60A5FA] border border-[#2B7FFF]/30'
+                          }`}>
+                            {item.swapMode || 'Market'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-white font-bold whitespace-nowrap">
+                          ${vol.toFixed(2)}
+                        </td>
+                        <td className="py-2.5 px-3 text-[#08D189] font-bold whitespace-nowrap">
+                          +${feeUsd.toFixed(4)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
                           <a
-                            href={`https://suiscan.xyz/mainnet/account/${fullTraderAddr}`}
+                            href={`https://suiscan.xyz/mainnet/tx/${item.digest}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-cyan-300 transition-colors shrink-0"
-                            title="Open wallet in Suiscan"
+                            className="inline-flex items-center gap-1 text-[#60A5FA] hover:text-white underline text-xs"
                           >
-                            <ExternalLink className="w-3 h-3" />
+                            {item.digest ? `${item.digest.slice(0, 6)}...` : 'Suiscan'} <ExternalLink className="w-3 h-3" />
                           </a>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
-                        {item.fromAmount} {item.fromToken} ➔ {item.toToken}
-                      </td>
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                          String(item.swapMode).toLowerCase().includes('perp')
-                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                            : String(item.swapMode).toLowerCase().includes('plus')
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                            : String(item.swapMode).toLowerCase().includes('limit')
-                            ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                            : 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/30'
-                        }`}>
-                          {item.swapMode || 'Market'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-white font-bold whitespace-nowrap">
-                        ${vol.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-3 text-emerald-400 font-bold whitespace-nowrap">
-                        +${feeUsd.toFixed(4)}
-                      </td>
-                      <td className="py-3 px-3 text-right whitespace-nowrap">
-                        <a
-                          href={`https://suiscan.xyz/mainnet/tx/${item.digest}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-cyan-400 hover:text-white underline text-xs"
-                        >
-                          {item.digest ? `${item.digest.slice(0, 6)}...` : 'Suiscan'} <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* DeepBook v3 Native Monetization & Referrals */}
-      <div className="bg-[#101722] border border-[#18C8FF]/25 rounded-3xl p-6 shadow-2xl space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A1E26] pb-3.5">
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[#18C8FF]" />
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#60A5FA]" />
               <span>DeepBook v3 Native Monetization (Zero Principal Cut)</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -785,7 +780,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           <button
             type="button"
             onClick={loadDeepBookMonetization}
-            className="px-3 py-1.5 rounded-xl bg-[#0A1019] border border-white/10 text-xs text-slate-300 hover:text-white inline-flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg bg-[#000000] border border-[#1A1E26] text-xs text-slate-300 hover:text-white hover:border-[#2B7FFF]/50 inline-flex items-center gap-1.5 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${monetizationLoading ? 'animate-spin' : ''}`} />
             Refresh Status
@@ -793,7 +788,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
 
         {!isTreasurySigner && (
-          <div className="rounded-2xl bg-amber-500/10 border border-amber-400/35 px-4 py-3 text-xs text-amber-200 flex items-start gap-2.5">
+          <div className="rounded-lg bg-amber-500/10 border border-amber-400/30 px-4 py-3 text-xs text-amber-200 flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div>
               Switch active Sui wallet to <span className="font-mono font-bold text-white">{VOLT_TREASURY_ADDRESS.slice(0, 10)}...{VOLT_TREASURY_ADDRESS.slice(-6)}</span> to initialize or claim Treasury-owned referral objects (`0x075978...`, `0xd9f1d77a...`, Margin &amp; Spot referrals). Currently connected as `{currentAccount?.address?.slice(0, 8)}...`.
@@ -803,14 +798,14 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* 1. Predict BuilderCode + Account Referrer */}
-          <div className="rounded-2xl bg-[#0A1019] border border-white/10 p-4 space-y-3 flex flex-col justify-between">
+          <div className="rounded-xl bg-[#000000] border border-[#1A1E26] p-4 space-y-3 flex flex-col justify-between">
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <Target className="w-4 h-4 text-[#00E599]" />
+                  <Target className="w-4 h-4 text-[#08D189]" />
                   DeepBook Predict
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#18C8FF]/15 text-[#18C8FF]">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/30">
                   v{predictStatus?.versionWatermark ?? 4} {predictStatus?.builderFeeCutoverActive ? 'BuilderFee Live' : '10% Ref Live'}
                 </span>
               </div>
@@ -818,13 +813,13 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               <div className="text-[11px] font-mono space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">BuilderCode:</span>
-                  <span className={predictStatus?.builderCodeExists ? 'text-[#00E599]' : 'text-amber-300'}>
+                  <span className={predictStatus?.builderCodeExists ? 'text-[#08D189]' : 'text-amber-300'}>
                     {predictStatus?.builderCodeExists ? 'Active' : 'Not Minted'} ({predictStatus?.builderCodeId.slice(0, 8)}...)
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Referrer Acc:</span>
-                  <span className={predictStatus?.referrerWrapperExists ? 'text-[#00E599]' : 'text-amber-300'}>
+                  <span className={predictStatus?.referrerWrapperExists ? 'text-[#08D189]' : 'text-amber-300'}>
                     {predictStatus?.referrerWrapperExists ? 'Active' : 'Not Minted'} ({predictStatus?.referrerWrapperId.slice(0, 8)}...)
                   </span>
                 </div>
@@ -855,7 +850,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                       'Volt BuilderCode + Referrer AccountWrapper shared on Sui Mainnet.'
                     )
                   }
-                  className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-[#18C8FF] text-[#05101A] hover:brightness-110 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                  className="w-full py-2 px-3 rounded-lg text-xs font-bold btn-deepbook disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
                 >
                   {monetizationBusy === 'init-predict' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Initialize Predict Referrals (1 PTB)
@@ -873,7 +868,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                       'USDC builder fees swept directly into Treasury wallet.'
                     )
                   }
-                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                  className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#08D189]/15 border border-[#08D189]/40 text-[#08D189] hover:bg-[#08D189]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
                 >
                   {monetizationBusy === 'claim-predict' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Claim Builder USDC
@@ -883,14 +878,14 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           </div>
 
           {/* 2. MarginPool SupplyReferral */}
-          <div className="rounded-2xl bg-[#0A1019] border border-white/10 p-4 space-y-3 flex flex-col justify-between">
+          <div className="rounded-xl bg-[#000000] border border-[#1A1E26] p-4 space-y-3 flex flex-col justify-between">
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-[#18C8FF]" />
+                  <Layers className="w-4 h-4 text-[#60A5FA]" />
                   Margin SupplyReferrals
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#00E599]/15 text-[#00E599]">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#08D189]/12 text-[#08D189]">
                   {marginReferrals.length}/{MARGIN_REFERRAL_COINS.length} Live
                 </span>
               </div>
@@ -900,10 +895,10 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                   return (
                     <span
                       key={coin}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-mono border ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
                         found
-                          ? 'bg-[#00E599]/12 border-[#00E599]/40 text-[#00E599]'
-                          : 'bg-white/[0.03] border-white/10 text-slate-500'
+                          ? 'bg-[#08D189]/10 border-[#08D189]/35 text-[#08D189]'
+                          : 'bg-[#06070A] border-[#1A1E26] text-slate-500'
                       }`}
                     >
                       {coin} {found ? '✓' : '·'}
@@ -934,7 +929,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                         `Activated native DeepBook MarginPool referral shares for ${missing.join(', ')}.`
                       )
                     }
-                    className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-[#18C8FF] text-[#05101A] hover:brightness-110 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-bold btn-deepbook disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
                   >
                     {monetizationBusy === 'mint-margin' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Mint Missing Margin Refs ({missing.length})
@@ -957,7 +952,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                       'All accumulated native MarginPool referral interest claimed to Treasury.'
                     )
                   }
-                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                  className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#08D189]/15 border border-[#08D189]/40 text-[#08D189] hover:bg-[#08D189]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
                 >
                   {monetizationBusy === 'claim-margin' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Withdraw All Margin Ref Fees
@@ -967,14 +962,14 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           </div>
 
           {/* 3. Spot CLOB DeepBookPoolReferral */}
-          <div className="rounded-2xl bg-[#0A1019] border border-white/10 p-4 space-y-3 flex flex-col justify-between">
+          <div className="rounded-xl bg-[#000000] border border-[#1A1E26] p-4 space-y-3 flex flex-col justify-between">
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-white flex items-center gap-1.5">
-                  <Coins className="w-4 h-4 text-amber-300" />
+                  <Coins className="w-4 h-4 text-amber-400" />
                   Spot PoolReferrals (0.5x)
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#00E599]/15 text-[#00E599]">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#08D189]/12 text-[#08D189]">
                   {spotReferrals.length}/{SPOT_REFERRAL_POOLS.length} Live
                 </span>
               </div>
@@ -984,10 +979,10 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                   return (
                     <span
                       key={pool}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-mono border ${
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
                         found
-                          ? 'bg-[#00E599]/12 border-[#00E599]/40 text-[#00E599]'
-                          : 'bg-white/[0.03] border-white/10 text-slate-500'
+                          ? 'bg-[#08D189]/10 border-[#08D189]/35 text-[#08D189]'
+                          : 'bg-[#06070A] border-[#1A1E26] text-slate-500'
                       }`}
                     >
                       {pool} {found ? '✓' : '·'}
@@ -1019,7 +1014,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                         `Created DeepBookPoolReferral objects (0.5x multiplier) for ${missing.join(', ')}.`
                       )
                     }
-                    className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-[#18C8FF] text-[#05101A] hover:brightness-110 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                    className="w-full py-2 px-3 rounded-lg text-xs font-bold btn-deepbook disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
                   >
                     {monetizationBusy === 'mint-spot' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Mint Missing Spot Refs ({missing.length})
@@ -1042,7 +1037,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                       'DEEP, base, and quote Spot CLOB referral rewards swept to Treasury.'
                     )
                   }
-                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                  className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#08D189]/15 border border-[#08D189]/40 text-[#08D189] hover:bg-[#08D189]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
                 >
                   {monetizationBusy === 'claim-spot' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Claim All Spot Ref Rewards
@@ -1054,31 +1049,29 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       </div>
 
       {/* Protocol Ownership & Direct Sui Management */}
-      <div className="bg-[#101722] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
+      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-[#18C8FF]" />
-              <h3 className="font-bold text-base text-white">Protocol Treasury Ownership</h3>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold">
+              <Lock className="w-4 h-4 text-[#60A5FA]" />
+              <h3 className="font-bold text-sm text-white">Protocol Treasury Ownership</h3>
+              <span className="px-2 py-0.5 rounded bg-[#08D189]/15 text-[#08D189] border border-[#08D189]/30 text-[11px] font-mono font-bold">
                 Owner Verified
               </span>
             </div>
-            <p className="text-xs text-gray-400">
-              Creator Wallet: <code>{currentAccount?.address}</code>. All protocol revenue and vault assets remain under your direct non-custodial control on the Sui blockchain.
+            <p className="text-xs text-slate-400">
+              Creator Wallet: <code className="text-slate-300">{currentAccount?.address}</code>. All protocol revenue and vault assets remain under your direct non-custodial control on the Sui blockchain.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <a
-              href={`https://suiscan.xyz/mainnet/account/${VOLT_TREASURY_ADDRESS}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-mono text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              Suiscan History <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
+          <a
+            href={`https://suiscan.xyz/mainnet/account/${VOLT_TREASURY_ADDRESS}`}
+            target="_blank"
+            rel="noreferrer"
+            className="px-4 py-2 rounded-lg bg-[#000000] hover:bg-[#0C0E13] border border-[#1A1E26] hover:border-[#2B7FFF]/50 text-white font-mono text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+          >
+            Suiscan History <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       </div>
     </div>

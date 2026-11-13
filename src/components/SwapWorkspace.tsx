@@ -804,17 +804,17 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     : 0;
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full">
       {/* Sub-navigation bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center p-1.5 rounded-2xl panel-carbon gap-1">
+      <div className="w-full border-b border-[#1A1E26] bg-[#000000] px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="inline-flex items-center p-0.5 rounded-lg bg-[#06070A] border border-[#1B1F27] gap-1">
           <button
             type="button"
             onClick={() => setMode('market')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all ${
               mode === 'market'
-                ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40 shadow-[0_0_16px_rgba(24, 200, 255,0.14)]'
-                : 'text-slate-300 hover:text-white border border-transparent'
+                ? 'bg-[#2B7FFF] text-white shadow-[0_0_12px_rgba(43,127,255,0.28)]'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             Swap
@@ -822,38 +822,48 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           <button
             type="button"
             onClick={() => setMode('limit')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all flex items-center gap-1.5 ${
               mode === 'limit'
-                ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40 shadow-[0_0_16px_rgba(24, 200, 255,0.14)]'
-                : 'text-slate-300 hover:text-white border border-transparent'
+                ? 'bg-[#2B7FFF] text-white shadow-[0_0_12px_rgba(43,127,255,0.28)]'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <span>Spot CLOB</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-white/[0.08] text-slate-200">
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                mode === 'limit' ? 'bg-black/25 text-white' : 'bg-white/[0.06] text-slate-300'
+              }`}
+            >
               DeepBook v3
             </span>
           </button>
           <button
             type="button"
             onClick={() => setMode('margin')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all flex items-center gap-1.5 ${
               mode === 'margin'
-                ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40 shadow-[0_0_16px_rgba(24, 200, 255,0.14)]'
-                : 'text-slate-300 hover:text-white border border-transparent'
+                ? 'bg-[#2B7FFF] text-white shadow-[0_0_12px_rgba(43,127,255,0.28)]'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             <span>Margin</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[#18C8FF]/15 text-[#18C8FF]">
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                mode === 'margin'
+                  ? 'bg-black/25 text-white'
+                  : 'bg-[#2B7FFF]/15 text-[#60A5FA]'
+              }`}
+            >
               4.5x CLOB
             </span>
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm font-mono text-slate-300">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-300">
           <button
             type="button"
             onClick={() => setShowDustSweeper(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#00E599]/10 border border-[#00E599]/35 text-[#00E599] hover:bg-[#00E599]/20 font-sans font-bold text-xs transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#08D189]/10 border border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/20 font-sans font-semibold text-xs transition-colors"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Sweep Dust</span>
@@ -861,383 +871,385 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           <button
             type="button"
             onClick={() => setShowAiCopilot(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 font-sans font-bold text-xs transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#2B7FFF]/12 border border-[#2B7FFF]/40 text-[#60A5FA] hover:bg-[#2B7FFF]/20 font-sans font-semibold text-xs transition-colors"
           >
             <Bot className="w-3.5 h-3.5" />
             <span>AI Copilot</span>
           </button>
-          <span className="px-3.5 py-2 rounded-xl panel-carbon">
+          <span className="px-3 py-1.5 rounded-lg bg-[#06070A] border border-[#1B1F27] text-xs">
             {traderTier.badgeEmoji} <span className="text-white font-semibold">{traderTier.name}</span> ·{' '}
-            <span className="text-[#18C8FF] font-bold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+            <span className="text-[#60A5FA] font-bold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
           </span>
           {activeReferrer && (
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#00D98B]/15 border border-[#00D98B]/30 text-[#00E599] font-semibold">
-              <CheckCircle2 className="w-4 h-4" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#08D189]/12 border border-[#08D189]/30 text-[#08D189] font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
               Ref Split Active
             </span>
           )}
         </div>
       </div>
 
-      {/* MODE 1: CETUS-PRO CLEAN MARKET SWAP */}
+      {/* MODE 1: INSTITUTIONAL INSTANT SWAP STAGE */}
       {mode === 'market' && (
-        <div
-          className={`grid gap-5 items-start ${
-            showMarketChart ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'
-          }`}
-        >
-          {showMarketChart && (
-            <div className="lg:col-span-7 xl:col-span-8 panel-carbon rounded-2xl p-3.5">
-              <ProCandleChart
-                symbolLabel={chartMeta.label}
-                sourceLabel={chartMeta.source}
-                candles={candles}
-                timeframe={timeframe}
-                onTimeframeChange={setTimeframe}
-                isLoading={candlesLoading}
-                heightClass="h-[420px] lg:h-[500px]"
-              />
-            </div>
-          )}
-
+        <div className="max-w-[1280px] mx-auto px-3 sm:px-6 py-6 animate-panel-in">
           <div
-            className={
-              showMarketChart
-                ? 'lg:col-span-5 xl:col-span-4 w-full'
-                : 'w-full max-w-[500px] mx-auto pt-3'
-            }
+            className={`grid gap-5 items-start ${
+              showMarketChart ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'
+            }`}
           >
-            <div className="panel-carbon rounded-2xl p-5 space-y-3.5">
-              {/* Top Controls */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base font-bold text-white">Swap</span>
-                  <span className="text-xs font-mono text-[#18C8FF] px-2.5 py-0.5 rounded-lg bg-[#18C8FF]/15 border border-[#18C8FF]/30">
-                    Cetus + Aftermath
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowMarketChart((v) => !v)}
-                    className={`p-2 rounded-xl border text-xs transition-all ${
-                      showMarketChart
-                        ? 'bg-[#18C8FF]/20 border-[#18C8FF]/40 text-[#18C8FF]'
-                        : 'bg-[#0A1019] border-white/[0.1] text-slate-300 hover:text-white'
-                    }`}
-                    title="Toggle live price chart"
-                  >
-                    <BarChart2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowSettings((v) => !v)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0A1019] border border-white/[0.1] text-xs font-mono text-slate-200 hover:text-white"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" />
-                    <span>{slippagePct}%</span>
-                  </button>
-                </div>
+            {showMarketChart && (
+              <div className="lg:col-span-7 xl:col-span-8 bg-[#000000] border border-[#1B1F27] rounded-xl overflow-hidden">
+                <ProCandleChart
+                  symbolLabel={chartMeta.label}
+                  sourceLabel={chartMeta.source}
+                  candles={candles}
+                  timeframe={timeframe}
+                  onTimeframeChange={setTimeframe}
+                  isLoading={candlesLoading}
+                  heightClass="h-[420px] lg:h-[500px]"
+                />
               </div>
+            )}
 
-              {showSettings && (
-                <div className="panel-carbon-sub rounded-xl p-3 flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-slate-300">Max Slippage</span>
-                  <div className="flex items-center gap-1.5">
-                    {[0.1, 0.5, 1.0].map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setSlippagePct(v)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono ${
-                          slippagePct === v
-                            ? 'bg-[#18C8FF]/20 text-[#18C8FF] border border-[#18C8FF]/40 font-semibold'
-                            : 'bg-white/[0.06] text-slate-300 hover:text-white'
-                        }`}
-                      >
-                        {v}%
-                      </button>
-                    ))}
-                    <div className="flex items-center bg-white/[0.06] rounded-lg px-2 py-1 border border-white/[0.08]">
-                      <input
-                        type="number"
-                        min="0.05"
-                        max="25"
-                        step="0.1"
-                        value={slippagePct}
-                        onChange={(e) => {
-                          const v = Number(e.target.value);
-                          if (Number.isFinite(v) && v >= 0.05 && v <= 25) setSlippagePct(v);
-                        }}
-                        className="w-12 bg-transparent text-right text-xs font-mono text-white outline-none"
-                      />
-                      <span className="text-xs font-mono text-slate-400 ml-0.5">%</span>
-                    </div>
+            <div
+              className={
+                showMarketChart
+                  ? 'lg:col-span-5 xl:col-span-4 w-full'
+                  : 'w-full max-w-[460px] mx-auto pt-2'
+              }
+            >
+              <div className="panel-carbon rounded-xl p-4 sm:p-5 space-y-3 border border-[#1B1F27]">
+                {/* Top Controls */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold text-white tracking-tight">Instant Swap</span>
+                    <span className="text-[11px] font-mono text-[#60A5FA] px-2 py-0.5 rounded bg-[#2B7FFF]/12 border border-[#2B7FFF]/30">
+                      Cetus + Aftermath
+                    </span>
                   </div>
-                </div>
-              )}
-
-              {/* You Pay */}
-              <div className="panel-carbon-sub rounded-2xl p-4 space-y-2.5">
-                <div className="flex items-center justify-between text-xs sm:text-sm text-slate-300">
-                  <span className="font-medium">You Pay</span>
-                  <div className="flex items-center gap-2 font-mono tabular-nums text-xs">
-                    <Wallet className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{fromBal.toFixed(fromToken.decimals > 6 ? 4 : 2)}</span>
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() =>
-                        setAmountIn((fromBal * 0.5).toFixed(fromToken.decimals > 6 ? 4 : 2))
-                      }
-                      className="px-2 py-0.5 rounded-md bg-white/[0.08] hover:bg-white/[0.15] text-xs text-white font-semibold"
+                      onClick={() => setShowMarketChart((v) => !v)}
+                      className={`p-2 rounded-lg border text-xs transition-all ${
+                        showMarketChart
+                          ? 'bg-[#2B7FFF]/20 border-[#2B7FFF]/50 text-[#60A5FA]'
+                          : 'bg-[#0C0E13] border-[#1A1E26] text-slate-400 hover:text-white'
+                      }`}
+                      title="Toggle live price chart"
                     >
-                      HALF
+                      <BarChart2 className="w-4 h-4" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSettings((v) => !v)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0C0E13] border border-[#1A1E26] text-xs font-mono text-slate-300 hover:text-white hover:border-[#2B7FFF]/40 transition-colors"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>{slippagePct}%</span>
+                    </button>
+                  </div>
+                </div>
+
+                {showSettings && (
+                  <div className="bg-[#0C0E13] border border-[#1A1E26] rounded-lg p-3 flex items-center justify-between gap-2 animate-panel-in">
+                    <span className="text-xs font-medium text-slate-300">Max Slippage</span>
+                    <div className="flex items-center gap-1.5">
+                      {[0.1, 0.5, 1.0].map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setSlippagePct(v)}
+                          className={`px-2 py-1 rounded text-xs font-mono ${
+                            slippagePct === v
+                              ? 'bg-[#2B7FFF]/20 text-[#60A5FA] border border-[#2B7FFF]/45 font-semibold'
+                              : 'bg-[#12151C] text-slate-300 hover:text-white border border-[#1A1E26]'
+                          }`}
+                        >
+                          {v}%
+                        </button>
+                      ))}
+                      <div className="flex items-center bg-[#000000] rounded px-2 py-1 border border-[#1A1E26] focus-within:border-[#2B7FFF]/60">
+                        <input
+                          type="number"
+                          min="0.05"
+                          max="25"
+                          step="0.1"
+                          value={slippagePct}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (Number.isFinite(v) && v >= 0.05 && v <= 25) setSlippagePct(v);
+                          }}
+                          className="w-11 bg-transparent text-right text-xs font-mono text-white outline-none"
+                        />
+                        <span className="text-xs font-mono text-slate-400 ml-0.5">%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* You Pay */}
+                <div className="bg-[#0C0E13] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 rounded-xl p-3.5 space-y-2 transition-colors">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-medium">You Pay</span>
+                    <div className="flex items-center gap-1.5 font-mono tabular-nums text-xs">
+                      <Wallet className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-slate-300">{fromBal.toFixed(fromToken.decimals > 6 ? 4 : 2)}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAmountIn((fromBal * 0.5).toFixed(fromToken.decimals > 6 ? 4 : 2))
+                        }
+                        className="px-2 py-0.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-[11px] text-white font-semibold transition-colors"
+                      >
+                        HALF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const maxAmt = fromToken.symbol === 'SUI' ? Math.max(0, fromBal - 0.05) : fromBal;
+                          setAmountIn(maxAmt.toFixed(fromToken.decimals > 6 ? 4 : 2));
+                        }}
+                        className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 hover:bg-[#2B7FFF]/25 text-[11px] text-[#60A5FA] font-bold transition-colors"
+                      >
+                        MAX
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={amountIn}
+                      onChange={(e) => setAmountIn(e.target.value)}
+                      placeholder="0.0"
+                      className="w-full bg-transparent text-2xl sm:text-[26px] font-mono tabular-nums font-bold text-white outline-none"
+                    />
                     <button
                       type="button"
                       onClick={() => {
-                        const maxAmt = fromToken.symbol === 'SUI' ? Math.max(0, fromBal - 0.05) : fromBal;
-                        setAmountIn(maxAmt.toFixed(fromToken.decimals > 6 ? 4 : 2));
+                        setTokenQuery('');
+                        setTokenPickerFor('from');
                       }}
-                      className="px-2 py-0.5 rounded-md bg-[#18C8FF]/20 hover:bg-[#18C8FF]/30 text-xs text-[#18C8FF] font-bold"
+                      className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#121620] hover:bg-[#191E2B] border border-[#232938] text-sm font-bold text-white transition-colors"
                     >
-                      MAX
+                      <img
+                        src={fromToken.logo}
+                        alt={fromToken.symbol}
+                        className="w-5 h-5 rounded-full"
+                      />
+                      <span>{fromToken.symbol}</span>
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={amountIn}
-                    onChange={(e) => setAmountIn(e.target.value)}
-                    placeholder="0.0"
-                    className="w-full bg-transparent text-2xl sm:text-3xl font-mono tabular-nums font-bold text-white outline-none"
-                  />
+
+                {/* Flip */}
+                <div className="flex justify-center -my-1.5 relative z-10">
                   <button
                     type="button"
                     onClick={() => {
-                      setTokenQuery('');
-                      setTokenPickerFor('from');
+                      setFromToken(toToken);
+                      setToToken(fromToken);
                     }}
-                    className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#161A22] hover:bg-[#1E232E] border border-white/[0.12] text-sm font-bold text-white transition-colors"
+                    className="p-2 rounded-lg bg-[#06070A] border border-[#222734] text-slate-300 hover:text-[#60A5FA] hover:border-[#2B7FFF] transition-all hover:rotate-180 duration-300"
+                    title="Flip pair"
                   >
-                    <img
-                      src={fromToken.logo}
-                      alt={fromToken.symbol}
-                      className="w-6 h-6 rounded-full"
-                    />
-                    <span>{fromToken.symbol}</span>
-                    <ChevronDown className="w-4 h-4 text-slate-300" />
+                    <ArrowDownUp className="w-4 h-4" />
                   </button>
                 </div>
-              </div>
 
-              {/* Flip */}
-              <div className="flex justify-center -my-2 relative z-10">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFromToken(toToken);
-                    setToToken(fromToken);
-                  }}
-                  className="p-2.5 rounded-xl bg-[#141820] border border-white/[0.12] text-white hover:text-[#18C8FF] hover:border-[#18C8FF]/45 transition-colors shadow-lg"
-                >
-                  <ArrowDownUp className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* You Receive */}
-              <div className="panel-carbon-sub rounded-2xl p-4 space-y-2.5">
-                <div className="flex items-center justify-between text-xs sm:text-sm text-slate-300">
-                  <span className="font-medium">You Receive</span>
-                  <div className="flex items-center gap-2 font-mono tabular-nums text-xs">
-                    <Wallet className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{toBal.toFixed(toToken.decimals > 6 ? 4 : 2)}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-2xl sm:text-3xl font-mono tabular-nums font-bold text-white truncate">
-                    {isQuoting ? (
-                      <span className="text-slate-400 text-lg">Quoting...</span>
-                    ) : (
-                      formattedOut
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTokenQuery('');
-                      setTokenPickerFor('to');
-                    }}
-                    className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#161E29] hover:bg-[#1E2837] border border-white/[0.12] text-sm font-bold text-white transition-colors"
-                  >
-                    <img src={toToken.logo} alt={toToken.symbol} className="w-6 h-6 rounded-full" />
-                    <span>{toToken.symbol}</span>
-                    <ChevronDown className="w-4 h-4 text-slate-300" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Route & Fee Details */}
-              <div className="panel-carbon-sub rounded-2xl p-3.5 space-y-2 text-xs font-mono">
-                <div className="flex items-center justify-between gap-2 text-slate-300">
-                  <span>Best Aggregator</span>
-                  <div className="flex items-center gap-2">
-                    {quote ? (
-                      <>
-                        <span className="px-2 py-0.5 rounded-md bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/30 text-xs font-bold">
-                          {quote.provider === 'Cetus' ? 'Cetus (incl. Bluefin)' : 'Aftermath Router'}
-                        </span>
-                        {quote.savingsPct > 0.001 && (
-                          <span className="text-xs font-bold text-[#00E599]">
-                            +{quote.savingsPct.toFixed(2)}%
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <span>—</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span>DEX Hops</span>
-                  <span className="text-white truncate max-w-[240px]">
-                    {quote ? quote.dexHops.join(' + ') : '—'}
-                  </span>
-                </div>
-                {quote && quote.alternatives.some((a) => a.amountOutAtomic > 0n) && (
-                  <div className="flex items-center justify-between gap-2 pt-0.5 text-xs text-slate-400">
-                    <span>Quotes Race</span>
-                    <div className="flex items-center gap-2.5 tabular-nums">
-                      {quote.alternatives.map((alt) => (
-                        <span
-                          key={alt.provider}
-                          className={
-                            alt.provider === quote.provider
-                              ? 'text-[#00E599] font-semibold'
-                              : 'text-slate-400'
-                          }
-                        >
-                          {alt.provider}:{' '}
-                          {alt.amountOutAtomic > 0n
-                            ? (Number(alt.amountOutAtomic) / Math.pow(10, toToken.decimals)).toFixed(
-                                toToken.decimals > 6 ? 4 : 3
-                              )
-                            : 'N/A'}
-                        </span>
-                      ))}
+                {/* You Receive */}
+                <div className="bg-[#0C0E13] border border-[#1A1E26] rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span className="font-medium">You Receive</span>
+                    <div className="flex items-center gap-1.5 font-mono tabular-nums text-xs">
+                      <Wallet className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-slate-300">{toBal.toFixed(toToken.decimals > 6 ? 4 : 2)}</span>
                     </div>
                   </div>
-                )}
-                <div className="flex justify-between text-slate-300">
-                  <span>Volt Tier Fee ({traderTier.name})</span>
-                  <span className="text-[#18C8FF] font-semibold tabular-nums">
-                    {(traderTier.feeRate * 100).toFixed(2)}%
-                    {activeReferrer ? ` (${Math.round(refTier.revSharePct * 100)}% → Ref)` : ''}
-                  </span>
-                </div>
-                {quote && (
-                  <div className="flex justify-between text-slate-300">
-                    <span>Price Impact</span>
-                    <span
-                      className={`tabular-nums font-semibold ${
-                        quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-[#00E599]'
-                      }`}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-2xl sm:text-[26px] font-mono tabular-nums font-bold text-white truncate">
+                      {isQuoting ? (
+                        <span className="text-slate-400 text-base">Quoting...</span>
+                      ) : (
+                        formattedOut
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTokenQuery('');
+                        setTokenPickerFor('to');
+                      }}
+                      className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#121620] hover:bg-[#191E2B] border border-[#232938] text-sm font-bold text-white transition-colors"
                     >
-                      {quote.priceImpactPct.toFixed(2)}%
+                      <img src={toToken.logo} alt={toToken.symbol} className="w-5 h-5 rounded-full" />
+                      <span>{toToken.symbol}</span>
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Route & Fee Details */}
+                <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 space-y-1.5 text-xs font-mono">
+                  <div className="flex items-center justify-between gap-2 text-slate-400">
+                    <span>Best Aggregator</span>
+                    <div className="flex items-center gap-2">
+                      {quote ? (
+                        <>
+                          <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 text-[11px] font-bold">
+                            {quote.provider === 'Cetus' ? 'Cetus (incl. Bluefin)' : 'Aftermath Router'}
+                          </span>
+                          {quote.savingsPct > 0.001 && (
+                            <span className="text-xs font-bold text-[#08D189]">
+                              +{quote.savingsPct.toFixed(2)}%
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span>—</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>DEX Hops</span>
+                    <span className="text-white truncate max-w-[230px]">
+                      {quote ? quote.dexHops.join(' + ') : '—'}
                     </span>
                   </div>
-                )}
-              </div>
-
-              {quoteError && (
-                <div className="text-xs text-[#FF4D6A] bg-[#F6465D]/15 border border-[#F6465D]/35 rounded-xl px-3.5 py-2.5">
-                  {quoteError}
+                  {quote && quote.alternatives.some((a) => a.amountOutAtomic > 0n) && (
+                    <div className="flex items-center justify-between gap-2 pt-0.5 text-[11px] text-slate-400">
+                      <span>Quotes Race</span>
+                      <div className="flex items-center gap-2.5 tabular-nums">
+                        {quote.alternatives.map((alt) => (
+                          <span
+                            key={alt.provider}
+                            className={
+                              alt.provider === quote.provider
+                                ? 'text-[#08D189] font-semibold'
+                                : 'text-slate-400'
+                            }
+                          >
+                            {alt.provider}:{' '}
+                            {alt.amountOutAtomic > 0n
+                              ? (Number(alt.amountOutAtomic) / Math.pow(10, toToken.decimals)).toFixed(
+                                  toToken.decimals > 6 ? 4 : 3
+                                )
+                              : 'N/A'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-400">
+                    <span>Volt Tier Fee ({traderTier.name})</span>
+                    <span className="text-[#60A5FA] font-semibold tabular-nums">
+                      {(traderTier.feeRate * 100).toFixed(2)}%
+                      {activeReferrer ? ` (${Math.round(refTier.revSharePct * 100)}% → Ref)` : ''}
+                    </span>
+                  </div>
+                  {quote && (
+                    <div className="flex justify-between text-slate-400">
+                      <span>Price Impact</span>
+                      <span
+                        className={`tabular-nums font-semibold ${
+                          quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-[#08D189]'
+                        }`}
+                      >
+                        {quote.priceImpactPct.toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
 
-              <button
-                type="button"
-                disabled={isSwapping || isQuoting || !quote}
-                onClick={executeMarketSwap}
-                className="w-full py-3.5 rounded-2xl btn-deepbook disabled:bg-white/[0.08] disabled:text-slate-400 disabled:shadow-none font-bold text-base transition-all flex items-center justify-center gap-2"
-              >
-                {isSwapping && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>
-                  {!account
-                    ? 'Connect Wallet to Swap'
-                    : isSwapping
-                      ? 'Confirm in Wallet...'
-                      : `Swap ${fromToken.symbol} for ${toToken.symbol}`}
-                </span>
-              </button>
+                {quoteError && (
+                  <div className="text-xs text-[#F0525E] bg-[#F0525E]/12 border border-[#F0525E]/35 rounded-lg px-3 py-2">
+                    {quoteError}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={isSwapping || isQuoting || !quote}
+                  onClick={executeMarketSwap}
+                  className="w-full py-3.5 rounded-lg btn-deepbook disabled:bg-[#121620] disabled:text-slate-500 disabled:shadow-none font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2"
+                >
+                  {isSwapping && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>
+                    {!account
+                      ? 'Connect Wallet to Swap'
+                      : isSwapping
+                        ? 'Confirm in Wallet...'
+                        : `Swap ${fromToken.symbol} for ${toToken.symbol}`}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODE 2 & 3: WIDESCREEN DEEPBOOK v3 CLOB (PRO LIMIT + MARGIN TRADING) */}
+      {/* MODE 2 & 3: FLUSH DEEPBOOK-PRO CLOB TERMINAL (SPOT CLOB + MARGIN 4.5x) */}
       {(mode === 'limit' || mode === 'margin') && (
-        <div className="space-y-3.5">
-          {/* DeepBook v3 Pool Ribbon */}
-          <div className="panel-carbon rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {(mode === 'margin' && marginPools.length > 0 ? marginPools : pools).map((pool) => (
-                <button
-                  key={pool.poolName}
-                  type="button"
-                  onClick={() => {
-                    setActivePool(pool);
-                    setLimitPrice('');
-                    setSelectedBookPrice('');
-                  }}
-                  className={`px-3 py-1.5 rounded-xl text-xs sm:text-sm font-mono whitespace-nowrap transition-all ${
-                    activePool.poolName === pool.poolName
-                      ? 'bg-[#18C8FF]/20 text-[#18C8FF] border border-[#18C8FF]/40 font-bold'
-                      : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
-                  }`}
-                >
-                  {pool.baseSymbol}/{pool.quoteSymbol}
-                </button>
-              ))}
+        <div className="w-full bg-[#000000] border-b border-[#1A1E26] animate-panel-in">
+          <div className="w-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_270px_330px] xl:grid-cols-[minmax(0,1fr)_295px_345px]">
+            {/* Cols 1-2, Row 1: DeepBook v3 Pair Ribbon */}
+            <div className="lg:col-start-1 lg:col-span-2 lg:row-start-1 bg-[#000000] border-b border-[#1A1E26] lg:border-r lg:border-[#1A1E26] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                {(mode === 'margin' && marginPools.length > 0 ? marginPools : pools).map((pool) => (
+                  <button
+                    key={pool.poolName}
+                    type="button"
+                    onClick={() => {
+                      setActivePool(pool);
+                      setLimitPrice('');
+                      setSelectedBookPrice('');
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-mono whitespace-nowrap transition-all border ${
+                      activePool.poolName === pool.poolName
+                        ? 'bg-[#2B7FFF]/15 text-[#60A5FA] border-[#2B7FFF]/45 font-bold'
+                        : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border-transparent'
+                    }`}
+                  >
+                    {pool.baseSymbol}/{pool.quoteSymbol}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4 sm:gap-5 text-xs font-mono tabular-nums">
+                <div>
+                  <span className="text-slate-500 mr-1.5">Mid</span>
+                  <span className="text-white font-bold">
+                    {orderbook.midPrice > 0 ? orderbook.midPrice.toFixed(4) : '—'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 mr-1.5">Spread</span>
+                  <span className="text-slate-200">{orderbook.spreadPct.toFixed(3)}%</span>
+                </div>
+                {mode === 'margin' && marginRiskConfig && (
+                  <>
+                    <div>
+                      <span className="text-slate-500 mr-1.5">Max Lev</span>
+                      <span className="text-[#60A5FA] font-bold">
+                        {marginRiskConfig.maxLeverageSafe.toFixed(1)}x
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 mr-1.5">Borrow APR</span>
+                      <span className="text-white">
+                        {marginRiskConfig.quoteBorrowAprPct.toFixed(2)}%
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-5 text-xs sm:text-sm font-mono tabular-nums">
-              <div>
-                <span className="text-slate-400 mr-1.5">Mid:</span>
-                <span className="text-white font-bold">
-                  {orderbook.midPrice > 0 ? orderbook.midPrice.toFixed(4) : '—'}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 mr-1.5">Spread:</span>
-                <span className="text-slate-200">{orderbook.spreadPct.toFixed(3)}%</span>
-              </div>
-              {mode === 'margin' && marginRiskConfig && (
-                <>
-                  <div>
-                    <span className="text-slate-400 mr-1.5">Max Lev:</span>
-                    <span className="text-[#18C8FF] font-bold">
-                      {marginRiskConfig.maxLeverageSafe.toFixed(1)}x
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 mr-1.5">Borrow APR:</span>
-                    <span className="text-white">
-                      {marginRiskConfig.quoteBorrowAprPct.toFixed(2)}%
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Full-Width 12-Column DeepBook CLOB Workspace (Wide Chart + L2 Book + Ticket) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
-            {/* Left: Wide Real DeepBook Candlestick Chart */}
-            <div className="lg:col-span-6 xl:col-span-7 panel-carbon rounded-2xl p-3.5">
+            {/* Col 1, Row 2: Wide Real DeepBook Candlestick Chart */}
+            <div className="lg:col-start-1 lg:row-start-2 bg-[#000000] border-b lg:border-b-0 lg:border-r border-[#1A1E26] min-w-0">
               <ProCandleChart
                 symbolLabel={`${activePool.baseSymbol}/${activePool.quoteSymbol}`}
                 sourceLabel={mode === 'margin' ? 'DeepBook v3 Margin' : chartMeta.source}
@@ -1245,21 +1257,21 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 timeframe={timeframe}
                 onTimeframeChange={setTimeframe}
                 isLoading={candlesLoading}
-                heightClass="h-[420px] lg:h-[510px] xl:h-[550px]"
+                heightClass="h-[430px] lg:h-[520px] xl:h-[550px]"
                 livePrice={orderbook.midPrice}
               />
             </div>
 
-            {/* Middle: Compact Live L2 Orderbook & Trades */}
-            <div className="lg:col-span-3 xl:col-span-2 panel-carbon rounded-2xl flex flex-col overflow-hidden h-[480px] lg:h-[572px] xl:h-[612px]">
-              <div className="px-3.5 py-2.5 border-b border-white/[0.08] flex items-center gap-2 bg-[#0B111C]">
+            {/* Col 2, Row 2: Compact Live L2 Orderbook & Trades */}
+            <div className="lg:col-start-2 lg:row-start-2 bg-[#000000] border-b lg:border-b-0 lg:border-r border-[#1A1E26] flex flex-col overflow-hidden h-[465px] lg:h-[556px] xl:h-[586px]">
+              <div className="px-3 border-b border-[#1A1E26] flex items-center gap-4 bg-[#000000] h-9 shrink-0">
                 <button
                   type="button"
                   onClick={() => setBookTab('book')}
-                  className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                  className={`h-full text-xs font-semibold border-b-2 transition-colors ${
                     bookTab === 'book'
-                      ? 'bg-[#18C8FF]/20 text-[#18C8FF]'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'border-[#2B7FFF] text-white'
+                      : 'border-transparent text-slate-400 hover:text-white'
                   }`}
                 >
                   Order Book
@@ -1267,10 +1279,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => setBookTab('trades')}
-                  className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                  className={`h-full text-xs font-semibold border-b-2 transition-colors ${
                     bookTab === 'trades'
-                      ? 'bg-[#18C8FF]/20 text-[#18C8FF]'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'border-[#2B7FFF] text-white'
+                      : 'border-transparent text-slate-400 hover:text-white'
                   }`}
                 >
                   Trades
@@ -1278,8 +1290,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               </div>
 
               {bookTab === 'book' ? (
-                <div className="flex-1 flex flex-col justify-between p-2.5 text-xs font-mono tabular-nums overflow-hidden">
-                  <div className="grid grid-cols-3 text-slate-400 px-1 pb-1 text-xs">
+                <div className="flex-1 min-h-0 flex flex-col justify-between p-2 text-[11px] font-mono tabular-nums overflow-hidden">
+                  <div className="grid grid-cols-3 text-slate-500 px-1.5 pb-1 text-[11px]">
                     <span>Price</span>
                     <span className="text-right">Size</span>
                     <span className="text-right">Total</span>
@@ -1287,7 +1299,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
                   {/* Asks */}
                   <div className="space-y-0.5 overflow-hidden">
-                    {orderbook.asks.slice(-10).map((lv, idx) => {
+                    {orderbook.asks.slice(-11).map((lv, idx) => {
                       const maxTotal =
                         orderbook.asks[0]?.totalSize || orderbook.asks[orderbook.asks.length - 1]?.totalSize || 1;
                       const pct = Math.min(100, (lv.totalSize / Math.max(1e-9, maxTotal)) * 100);
@@ -1300,15 +1312,15 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                             setLimitPrice(val);
                             setSelectedBookPrice(val);
                           }}
-                          className="relative w-full grid grid-cols-3 px-1.5 py-0.5 rounded hover:bg-white/[0.05] text-left"
+                          className="relative w-full grid grid-cols-3 px-1.5 py-[2.5px] rounded hover:bg-white/[0.04] text-left transition-colors"
                         >
                           <div
-                            className="absolute inset-y-0 right-0 bg-[#F6465D]/20 pointer-events-none"
+                            className="absolute inset-y-0 right-0 bg-[#F0525E]/15 pointer-events-none"
                             style={{ width: `${pct}%` }}
                           />
-                          <span className="relative text-[#FF4D6A] font-semibold">{lv.price.toFixed(4)}</span>
-                          <span className="relative text-right text-white">{lv.size.toFixed(1)}</span>
-                          <span className="relative text-right text-slate-300">
+                          <span className="relative text-[#F0525E] font-medium">{lv.price.toFixed(4)}</span>
+                          <span className="relative text-right text-slate-200">{lv.size.toFixed(1)}</span>
+                          <span className="relative text-right text-slate-400">
                             {lv.totalSize.toFixed(0)}
                           </span>
                         </button>
@@ -1317,19 +1329,19 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </div>
 
                   {/* Spread Mid */}
-                  <div className="py-1.5 px-2.5 my-1 rounded-xl bg-[#0A1019] border border-white/[0.08] flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">
+                  <div className="py-1.5 px-2 my-1 bg-[#06070A] border-y border-[#1A1E26] flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">
                       {orderbook.midPrice > 0 ? orderbook.midPrice.toFixed(4) : '—'}
                     </span>
-                    <span className="text-xs text-slate-300">
-                      {orderbook.spreadPct.toFixed(2)}%
+                    <span className="text-[11px] text-slate-400">
+                      Spread {orderbook.spreadPct.toFixed(2)}%
                     </span>
                   </div>
 
                   {/* Bids */}
                   <div className="space-y-0.5 overflow-hidden">
-                    {orderbook.bids.slice(0, 10).map((lv, idx) => {
-                      const maxTotal = orderbook.bids[Math.min(9, orderbook.bids.length - 1)]?.totalSize || 1;
+                    {orderbook.bids.slice(0, 11).map((lv, idx) => {
+                      const maxTotal = orderbook.bids[Math.min(10, orderbook.bids.length - 1)]?.totalSize || 1;
                       const pct = Math.min(100, (lv.totalSize / Math.max(1e-9, maxTotal)) * 100);
                       return (
                         <button
@@ -1340,15 +1352,15 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                             setLimitPrice(val);
                             setSelectedBookPrice(val);
                           }}
-                          className="relative w-full grid grid-cols-3 px-1.5 py-0.5 rounded hover:bg-white/[0.05] text-left"
+                          className="relative w-full grid grid-cols-3 px-1.5 py-[2.5px] rounded hover:bg-white/[0.04] text-left transition-colors"
                         >
                           <div
-                            className="absolute inset-y-0 right-0 bg-[#00D98B]/20 pointer-events-none"
+                            className="absolute inset-y-0 right-0 bg-[#08D189]/15 pointer-events-none"
                             style={{ width: `${pct}%` }}
                           />
-                          <span className="relative text-[#00E599] font-semibold">{lv.price.toFixed(4)}</span>
-                          <span className="relative text-right text-white">{lv.size.toFixed(1)}</span>
-                          <span className="relative text-right text-slate-300">
+                          <span className="relative text-[#08D189] font-medium">{lv.price.toFixed(4)}</span>
+                          <span className="relative text-right text-slate-200">{lv.size.toFixed(1)}</span>
+                          <span className="relative text-right text-slate-400">
                             {lv.totalSize.toFixed(0)}
                           </span>
                         </button>
@@ -1357,18 +1369,18 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 p-2.5 overflow-y-auto text-xs font-mono tabular-nums space-y-1">
-                  <div className="grid grid-cols-3 text-slate-400 px-1 pb-1">
+                <div className="flex-1 p-2.5 overflow-y-auto text-[11px] font-mono tabular-nums space-y-0.5">
+                  <div className="grid grid-cols-3 text-slate-500 px-1 pb-1">
                     <span>Price</span>
                     <span className="text-right">Size</span>
                     <span className="text-right">Time</span>
                   </div>
                   {trades.map((tr) => (
                     <div key={tr.tradeId} className="grid grid-cols-3 px-1 py-0.5">
-                      <span className={tr.type === 'buy' ? 'text-[#00E599] font-semibold' : 'text-[#FF4D6A] font-semibold'}>
+                      <span className={tr.type === 'buy' ? 'text-[#08D189] font-medium' : 'text-[#F0525E] font-medium'}>
                         {tr.price.toFixed(4)}
                       </span>
-                      <span className="text-right text-white">{tr.baseVolume.toFixed(1)}</span>
+                      <span className="text-right text-slate-200">{tr.baseVolume.toFixed(1)}</span>
                       <span className="text-right text-slate-400">
                         {new Date(tr.timestamp).toLocaleTimeString([], {
                           hour: '2-digit',
@@ -1381,8 +1393,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               )}
             </div>
 
-            {/* Right: Either Spot Limit Ticket OR DeepBook v3 Margin Trading Ticket */}
-            <div className="lg:col-span-3">
+            {/* Col 3, Rows 1-3: Full-Height Order Ticket (Spot CLOB OR DeepBook Margin) */}
+            <div className="lg:col-start-3 lg:row-start-1 lg:row-span-3 bg-[#000000] flex flex-col min-w-0">
               {mode === 'margin' ? (
                 <DeepBookMarginTicket
                   pool={activePool}
@@ -1402,20 +1414,20 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   onVolumeUpdated={onVolumeUpdated}
                 />
               ) : (
-                <div className="panel-carbon rounded-2xl p-4 flex flex-col justify-between gap-3.5 h-full">
-                  <div className="space-y-3.5">
+                <div className="bg-[#000000] p-3.5 flex flex-col justify-between gap-3 h-full">
+                  <div className="space-y-3">
                     {/* Spot Order Type Switcher: Market | Limit */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="inline-flex rounded-xl bg-[#090E16] border border-white/10 p-1">
+                    <div className="flex items-center justify-between gap-2 border-b border-[#1A1E26] pb-1.5">
+                      <div className="inline-flex items-center gap-3">
                         {(['market', 'limit'] as const).map((style) => (
                           <button
                             key={style}
                             type="button"
                             onClick={() => setSpotOrderStyle(style)}
-                            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
+                            className={`pb-1 text-xs font-semibold capitalize transition-all border-b-2 -mb-[7px] ${
                               spotOrderStyle === style
-                                ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/35'
-                                : 'text-slate-400 hover:text-white'
+                                ? 'border-[#2B7FFF] text-white'
+                                : 'border-transparent text-slate-500 hover:text-slate-300'
                             }`}
                           >
                             {style}
@@ -1427,40 +1439,40 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#0A1019] border border-white/10">
+                    <div className="grid grid-cols-2 gap-1 p-1 rounded-md bg-[#06070A] border border-[#1A1E26]">
                       <button
                         type="button"
                         onClick={() => setLimitSide('buy')}
-                        className={`py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                        className={`py-2 rounded text-xs font-bold transition-all border ${
                           limitSide === 'buy'
-                            ? 'bg-[#00D98B] text-[#04120F] shadow-[0_0_16px_rgba(0,217,139,0.28)]'
-                            : 'text-slate-300 hover:text-white'
+                            ? 'bg-[#0B1528] border-[#2B7FFF] text-white'
+                            : 'text-slate-400 hover:text-white border-transparent'
                         }`}
                       >
-                        Buy {activePool.baseSymbol}
+                        BUY {activePool.baseSymbol}
                       </button>
                       <button
                         type="button"
                         onClick={() => setLimitSide('sell')}
-                        className={`py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                        className={`py-2 rounded text-xs font-bold transition-all border ${
                           limitSide === 'sell'
-                            ? 'bg-[#F6465D] text-white shadow-[0_0_16px_rgba(246,70,93,0.28)]'
-                            : 'text-slate-300 hover:text-white'
+                            ? 'bg-[#240B10] border-[#F0525E] text-white'
+                            : 'text-slate-400 hover:text-white border-transparent'
                         }`}
                       >
-                        Sell {activePool.baseSymbol}
+                        SELL {activePool.baseSymbol}
                       </button>
                     </div>
 
                     {/* Price (Limit editable OR Market live book quote + slippage) */}
                     {spotOrderStyle === 'limit' ? (
-                      <div className="panel-carbon-sub rounded-xl p-3 space-y-1.5">
-                        <div className="flex justify-between text-xs text-slate-300">
+                      <div className="bg-[#06070A] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 rounded-lg p-2.5 space-y-1 transition-colors">
+                        <div className="flex justify-between text-xs text-slate-400">
                           <span>Limit Price</span>
                           <button
                             type="button"
                             onClick={() => orderbook.midPrice > 0 && setLimitPrice(orderbook.midPrice.toFixed(4))}
-                            className="text-[#18C8FF] font-mono font-semibold hover:underline"
+                            className="text-[#60A5FA] font-mono font-semibold hover:underline"
                           >
                             Mid {orderbook.midPrice > 0 ? orderbook.midPrice.toFixed(4) : ''}
                           </button>
@@ -1479,10 +1491,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div className="panel-carbon-sub rounded-xl p-3 space-y-2">
-                        <div className="flex justify-between items-center text-xs text-slate-300">
+                      <div className="bg-[#06070A] border border-[#1A1E26] rounded-lg p-2.5 space-y-2">
+                        <div className="flex justify-between items-center text-xs text-slate-400">
                           <span>Market Execution Price</span>
-                          <span className="font-mono font-bold text-[#18C8FF]">
+                          <span className="font-mono font-bold text-[#60A5FA]">
                             ~{(limitSide === 'buy'
                               ? orderbook.asks[0]?.price || orderbook.midPrice
                               : orderbook.bids[0]?.price || orderbook.midPrice
@@ -1498,10 +1510,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                                 key={s}
                                 type="button"
                                 onClick={() => setSpotMarketSlippage(s)}
-                                className={`px-2 py-0.5 rounded font-mono ${
+                                className={`px-2 py-0.5 rounded font-mono border ${
                                   spotMarketSlippage === s
-                                    ? 'bg-[#18C8FF]/20 text-[#18C8FF] border border-[#18C8FF]/35 font-semibold'
-                                    : 'bg-white/5 text-slate-400 hover:text-white'
+                                    ? 'bg-[#2B7FFF]/18 text-[#60A5FA] border-[#2B7FFF]/45 font-semibold'
+                                    : 'bg-[#0C0E13] text-slate-400 hover:text-white border-[#1A1E26]'
                                 }`}
                               >
                                 {s}%
@@ -1513,7 +1525,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     )}
 
                     {/* Quantity */}
-                    <div className="panel-carbon-sub rounded-xl p-3 space-y-2">
+                    <div className="bg-[#06070A] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 rounded-lg p-2.5 space-y-2 transition-colors">
                       <div className="flex justify-between text-xs text-slate-400">
                         <span>Amount</span>
                         <span className="font-mono tabular-nums">
@@ -1535,7 +1547,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         />
                         <span className="text-xs font-mono text-slate-400">{activePool.baseSymbol}</span>
                       </div>
-                      <div className="grid grid-cols-4 gap-1.5 pt-1">
+                      <div className="grid grid-cols-4 gap-1 pt-0.5">
                         {[0.25, 0.5, 0.75, 1].map((pct) => (
                           <button
                             key={pct}
@@ -1556,7 +1568,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                                 setLimitQty((totalBase * pct * 0.98).toFixed(2));
                               }
                             }}
-                            className="py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-xs font-mono text-slate-300"
+                            className="py-1 rounded bg-[#0C0E13] hover:bg-[#141821] border border-[#1A1E26] text-[11px] font-mono text-slate-300 transition-colors"
                           >
                             {Math.round(pct * 100)}%
                           </button>
@@ -1571,13 +1583,13 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           type="checkbox"
                           checked={postOnly}
                           onChange={(e) => setPostOnly(e.target.checked)}
-                          className="accent-[#18C8FF] w-4 h-4"
+                          className="accent-[#2B7FFF] w-4 h-4"
                         />
                       </label>
                     )}
 
-                    <div className="text-xs font-mono space-y-1.5 text-slate-300 pt-1">
-                      <div className="flex justify-between">
+                    <div className="text-xs font-mono space-y-1.5 text-slate-400 pt-1 border-t border-[#1A1E26]">
+                      <div className="flex justify-between pt-1">
                         <span>{spotOrderStyle === 'limit' ? 'Order Total' : 'Est. Total'}</span>
                         <span className="text-white font-semibold tabular-nums">
                           {((spotOrderStyle === 'limit'
@@ -1592,7 +1604,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       </div>
                       <div className="flex justify-between">
                         <span>Volt Fee ({traderTier.name})</span>
-                        <span className="text-[#18C8FF] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+                        <span className="text-[#60A5FA] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
                       </div>
                     </div>
 
@@ -1600,10 +1612,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       type="button"
                       disabled={isPlacingLimit}
                       onClick={spotOrderStyle === 'market' ? executePlaceSpotMarket : executePlaceLimit}
-                      className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                      className={`w-full py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                         limitSide === 'buy'
-                          ? 'bg-[#00D98B] hover:bg-[#12E89B] text-[#05120D] shadow-[0_0_20px_rgba(0,217,139,0.28)]'
-                          : 'bg-[#F6465D] hover:bg-[#FF5B72] text-white shadow-[0_0_20px_rgba(246,70,93,0.28)]'
+                          ? 'btn-deepbook'
+                          : 'bg-[#F0525E] hover:bg-[#FF6370] text-white'
                       } disabled:opacity-50`}
                     >
                       {isPlacingLimit && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -1617,183 +1629,185 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     </button>
                   </div>
 
-                    {/* DeepBook BalanceManager Custody Summary */}
-                    <div className="panel-carbon-sub rounded-xl p-3 space-y-2 border-t border-white/[0.1]">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-300 flex items-center gap-1.5">
-                          <ShieldCheck className="w-4 h-4 text-[#18C8FF]" />
-                          <span>DeepBook BalanceManager</span>
-                        </span>
-                        <span className="font-mono text-white">
-                          {managerIds.length > 1
-                            ? `${managerIds.length} Vaults`
-                            : managerIds[0]
-                              ? `${managerIds[0].slice(0, 6)}...`
-                              : '1-Tx Auto'}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 leading-snug">
-                        Shared for all Spot Market &amp; Limit pairs. Pre-deposit is optional — orders auto-draw from your wallet; Market auto-settles back to wallet.
-                      </p>
-
-                      {managerState && (
-                        <>
-                          <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
-                            <div className="bg-[#121821] rounded-lg px-2.5 py-1.5 border border-white/[0.08]">
-                              <div className="text-slate-400">Free {activePool.baseSymbol}</div>
-                              <div className="text-white font-semibold">{vaultSummary.freeBase.toFixed(4)}</div>
-                            </div>
-                            <div className="bg-[#121821] rounded-lg px-2.5 py-1.5 border border-white/[0.08]">
-                              <div className="text-slate-400">Free {activePool.quoteSymbol}</div>
-                              <div className="text-white font-semibold">{vaultSummary.freeQuote.toFixed(4)}</div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <select
-                              value={depositCoinSide}
-                              onChange={(e) => setDepositCoinSide(e.target.value as 'base' | 'quote')}
-                              className="bg-[#121821] border border-white/[0.12] rounded-lg px-2 py-1.5 text-xs font-mono text-white outline-none"
-                            >
-                              <option value="quote">{activePool.quoteSymbol}</option>
-                              <option value="base">{activePool.baseSymbol}</option>
-                            </select>
-                            <input
-                              type="number"
-                              placeholder="Amt"
-                              value={depositAmt}
-                              onChange={(e) => setDepositAmt(e.target.value)}
-                              className="w-full min-w-0 bg-[#121821] border border-white/[0.12] rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none"
-                            />
-                            <button
-                              type="button"
-                              disabled={isVaultBusy || !depositAmt}
-                              onClick={handleDepositManager}
-                              className="px-2.5 py-1.5 rounded-lg bg-white/[0.1] hover:bg-white/[0.18] text-xs font-semibold text-white shrink-0"
-                            >
-                              Dep
-                            </button>
-                            <button
-                              type="button"
-                              disabled={isVaultBusy}
-                              onClick={() => handleWithdrawManagerAll(false)}
-                              className="px-2.5 py-1.5 rounded-lg btn-deepbook text-xs shrink-0"
-                              title="Withdraw unlocked & settled funds across all DeepBook vaults to wallet"
-                            >
-                              Withdraw
-                            </button>
-                          </div>
-                        </>
-                      )}
+                  {/* DeepBook BalanceManager Custody Summary */}
+                  <div className="bg-[#06070A] border border-[#1A1E26] rounded-lg p-2.5 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#60A5FA]" />
+                        <span>DeepBook BalanceManager</span>
+                      </span>
+                      <span className="font-mono text-white">
+                        {managerIds.length > 1
+                          ? `${managerIds.length} Vaults`
+                          : managerIds[0]
+                            ? `${managerIds[0].slice(0, 6)}...`
+                            : '1-Tx Auto'}
+                      </span>
                     </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      Shared for all Spot Market &amp; Limit pairs. Pre-deposit is optional — orders auto-draw from your wallet; Market auto-settles back to wallet.
+                    </p>
+
+                    {managerState && (
+                      <>
+                        <div className="grid grid-cols-2 gap-1.5 text-xs font-mono tabular-nums">
+                          <div className="bg-[#000000] rounded px-2 py-1.5 border border-[#1A1E26]">
+                            <div className="text-slate-500 text-[10px]">Free {activePool.baseSymbol}</div>
+                            <div className="text-white font-semibold">{vaultSummary.freeBase.toFixed(4)}</div>
+                          </div>
+                          <div className="bg-[#000000] rounded px-2 py-1.5 border border-[#1A1E26]">
+                            <div className="text-slate-500 text-[10px]">Free {activePool.quoteSymbol}</div>
+                            <div className="text-white font-semibold">{vaultSummary.freeQuote.toFixed(4)}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={depositCoinSide}
+                            onChange={(e) => setDepositCoinSide(e.target.value as 'base' | 'quote')}
+                            className="bg-[#000000] border border-[#1A1E26] rounded px-2 py-1.5 text-xs font-mono text-white outline-none"
+                          >
+                            <option value="quote">{activePool.quoteSymbol}</option>
+                            <option value="base">{activePool.baseSymbol}</option>
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="Amt"
+                            value={depositAmt}
+                            onChange={(e) => setDepositAmt(e.target.value)}
+                            className="w-full min-w-0 bg-[#000000] border border-[#1A1E26] focus:border-[#2B7FFF]/60 rounded px-2 py-1.5 text-xs font-mono text-white outline-none"
+                          />
+                          <button
+                            type="button"
+                            disabled={isVaultBusy || !depositAmt}
+                            onClick={handleDepositManager}
+                            className="px-2.5 py-1.5 rounded bg-[#121620] hover:bg-[#1A202E] border border-[#232938] text-xs font-semibold text-white shrink-0"
+                          >
+                            Dep
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isVaultBusy}
+                            onClick={() => handleWithdrawManagerAll(false)}
+                            className="px-2.5 py-1.5 rounded btn-deepbook text-xs shrink-0"
+                            title="Withdraw unlocked & settled funds across all DeepBook vaults to wallet"
+                          >
+                            Withdraw
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
-            {/* Bottom Dock: Open Spot Limit Orders OR Isolated Margin Manager Account */}
-            {mode === 'margin' ? (
-              <DeepBookMarginAccountBar
-                pool={activePool}
-                position={marginPosition}
-                riskConfig={marginRiskConfig}
-                isLoading={marginLoading}
-                onRefresh={refreshMarginAccount}
-                onNotify={onNotify}
-              />
-            ) : (
-              <div className="panel-carbon rounded-2xl p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="text-sm font-bold text-white">
-                      Open Limit Orders ({vaultSummary.openOrders.length})
-                    </span>
-                    {vaultSummary.openOrders.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleWithdrawManagerAll(true)}
-                        disabled={isVaultBusy}
-                        className="px-3 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-xs font-semibold"
-                      >
-                        Cancel All &amp; Withdraw to Wallet
-                      </button>
-                    )}
-                    {(vaultSummary.settledBase > 0 || vaultSummary.settledQuote > 0) && (
-                      <button
-                        type="button"
-                        onClick={() => handleWithdrawManagerAll(false)}
-                        disabled={isVaultBusy}
-                        className="px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono"
-                      >
-                        Claim Settled ({vaultSummary.settledBase.toFixed(4)} {activePool.baseSymbol} /{' '}
-                        {vaultSummary.settledQuote.toFixed(4)} {activePool.quoteSymbol})
-                      </button>
-                    )}
+            {/* Cols 1-2, Row 3: Bottom Dock (Open Spot Limit Orders OR Isolated Margin Manager Account) */}
+            <div className="lg:col-start-1 lg:col-span-2 lg:row-start-3 bg-[#000000] border-t lg:border-r border-[#1A1E26] min-w-0">
+              {mode === 'margin' ? (
+                <DeepBookMarginAccountBar
+                  pool={activePool}
+                  position={marginPosition}
+                  riskConfig={marginRiskConfig}
+                  isLoading={marginLoading}
+                  onRefresh={refreshMarginAccount}
+                  onNotify={onNotify}
+                />
+              ) : (
+                <div className="p-3.5 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-xs font-bold uppercase tracking-wider text-white">
+                        Open Limit Orders ({vaultSummary.openOrders.length})
+                      </span>
+                      {vaultSummary.openOrders.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleWithdrawManagerAll(true)}
+                          disabled={isVaultBusy}
+                          className="px-2.5 py-1 rounded bg-[#F0525E]/15 hover:bg-[#F0525E]/25 border border-[#F0525E]/35 text-[#F0525E] text-xs font-semibold"
+                        >
+                          Cancel All &amp; Withdraw to Wallet
+                        </button>
+                      )}
+                      {(vaultSummary.settledBase > 0 || vaultSummary.settledQuote > 0) && (
+                        <button
+                          type="button"
+                          onClick={() => handleWithdrawManagerAll(false)}
+                          disabled={isVaultBusy}
+                          className="px-2.5 py-1 rounded bg-[#08D189]/15 border border-[#08D189]/35 text-[#08D189] text-xs font-mono"
+                        >
+                          Claim Settled ({vaultSummary.settledBase.toFixed(4)} {activePool.baseSymbol} /{' '}
+                          {vaultSummary.settledQuote.toFixed(4)} {activePool.quoteSymbol})
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={refreshDeepBookAccount}
+                      className="text-slate-400 hover:text-white p-1.5 rounded hover:bg-white/[0.06]"
+                      title="Refresh DeepBook state"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={refreshDeepBookAccount}
-                    className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/[0.06]"
-                    title="Refresh DeepBook state"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
-                </div>
 
-                {!account ? (
-                  <div className="text-sm text-slate-400 py-4 text-center">
-                    Connect your Sui wallet to view open DeepBook v3 limit orders.
-                  </div>
-                ) : vaultSummary.openOrders.length === 0 ? (
-                  <div className="text-sm text-slate-400 py-4 text-center">
-                    No open limit orders on {activePool.baseSymbol}/{activePool.quoteSymbol}.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm font-mono tabular-nums">
-                      <thead>
-                        <tr className="text-slate-400 border-b border-white/[0.08]">
-                          <th className="text-left py-2">Side</th>
-                          <th className="text-right py-2">Price ({activePool.quoteSymbol})</th>
-                          <th className="text-right py-2">Qty ({activePool.baseSymbol})</th>
-                          <th className="text-right py-2">Filled</th>
-                          <th className="text-right py-2">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {vaultSummary.openOrders.map((ord) => (
-                          <tr key={`${ord.managerId || ''}_${ord.orderId}`} className="border-b border-white/[0.04]">
-                            <td className={`py-2.5 font-semibold ${ord.isBid ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {ord.isBid ? 'BUY' : 'SELL'}
-                            </td>
-                            <td className="text-right py-2.5 text-white">{ord.price.toFixed(4)}</td>
-                            <td className="text-right py-2.5 text-slate-200">{ord.quantity.toFixed(4)}</td>
-                            <td className="text-right py-2.5 text-slate-400">{ord.filledQuantity.toFixed(4)}</td>
-                            <td className="text-right py-2.5">
-                              <button
-                                type="button"
-                                disabled={isVaultBusy}
-                                onClick={() => handleCancelOrder(ord)}
-                                className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 text-xs font-semibold"
-                              >
-                                Cancel & Settle
-                              </button>
-                            </td>
+                  {!account ? (
+                    <div className="text-xs text-slate-500 py-5 text-center">
+                      Connect your Sui wallet to view open DeepBook v3 limit orders.
+                    </div>
+                  ) : vaultSummary.openOrders.length === 0 ? (
+                    <div className="text-xs text-slate-500 py-5 text-center">
+                      No open limit orders on {activePool.baseSymbol}/{activePool.quoteSymbol}.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs font-mono tabular-nums">
+                        <thead>
+                          <tr className="text-slate-500 border-b border-[#1A1E26]">
+                            <th className="text-left py-2">Side</th>
+                            <th className="text-right py-2">Price ({activePool.quoteSymbol})</th>
+                            <th className="text-right py-2">Qty ({activePool.baseSymbol})</th>
+                            <th className="text-right py-2">Filled</th>
+                            <th className="text-right py-2">Action</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
+                        </thead>
+                        <tbody>
+                          {vaultSummary.openOrders.map((ord) => (
+                            <tr key={`${ord.managerId || ''}_${ord.orderId}`} className="border-b border-[#1A1E26]/60">
+                              <td className={`py-2 font-semibold ${ord.isBid ? 'text-[#08D189]' : 'text-[#F0525E]'}`}>
+                                {ord.isBid ? 'BUY' : 'SELL'}
+                              </td>
+                              <td className="text-right py-2 text-white">{ord.price.toFixed(4)}</td>
+                              <td className="text-right py-2 text-slate-200">{ord.quantity.toFixed(4)}</td>
+                              <td className="text-right py-2 text-slate-400">{ord.filledQuantity.toFixed(4)}</td>
+                              <td className="text-right py-2">
+                                <button
+                                  type="button"
+                                  disabled={isVaultBusy}
+                                  onClick={() => handleCancelOrder(ord)}
+                                  className="px-2.5 py-1 rounded bg-[#F0525E]/15 hover:bg-[#F0525E]/25 text-[#F0525E] text-xs font-semibold"
+                                >
+                                  Cancel & Settle
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
       {/* Token Picker Modal */}
       {tokenPickerFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="panel-carbon rounded-2xl w-full max-w-md p-5 space-y-3.5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="panel-carbon rounded-xl w-full max-w-md p-5 space-y-3.5 border border-[#1B1F27] animate-panel-in">
             <div className="flex items-center justify-between">
               <span className="text-base font-bold text-white">Select Token</span>
               <button
@@ -1810,7 +1824,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               value={tokenQuery}
               onChange={(e) => setTokenQuery(e.target.value)}
               placeholder="Search symbol or coin type..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#0A1019] border border-white/[0.12] text-sm text-white outline-none focus:border-[#18C8FF]"
+              className="w-full px-3.5 py-2.5 rounded-lg bg-[#0C0E13] border border-[#1A1E26] text-sm text-white outline-none focus:border-[#2B7FFF]"
             />
             <div className="max-h-80 overflow-y-auto space-y-1">
               {filteredTokens.map((t) => {

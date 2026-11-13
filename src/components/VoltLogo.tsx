@@ -65,7 +65,7 @@ export const VoltLogo: React.FC<VoltLogoProps> = ({
             VOLT
           </span>
           {subtitle && (
-            <span className="hidden xl:inline-block px-1.5 py-0.5 rounded bg-[#18C8FF]/10 border border-[#18C8FF]/30 text-[10px] font-bold tracking-widest text-[#4CE0FF] uppercase">
+            <span className="hidden xl:inline-block px-1.5 py-0.5 rounded bg-[#2B7FFF]/15 border border-[#2B7FFF]/35 text-[10px] font-bold tracking-widest text-[#60A5FA] uppercase">
               {subtitle}
             </span>
           )}

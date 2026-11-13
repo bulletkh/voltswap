@@ -386,22 +386,22 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col panel-carbon rounded-3xl border border-white/[0.1] shadow-2xl overflow-hidden">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col panel-carbon rounded-xl border border-[#1B1F27] shadow-2xl overflow-hidden animate-panel-in">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-white/[0.08] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-[#1A1E26] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/40 flex items-center justify-center text-[#18C8FF]">
+            <div className="w-9 h-9 rounded-lg bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 flex items-center justify-center text-[#60A5FA]">
               <Bot className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-white">Volt AI Strategy Copilot</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#00E599]/15 text-[#00E599] border border-[#00E599]/30">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#08D189]/15 text-[#08D189] border border-[#08D189]/30">
                   Live Mainnet Quant
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#6B7280]">
                 Real-time ATR / RSI / DeepBook pricing · Every strategy pre-simulated before wallet sign
               </p>
             </div>
@@ -429,7 +429,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
         </div>
 
         {/* Subtabs */}
-        <div className="px-5 pt-3 flex items-center gap-2 border-b border-white/[0.06] pb-3">
+        <div className="px-5 pt-3 flex items-center gap-2 border-b border-[#1A1E26] pb-3">
           {[
             { id: 'predict' as AiCopilotTab, label: 'Predict Alpha', icon: TrendingUp },
             { id: 'grid' as AiCopilotTab, label: 'Spot CLOB Grid', icon: Grid3X3 },
@@ -442,10 +442,10 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 border transition-colors ${
+                className={`px-3.5 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 border transition-colors ${
                   active
-                    ? 'bg-[#18C8FF]/15 border-[#18C8FF]/45 text-[#9CE7FF]'
-                    : 'bg-[#091019] border-white/[0.06] text-slate-400 hover:text-white'
+                    ? 'bg-[#2B7FFF]/15 border-[#2B7FFF]/45 text-[#60A5FA]'
+                    : 'bg-[#000000] border-[#1A1E26] text-[#9CA3AF] hover:text-white'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -459,29 +459,29 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {tab === 'predict' && (
             <>
-              <div className="panel-carbon-sub rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+              <div className="panel-carbon-sub rounded-lg p-3.5 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-bold text-white flex items-center gap-2">
                     <span>BTC Market Regime:</span>
-                    <span className="text-[#18C8FF]">{btcSignals.regime}</span>
+                    <span className="text-[#60A5FA]">{btcSignals.regime}</span>
                   </div>
-                  <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                  <div className="text-[11px] font-mono text-[#6B7280] mt-0.5">
                     {btcSignals.confidenceLabel} · Support ${Math.round(btcSignals.support).toLocaleString()} / Res $
                     {Math.round(btcSignals.resistance).toLocaleString()}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 text-xs font-mono">
-                  <span className="text-slate-400 mr-1">Bet Size:</span>
+                  <span className="text-[#6B7280] mr-1">Bet Size:</span>
                   {[2, 5, 10].map((amt) => (
                     <button
                       key={amt}
                       type="button"
                       onClick={() => setPredictBudget(amt)}
-                      className={`px-2.5 py-1 rounded-lg border font-semibold ${
+                      className={`px-2.5 py-1 rounded border font-semibold transition-colors ${
                         predictBudget === amt
-                          ? 'bg-[#18C8FF]/20 border-[#18C8FF]/45 text-[#9CE7FF]'
-                          : 'bg-[#091019] border-white/[0.08] text-slate-400'
+                          ? 'bg-[#2B7FFF]/20 border-[#2B7FFF]/45 text-[#60A5FA]'
+                          : 'bg-[#000000] border-[#1A1E26] text-[#9CA3AF] hover:text-white'
                       }`}
                     >
                       ${amt}
@@ -492,11 +492,11 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
 
               {isLoading && predictSetups.length === 0 ? (
                 <div className="flex items-center justify-center py-12 gap-2 text-sm text-slate-300">
-                  <Loader2 className="w-5 h-5 animate-spin text-[#18C8FF]" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[#2B7FFF]" />
                   <span>Scanning live Block-Scholes &amp; Pyth strike odds...</span>
                 </div>
               ) : predictSetups.length === 0 ? (
-                <div className="panel-carbon-sub rounded-2xl p-6 text-center text-xs text-slate-400">
+                <div className="panel-carbon-sub rounded-lg p-6 text-center text-xs text-[#6B7280]">
                   No open BTC Predict expiries currently accepting orders within the 15%–50% band. Try refreshing shortly.
                 </div>
               ) : (
@@ -510,31 +510,31 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                     return (
                       <div
                         key={setup.id}
-                        className="panel-carbon-sub rounded-2xl p-4 flex flex-col justify-between gap-3 border border-white/[0.08]"
+                        className="panel-carbon-sub rounded-lg p-4 flex flex-col justify-between gap-3 border border-[#1A1E26]"
                       >
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[#18C8FF]/15 text-[#18C8FF]">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#2B7FFF]/15 text-[#60A5FA]">
                               {setup.tag}
                             </span>
-                            <span className="text-xs font-mono text-[#00E599] font-bold">
+                            <span className="text-xs font-mono text-[#08D189] font-bold">
                               {setup.payoutMultiple.toFixed(2)}x
                             </span>
                           </div>
                           <div className="text-sm font-bold text-white">{setup.title}</div>
-                          <p className="text-[11px] text-slate-400 leading-relaxed">
+                          <p className="text-[11px] text-[#9CA3AF] leading-relaxed">
                             {setup.rationale}
                           </p>
                         </div>
 
-                        <div className="space-y-2 pt-2 border-t border-white/[0.06] text-[11px] font-mono">
+                        <div className="space-y-2 pt-2 border-t border-[#1A1E26] text-[11px] font-mono">
                           <div className="flex justify-between text-slate-300">
                             <span>Implied Prob</span>
                             <span>{setup.winProbPct.toFixed(1)}%</span>
                           </div>
                           <div className="flex justify-between text-slate-300">
                             <span>Est. Payout</span>
-                            <span className="text-[#00E599] font-bold">
+                            <span className="text-[#08D189] font-bold">
                               ${setup.potentialPayoutUsd.toFixed(2)} USDC
                             </span>
                           </div>
@@ -543,7 +543,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                             type="button"
                             disabled={busyId !== null}
                             onClick={() => handleDeployPredictSetup(setup)}
-                            className="w-full mt-1 py-2 px-3 rounded-xl text-xs font-bold bg-[#18C8FF] hover:bg-[#3BD1FF] text-[#050A12] disabled:opacity-45 inline-flex items-center justify-center gap-1.5"
+                            className="w-full mt-1 py-2 px-3 rounded-lg text-xs font-bold btn-deepbook disabled:opacity-45 inline-flex items-center justify-center gap-1.5"
                           >
                             {busyId === setup.id ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -567,8 +567,8 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
           {tab === 'grid' && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="panel-carbon-sub rounded-xl p-3 space-y-1">
-                  <label className="text-[11px] text-slate-400">DeepBook Pool</label>
+                <div className="panel-carbon-sub rounded-lg p-3 space-y-1">
+                  <label className="text-[11px] text-[#6B7280]">DeepBook Pool</label>
                   <select
                     value={gridPool.poolName}
                     onChange={(e) => {
@@ -578,28 +578,28 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                     className="w-full bg-transparent text-xs font-mono font-bold text-white outline-none"
                   >
                     {pools.map((p) => (
-                      <option key={p.poolName} value={p.poolName} className="bg-[#091019]">
+                      <option key={p.poolName} value={p.poolName} className="bg-[#06070A]">
                         {p.poolName.replace('_', '/')}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="panel-carbon-sub rounded-xl p-3 space-y-1">
-                  <label className="text-[11px] text-slate-400">Strategy Mode</label>
+                <div className="panel-carbon-sub rounded-lg p-3 space-y-1">
+                  <label className="text-[11px] text-[#6B7280]">Strategy Mode</label>
                   <select
                     value={gridStyle}
                     onChange={(e) => setGridStyle(e.target.value as SpotGridStyle)}
-                    className="w-full bg-transparent text-xs font-bold text-[#18C8FF] outline-none"
+                    className="w-full bg-transparent text-xs font-bold text-[#60A5FA] outline-none"
                   >
-                    <option value="dca_buy" className="bg-[#091019]">Dip Accumulation (Bids)</option>
-                    <option value="take_profit" className="bg-[#091019]">Take-Profit Ladder (Asks)</option>
-                    <option value="two_sided" className="bg-[#091019]">Two-Sided Maker Grid</option>
+                    <option value="dca_buy" className="bg-[#06070A]">Dip Accumulation (Bids)</option>
+                    <option value="take_profit" className="bg-[#06070A]">Take-Profit Ladder (Asks)</option>
+                    <option value="two_sided" className="bg-[#06070A]">Two-Sided Maker Grid</option>
                   </select>
                 </div>
 
-                <div className="panel-carbon-sub rounded-xl p-3 space-y-1">
-                  <label className="text-[11px] text-slate-400">
+                <div className="panel-carbon-sub rounded-lg p-3 space-y-1">
+                  <label className="text-[11px] text-[#6B7280]">
                     Total Capital ({gridPool.quoteSymbol})
                   </label>
                   <input
@@ -613,27 +613,27 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                 </div>
               </div>
 
-              <div className="panel-carbon-sub rounded-2xl p-4 space-y-3">
+              <div className="panel-carbon-sub rounded-lg p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div className="text-sm font-bold text-white">{gridPreview.title}</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
+                    <div className="text-[11px] text-[#6B7280] mt-0.5">
                       {gridSignals.confidenceLabel} · {gridPreview.rationale}
                     </div>
                   </div>
                   <div className="text-right font-mono text-xs">
-                    <div className="text-slate-400">Live Mid</div>
+                    <div className="text-[#6B7280]">Live Mid</div>
                     <div className="text-white font-bold">${gridMidPrice.toFixed(4)}</div>
                   </div>
                 </div>
 
                 {gridPreview.rungs.length > 0 ? (
-                  <div className="divide-y divide-white/[0.06] rounded-xl bg-[#091019] border border-white/[0.08] overflow-hidden text-xs font-mono">
+                  <div className="divide-y divide-[#1A1E26] rounded-lg bg-[#000000] border border-[#1A1E26] overflow-hidden text-xs font-mono">
                     {gridPreview.rungs.map((r, idx) => (
                       <div key={idx} className="px-3.5 py-2 flex items-center justify-between">
                         <span
                           className={`font-bold ${
-                            r.isBid ? 'text-[#00E599]' : 'text-[#FF5E7A]'
+                            r.isBid ? 'text-[#08D189]' : 'text-[#F0525E]'
                           }`}
                         >
                           {r.isBid ? 'LIMIT BID' : 'LIMIT ASK'} #{idx + 1}
@@ -646,7 +646,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-400/30 rounded-xl px-3 py-2">
+                  <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-2">
                     {gridPreview.error}
                   </div>
                 )}
@@ -655,7 +655,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                   type="button"
                   disabled={busyId !== null || gridPreview.rungs.length === 0 || !account?.address}
                   onClick={handleDeploySpotGrid}
-                  className="w-full py-3 rounded-xl text-sm font-bold bg-[#00D98B] hover:bg-[#12E89B] text-[#05120D] disabled:opacity-45 inline-flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-lg text-sm font-bold bg-[#08D189] hover:bg-[#0DE295] text-[#05120D] disabled:opacity-45 inline-flex items-center justify-center gap-2 transition-colors"
                 >
                   {busyId === 'spot-grid' && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>
@@ -671,7 +671,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
           {tab === 'yield' && (
             <div className="space-y-4">
               {yieldReport.marginWarning && (
-                <div className="rounded-2xl bg-amber-500/15 border border-amber-400/35 px-4 py-3 flex items-start gap-2.5 text-xs text-amber-200">
+                <div className="rounded-lg bg-amber-500/15 border border-amber-400/35 px-4 py-3 flex items-start gap-2.5 text-xs text-amber-200">
                   <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
                   <div>
                     <div className="font-bold">Isolated Margin Health Alert</div>
@@ -685,23 +685,23 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                 </div>
               )}
 
-              <div className="panel-carbon-sub rounded-2xl p-4 space-y-3">
+              <div className="panel-carbon-sub rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-bold text-white">
                     Top DeepBook v3 MarginPool Supply APRs (0% Deposit Fee)
                   </div>
-                  <span className="text-[11px] font-mono text-[#00E599]">Live On-Chain</span>
+                  <span className="text-[11px] font-mono text-[#08D189]">Live On-Chain</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {yieldReport.topVaults.map((v) => (
                     <div
                       key={v.coinKey}
-                      className="rounded-xl bg-[#091019] border border-white/[0.08] p-3 text-xs font-mono space-y-1"
+                      className="rounded-lg bg-[#000000] border border-[#1A1E26] p-3 text-xs font-mono space-y-1"
                     >
                       <div className="text-white font-bold">{v.coinKey} Pool</div>
-                      <div className="text-lg font-bold text-[#00E599]">{v.apr.toFixed(2)}% APR</div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-lg font-bold text-[#08D189]">{v.apr.toFixed(2)}% APR</div>
+                      <div className="text-[10px] text-[#6B7280]">
                         Util: {v.utilizationPct.toFixed(1)}%
                       </div>
                     </div>

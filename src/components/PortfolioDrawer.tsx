@@ -213,64 +213,101 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/80">
-      <div className="panel-carbon w-full max-w-md h-full flex flex-col border-l border-white/[0.14]">
-        <div className="px-5 py-4 border-b border-white/[0.1] flex items-center justify-between bg-[#0A1019]">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/80 backdrop-blur-[2px]">
+      <div className="w-full max-w-[410px] h-full flex flex-col bg-[#000000] border-l border-[#1E232D] animate-drawer-in">
+        <div className="px-5 py-3.5 border-b border-[#1A1E26] flex items-center justify-between bg-[#000000]">
           <div className="flex items-center gap-2.5">
-            <Wallet className="w-5 h-5 text-[#18C8FF]" />
-            <span className="text-base font-bold text-white">Wallet Portfolio</span>
+            <Wallet className="w-4 h-4 text-[#60A5FA]" />
+            <span className="text-sm font-bold text-white tracking-tight">Portfolio</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
                 loadPortfolio();
                 loadPredictState(account?.address);
               }}
-              className="p-2 rounded-xl bg-[#0A1019] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#18C8FF]/50"
+              className="p-2 rounded-lg bg-[#06070A] border border-[#1B1F27] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
+              title="Refresh portfolio"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl bg-[#0A1019] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#18C8FF]/50"
+              className="p-2 rounded-lg bg-[#06070A] border border-[#1B1F27] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
+              title="Close drawer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {!account ? (
-            <div className="text-sm text-slate-300 text-center py-12">
+            <div className="text-sm text-slate-400 text-center py-12">
               Connect your Sui wallet to inspect live balances, DeepBook vaults, and perpetual equity.
             </div>
           ) : (
             <>
-              <div className="panel-carbon-sub rounded-2xl p-4 space-y-2.5">
-                <div className="text-sm text-slate-300">Net Estimated Equity</div>
-                <div className="text-3xl font-mono tabular-nums font-bold text-white">
-                  ${(spotUsd + perpsUsd + vaultsUsd + clobVaultsUsd + predictAvailableUsd + predictPendingUsd).toFixed(2)}
+              {/* Hero Total Equity Header matching DeepBook Alpha Drawer */}
+              <div className="pb-4 border-b border-[#1A1E26] space-y-3">
+                <div>
+                  <div className="text-xs text-slate-400 font-medium">Total Portfolio Equity</div>
+                  <div className="text-4xl font-mono tabular-nums font-bold text-white tracking-tight mt-1">
+                    ${(spotUsd + perpsUsd + vaultsUsd + clobVaultsUsd + predictAvailableUsd + predictPendingUsd).toFixed(2)}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-xs font-mono text-slate-300 pt-1">
-                  <span>Spot: ${spotUsd.toFixed(2)}</span>
-                  <span>Vaults: ${(vaultsUsd + clobVaultsUsd).toFixed(2)}</span>
-                  <span>Perps: ${perpsUsd.toFixed(2)}</span>
+
+                <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+                  <span>Spot: <strong className="text-slate-200">${spotUsd.toFixed(2)}</strong></span>
+                  <span>Vaults: <strong className="text-slate-200">${(vaultsUsd + clobVaultsUsd).toFixed(2)}</strong></span>
+                  <span>Perps: <strong className="text-slate-200">${perpsUsd.toFixed(2)}</strong></span>
                 </div>
+
                 {(predictAvailableUsd > 0.001 || predictPendingUsd > 0.001) && (
-                  <div className="flex items-center justify-between text-xs font-mono text-[#00E599] pt-0.5 border-t border-white/[0.06]">
+                  <div className="flex items-center justify-between text-xs font-mono text-[#08D189] pt-1 border-t border-[#1A1E26]">
                     <span>DeepBook Predict USDC</span>
                     <span>${(predictAvailableUsd + predictPendingUsd).toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="space-y-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsDustModalOpen(true)}
+                    className="w-full py-2.5 px-4 rounded-lg btn-deepbook text-xs font-bold tracking-wide inline-flex items-center justify-center gap-2"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>SWEEP DUST &amp; RECLAIM SUI GAS</span>
+                  </button>
+                  {hasClobUnlocked && (
+                    <button
+                      type="button"
+                      disabled={isWithdrawingClob}
+                      onClick={() => handleWithdrawClob(false)}
+                      className="w-full py-2 px-4 rounded-lg bg-[#06070A] hover:bg-[#0C0E13] border border-[#1E232D] text-white text-xs font-semibold tracking-wide transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                    >
+                      {isWithdrawingClob && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>WITHDRAW CLOB BALANCES</span>
+                    </button>
+                  )}
+                </div>
+                {rpcStats && (
+                  <div className="text-[11px] font-mono text-slate-500">
+                    Mainnet RPC: {rpcStats.activeEndpoint.label}
+                    {rpcStats.activeEndpoint.latencyMs > 0
+                      ? ` (${rpcStats.activeEndpoint.latencyMs}ms)`
+                      : ''}
                   </div>
                 )}
               </div>
 
               {(predictAvailableUsd > 0.001 || predictPendingUsd > 0.001 || predictStatusMsg) && (
-                <div className="panel-carbon-sub rounded-2xl p-3.5 space-y-2.5 border border-[#00E599]/25">
+                <div className="bg-[#06070A] rounded-lg p-3.5 space-y-2.5 border border-[#08D189]/30">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-white">DeepBook Predict Account</span>
-                    <span className="text-xs font-mono text-[#00E599] tabular-nums">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">DeepBook Predict Account</span>
+                    <span className="text-xs font-mono text-[#08D189] tabular-nums font-semibold">
                       ${predictAvailableUsd.toFixed(2)} USDC
                     </span>
                   </div>
@@ -280,14 +317,14 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     </div>
                   )}
                   {predictStatusMsg && (
-                    <div className="text-[11px] text-[#9CE7FF] font-mono">{predictStatusMsg}</div>
+                    <div className="text-[11px] text-[#60A5FA] font-mono">{predictStatusMsg}</div>
                   )}
                   {predictAvailableUsd > 0.001 && (
                     <button
                       type="button"
                       disabled={isWithdrawingPredict}
                       onClick={handleWithdrawPredict}
-                      className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                      className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#08D189]/15 border border-[#08D189]/40 text-[#08D189] hover:bg-[#08D189]/25 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
                     >
                       {isWithdrawingPredict && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       <span>Withdraw All Predict USDC (${predictAvailableUsd.toFixed(2)})</span>
@@ -296,47 +333,20 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                 </div>
               )}
 
-              <div className="panel-carbon-sub rounded-2xl p-3.5 flex items-center justify-between gap-3 border border-[#18C8FF]/20">
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-[#18C8FF]" />
-                    <span>Dust &amp; SUI Rebate Sweeper</span>
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    Burn 0-balance coins for SUI gas rebate or swap dust -&gt; SUI / USDC
-                  </div>
-                  {rpcStats && (
-                    <div className="text-[10px] font-mono text-slate-500 mt-1">
-                      RPC: {rpcStats.activeEndpoint.label}
-                      {rpcStats.activeEndpoint.latencyMs > 0
-                        ? ` (${rpcStats.activeEndpoint.latencyMs}ms)`
-                        : ''}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsDustModalOpen(true)}
-                  className="px-3 py-2 rounded-xl text-xs font-bold bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 shrink-0"
-                >
-                  Open Sweeper
-                </button>
-              </div>
-
               {hasClobFundsOrOrders && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-sm font-semibold text-white">
-                      DeepBook Spot CLOB Vaults ({nonEmptyClobManagers.length})
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Spot CLOB Vaults ({nonEmptyClobManagers.length})
                     </span>
-                    <span className="text-xs font-mono text-[#18C8FF]">
+                    <span className="text-xs font-mono text-[#60A5FA] font-semibold">
                       ${clobVaultsUsd.toFixed(2)}
                     </span>
                   </div>
-                  <div className="panel-carbon-sub rounded-2xl p-3.5 space-y-3 border border-[#18C8FF]/25">
+                  <div className="bg-[#06070A] rounded-lg p-3 space-y-2.5 border border-[#1B1F27]">
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                      <div className="rounded-xl bg-[#0A1019] border border-white/[0.08] px-3 py-2">
-                        <div className="text-[11px] text-slate-400 font-sans">Unlocked in Vaults</div>
+                      <div className="rounded bg-[#000000] border border-[#1A1E26] px-2.5 py-2">
+                        <div className="text-[10px] text-slate-500 font-sans">Unlocked in Vaults</div>
                         <div className="text-white font-semibold mt-0.5 tabular-nums">
                           {clobUnlockedSui.toFixed(4)} SUI
                         </div>
@@ -344,8 +354,8 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                           {clobUnlockedUsdc.toFixed(4)} USDC
                         </div>
                       </div>
-                      <div className="rounded-xl bg-[#0A1019] border border-white/[0.08] px-3 py-2">
-                        <div className="text-[11px] text-slate-400 font-sans">
+                      <div className="rounded bg-[#000000] border border-[#1A1E26] px-2.5 py-2">
+                        <div className="text-[10px] text-slate-500 font-sans">
                           In Open Orders ({clobOpenOrders.length})
                         </div>
                         <div className="text-amber-300 font-semibold mt-0.5 tabular-nums">
@@ -357,20 +367,20 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                       </div>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       {nonEmptyClobManagers.map((m) => {
                         const mSui = m.baseBalance + m.settledBase;
                         const mUsdc = m.quoteBalance + m.settledQuote;
                         return (
                           <div
                             key={m.managerId}
-                            className="flex items-center justify-between text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-[#0A1019]/70 border border-white/[0.06]"
+                            className="flex items-center justify-between text-[11px] font-mono px-2.5 py-1.5 rounded bg-[#000000] border border-[#1A1E26]"
                           >
                             <a
                               href={`https://suiscan.xyz/mainnet/object/${m.managerId}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[#18C8FF] hover:underline"
+                              className="inline-flex items-center gap-1 text-[#60A5FA] hover:underline"
                             >
                               <span>
                                 {m.managerId.slice(0, 6)}...{m.managerId.slice(-4)}
@@ -386,40 +396,27 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                       })}
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      {hasClobUnlocked && (
-                        <button
-                          type="button"
-                          disabled={isWithdrawingClob}
-                          onClick={() => handleWithdrawClob(false)}
-                          className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
-                        >
-                          {isWithdrawingClob && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                          <span>Withdraw Unlocked Funds to Wallet</span>
-                        </button>
-                      )}
-                      {clobOpenOrders.length > 0 && (
-                        <button
-                          type="button"
-                          disabled={isWithdrawingClob}
-                          onClick={() => handleWithdrawClob(true)}
-                          className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-amber-500/15 border border-amber-400/40 text-amber-200 hover:bg-amber-500/25 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
-                        >
-                          {isWithdrawingClob && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                          <span>
-                            Cancel All ({clobOpenOrders.length}) & Withdraw All to Wallet
-                          </span>
-                        </button>
-                      )}
-                    </div>
+                    {clobOpenOrders.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={isWithdrawingClob}
+                        onClick={() => handleWithdrawClob(true)}
+                        className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#F0525E]/15 border border-[#F0525E]/40 text-[#F0525E] hover:bg-[#F0525E]/25 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                      >
+                        {isWithdrawingClob && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        <span>
+                          Cancel All ({clobOpenOrders.length}) &amp; Withdraw All to Wallet
+                        </span>
+                      </button>
+                    )}
 
                     {clobStatus && (
-                      <div className="text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-400/30 rounded-xl px-3 py-2">
+                      <div className="text-xs text-[#08D189] bg-[#08D189]/10 border border-[#08D189]/30 rounded-lg px-3 py-2">
                         {clobStatus}
                       </div>
                     )}
                     {clobError && (
-                      <div className="text-xs text-rose-300 bg-rose-500/10 border border-rose-400/30 rounded-xl px-3 py-2">
+                      <div className="text-xs text-[#F0525E] bg-[#F0525E]/10 border border-[#F0525E]/30 rounded-lg px-3 py-2">
                         {clobError}
                       </div>
                     )}
@@ -429,24 +426,24 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
 
               {activeMarginEntries.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-sm font-semibold text-white px-1">
+                  <div className="text-xs font-bold uppercase tracking-wider text-slate-300 px-0.5">
                     DeepBook v3 Lending Deposits
                   </div>
-                  <div className="divide-y divide-white/[0.06] panel-carbon-sub rounded-2xl overflow-hidden">
+                  <div className="divide-y divide-[#1A1E26] bg-[#06070A] border border-[#1B1F27] rounded-lg overflow-hidden">
                     {activeMarginEntries.map((m) => (
                       <div
                         key={m.coinKey}
-                        className="px-4 py-3 flex items-center justify-between text-xs font-mono"
+                        className="px-3.5 py-2.5 flex items-center justify-between text-xs font-mono"
                       >
                         <div>
                           <div className="text-sm font-bold text-white font-sans">{m.coinKey} Vault</div>
-                          <div className="text-xs text-[#18C8FF]">{m.apr.toFixed(2)}% APR</div>
+                          <div className="text-xs text-[#60A5FA]">{m.apr.toFixed(2)}% APR</div>
                         </div>
                         <div className="text-right tabular-nums">
                           <div className="text-sm font-semibold text-white">
                             {m.suppliedAmount.toFixed(4)} {m.coinKey}
                           </div>
-                          <div className="text-xs text-slate-300">${m.usd.toFixed(2)}</div>
+                          <div className="text-xs text-slate-400">${m.usd.toFixed(2)}</div>
                         </div>
                       </div>
                     ))}
@@ -455,42 +452,42 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
               )}
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm text-slate-300 px-1">
-                  <span className="font-semibold text-white">On-Chain Assets</span>
+                <div className="flex items-center justify-between text-xs px-0.5">
+                  <span className="font-bold uppercase tracking-wider text-slate-300">Wallet Assets</span>
                   <a
                     href={`https://suiscan.xyz/mainnet/account/${account.address}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-[#18C8FF] hover:underline font-mono"
+                    className="inline-flex items-center gap-1 text-xs text-[#60A5FA] hover:underline font-mono"
                   >
                     <span>Suiscan</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
 
                 {heldTokens.length === 0 ? (
-                  <div className="panel-carbon-sub rounded-xl p-4 text-center text-sm text-slate-400">
-                    No tracked Sui balances found in wallet.
+                  <div className="bg-[#06070A] border border-[#1B1F27] rounded-lg p-5 text-center text-xs text-slate-500">
+                    No assets yet
                   </div>
                 ) : (
-                  <div className="divide-y divide-white/[0.06] panel-carbon-sub rounded-2xl overflow-hidden">
+                  <div className="divide-y divide-[#1A1E26] bg-[#06070A] border border-[#1B1F27] rounded-lg overflow-hidden">
                     {heldTokens.map(({ token, amount, usd }) => (
                       <div
                         key={token.address + token.symbol}
-                        className="px-4 py-3 flex items-center justify-between"
+                        className="px-3.5 py-2.5 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <img src={token.logo} alt={token.symbol} className="w-7 h-7 rounded-full" />
+                        <div className="flex items-center gap-2.5">
+                          <img src={token.logo} alt={token.symbol} className="w-6 h-6 rounded-full" />
                           <div>
                             <div className="text-sm font-bold text-white">{token.symbol}</div>
-                            <div className="text-xs text-slate-300">{token.name}</div>
+                            <div className="text-[11px] text-slate-400">{token.name}</div>
                           </div>
                         </div>
                         <div className="text-right font-mono tabular-nums">
                           <div className="text-sm text-white font-semibold">
                             {amount.toFixed(token.decimals > 6 ? 4 : 2)}
                           </div>
-                          <div className="text-xs text-slate-300">${usd.toFixed(2)}</div>
+                          <div className="text-[11px] text-slate-400">${usd.toFixed(2)}</div>
                         </div>
                       </div>
                     ))}

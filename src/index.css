@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --dapp-kit-background: #0B111C;
+  --dapp-kit-background: #06070a;
   --dapp-kit-foreground: #f8fafc;
-  --dapp-kit-primary: #18C8FF;
-  --dapp-kit-primary-foreground: #04111D;
-  --dapp-kit-secondary: #151E2C;
+  --dapp-kit-primary: #2b7fff;
+  --dapp-kit-primary-foreground: #ffffff;
+  --dapp-kit-secondary: #10131a;
   --dapp-kit-secondary-foreground: #f8fafc;
-  --dapp-kit-border: rgba(255, 255, 255, 0.12);
-  --dapp-kit-accent: rgba(24, 200, 255, 0.14);
-  --dapp-kit-accent-foreground: #6CE6FF;
-  --dapp-kit-muted: #151E2C;
-  --dapp-kit-muted-foreground: #cbd5e1;
-  --dapp-kit-popover: #101722;
+  --dapp-kit-border: rgba(255, 255, 255, 0.1);
+  --dapp-kit-accent: rgba(43, 127, 255, 0.14);
+  --dapp-kit-accent-foreground: #60a5fa;
+  --dapp-kit-muted: #10131a;
+  --dapp-kit-muted-foreground: #94a3b8;
+  --dapp-kit-popover: #090b10;
   --dapp-kit-popover-foreground: #f8fafc;
-  --dapp-kit-positive: #00d98b;
-  --dapp-kit-destructive: #f6465d;
-  --dapp-kit-ring: #18C8FF;
-  --dapp-kit-radius: 14px;
+  --dapp-kit-positive: #08d189;
+  --dapp-kit-destructive: #f0525e;
+  --dapp-kit-ring: #2b7fff;
+  --dapp-kit-radius: 8px;
 }
 
 @layer base {
@@ -32,13 +32,8 @@
   }
 
   html, body {
-    background-color: #090e16;
-    background-image:
-      radial-gradient(ellipse 68% 44% at 48% 10%, rgba(24, 200, 255, 0.095), transparent 68%),
-      radial-gradient(circle at 74% 24%, rgba(59, 130, 246, 0.065), transparent 52%),
-      radial-gradient(ellipse 88% 30% at 50% 100%, rgba(14, 165, 233, 0.055), transparent 62%);
-    background-attachment: fixed;
-    @apply text-slate-100 font-sans antialiased selection:bg-[#18C8FF] selection:text-[#04111D];
+    background-color: #000000;
+    @apply text-slate-100 font-sans antialiased selection:bg-[#2B7FFF] selection:text-white;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden !important;
@@ -46,34 +41,37 @@
 }
 
 .panel-carbon {
-  background: #101722;
-  border: 1px solid rgba(255, 255, 255, 0.085);
-  box-shadow: 0 12px 36px -14px rgba(0, 0, 0, 0.85);
+  background: #06070a;
+  border: 1px solid #1b1f27;
 }
 
 .panel-carbon-sub {
-  background: #0A1019;
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #0c0e13;
+  border: 1px solid #1b1f27;
 }
 
 .pnl-green {
-  color: #00d98b;
+  color: #08d189;
 }
 
 .pnl-red {
-  color: #f6465d;
+  color: #f0525e;
 }
 
 .btn-deepbook {
-  background: linear-gradient(135deg, #4CE0FF 0%, #18C8FF 55%, #0EA5E9 100%);
-  color: #04111D;
-  font-weight: 800;
-  box-shadow: 0 0 22px rgba(24, 200, 255, 0.24);
+  background: #2b7fff;
+  color: #ffffff;
+  font-weight: 700;
+  transition: background-color 160ms ease, transform 120ms ease, box-shadow 180ms ease;
 }
 
 .btn-deepbook:hover {
-  background: linear-gradient(135deg, #7CE9FF 0%, #2AD4FF 55%, #0284C7 100%);
-  box-shadow: 0 0 28px rgba(24, 200, 255, 0.42);
+  background: #3d8bff;
+  box-shadow: 0 0 20px rgba(43, 127, 255, 0.28);
+}
+
+.btn-deepbook:active {
+  transform: scale(0.99);
 }
 
 input[type='number']::-webkit-inner-spin-button,
@@ -85,8 +83,8 @@ input[type='number']::-webkit-outer-spin-button {
 input[type='range'].carbon-slider {
   -webkit-appearance: none;
   appearance: none;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.14);
+  height: 4px;
+  background: #1b1f27;
   border-radius: 9999px;
   outline: none;
 }
@@ -94,12 +92,12 @@ input[type='range'].carbon-slider {
 input[type='range'].carbon-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 9999px;
-  background: #18C8FF;
-  border: 2px solid #04111D;
-  box-shadow: 0 0 12px rgba(24, 200, 255, 0.75);
+  background: #2b7fff;
+  border: 2px solid #000000;
+  box-shadow: 0 0 10px rgba(43, 127, 255, 0.65);
   cursor: pointer;
 }
 
@@ -117,26 +115,26 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090E16;
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(24, 200, 255, 0.55);
+  background: rgba(43, 127, 255, 0.6);
 }
 
 @keyframes slideUpSheet {
   from {
-    transform: translateY(100%);
+    transform: translateY(12px);
     opacity: 0;
   }
   to {
@@ -145,8 +143,63 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
   }
 }
 
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drawerSlideLeft {
+  from {
+    opacity: 0.4;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes livePing {
+  0% {
+    box-shadow: 0 0 0 0 rgba(8, 209, 137, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(8, 209, 137, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(8, 209, 137, 0);
+  }
+}
+
 .animate-slide-up {
-  animation: slideUpSheet 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUpSheet 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-panel-in {
+  animation: panelFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-drawer-in {
+  animation: drawerSlideLeft 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-live-dot {
+  animation: livePing 2.2s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-up,
+  .animate-panel-in,
+  .animate-drawer-in,
+  .animate-live-dot {
+    animation: none !important;
+  }
 }
 
 .safe-pb {
