@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --dapp-kit-background: #0d1015;
-  --dapp-kit-foreground: #f8fafc;
-  --dapp-kit-primary: #38bdf8;
-  --dapp-kit-primary-foreground: #090b0e;
-  --dapp-kit-secondary: #141923;
-  --dapp-kit-secondary-foreground: #e2e8f0;
-  --dapp-kit-border: rgba(255, 255, 255, 0.08);
-  --dapp-kit-accent: rgba(56, 189, 248, 0.14);
+  --dapp-kit-background: #070b14;
+  --dapp-kit-foreground: #ffffff;
+  --dapp-kit-primary: #1d63ff;
+  --dapp-kit-primary-foreground: #ffffff;
+  --dapp-kit-secondary: #0f1628;
+  --dapp-kit-secondary-foreground: #f8fafc;
+  --dapp-kit-border: rgba(255, 255, 255, 0.14);
+  --dapp-kit-accent: rgba(29, 99, 255, 0.2);
   --dapp-kit-accent-foreground: #ffffff;
-  --dapp-kit-muted: #141923;
-  --dapp-kit-muted-foreground: #94a3b8;
-  --dapp-kit-popover: #101318;
-  --dapp-kit-popover-foreground: #f8fafc;
-  --dapp-kit-positive: #10b981;
-  --dapp-kit-destructive: #ef4444;
-  --dapp-kit-ring: #38bdf8;
+  --dapp-kit-muted: #0f1628;
+  --dapp-kit-muted-foreground: #cbd5e1;
+  --dapp-kit-popover: #0b101d;
+  --dapp-kit-popover-foreground: #ffffff;
+  --dapp-kit-positive: #00d98b;
+  --dapp-kit-destructive: #f6465d;
+  --dapp-kit-ring: #3b82f6;
   --dapp-kit-radius: 10px;
 }
 
@@ -28,52 +28,64 @@
   }
 
   html, body {
-    @apply bg-[#090B0E] text-slate-100 font-sans antialiased selection:bg-[#38BDF8] selection:text-[#090B0E];
-    overflow-x: hidden;
-    max-width: 100vw;
-    width: 100%;
-    -webkit-text-size-adjust: 100%;
-    touch-action: manipulation;
+    background-color: #030509;
+    background-image:
+      radial-gradient(ellipse 75% 42% at 50% -12%, rgba(29, 99, 255, 0.18), transparent 72%),
+      radial-gradient(circle at 85% 15%, rgba(0, 217, 139, 0.05), transparent 45%);
+    background-attachment: fixed;
+    @apply text-white font-sans antialiased selection:bg-[#1D63FF] selection:text-white;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden !important;
   }
-
-  button, a, input, select, textarea {
-    -webkit-tap-highlight-color: transparent !important;
-    touch-action: manipulation;
-  }
-}
-
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
 }
 
 .panel-carbon {
-  background: #101318;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0a0f1a;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.75);
 }
 
 .panel-carbon-sub {
-  background: #0c0e12;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #05080f;
+  border: 1px solid rgba(255, 255, 255, 0.085);
 }
 
-/* Custom sleek dark range slider */
+.btn-deepbook {
+  background: linear-gradient(135deg, #1d63ff 0%, #0094ff 100%);
+  color: #ffffff;
+  box-shadow: 0 0 22px rgba(29, 99, 255, 0.35);
+}
+
+.btn-deepbook:hover {
+  background: linear-gradient(135deg, #2d73ff 0%, #1ca3ff 100%);
+  box-shadow: 0 0 28px rgba(45, 115, 255, 0.5);
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 input[type='range'].carbon-slider {
   -webkit-appearance: none;
   appearance: none;
   height: 5px;
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.08);
   outline: none;
 }
 
 input[type='range'].carbon-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   border-radius: 9999px;
-  background: #38bdf8;
-  border: 2px solid #090b0e;
+  background: #2970ff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 10px rgba(41, 112, 255, 0.75);
   cursor: pointer;
 }
 
@@ -96,16 +108,16 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar-track {
-  background: #090b0e;
+  background: #030509;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 189, 248, 0.35);
+  background: rgba(29, 99, 255, 0.6);
 }
 
 @keyframes slideUpSheet {

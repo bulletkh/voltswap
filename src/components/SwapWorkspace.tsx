@@ -580,14 +580,14 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     <div className="w-full space-y-3">
       {/* Sub-navigation bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center p-1 rounded-lg bg-[#101318] border border-white/[0.06]">
+        <div className="inline-flex items-center p-1 rounded-xl bg-[#0A0F1A] border border-white/[0.11]">
           <button
             type="button"
             onClick={() => setMode('market')}
-            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
               mode === 'market'
-                ? 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30'
-                : 'text-slate-400 hover:text-white border border-transparent'
+                ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)]'
+                : 'text-slate-300 hover:text-white'
             }`}
           >
             Market Swap
@@ -595,26 +595,26 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           <button
             type="button"
             onClick={() => setMode('limit')}
-            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
               mode === 'limit'
-                ? 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30'
-                : 'text-slate-400 hover:text-white border border-transparent'
+                ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)]'
+                : 'text-slate-300 hover:text-white'
             }`}
           >
             <span>Pro Limit</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-white/[0.06] text-slate-300">
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.12] text-white">
               DeepBook v3
             </span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-          <span className="px-2.5 py-1 rounded-md bg-[#101318] border border-white/[0.06]">
-            {traderTier.badgeEmoji} {traderTier.name} ·{' '}
-            <span className="text-[#38BDF8]">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+        <div className="flex items-center gap-2 text-xs font-mono text-slate-300">
+          <span className="px-2.5 py-1 rounded-lg bg-[#0A0F1A] border border-white/[0.11]">
+            {traderTier.badgeEmoji} <span className="text-white font-semibold">{traderTier.name}</span> ·{' '}
+            <span className="text-[#4BA3FF] font-bold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
           </span>
           {activeReferrer && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#00D98B]/15 border border-[#00D98B]/30 text-[#00E599] font-semibold">
               <CheckCircle2 className="w-3 h-3" />
               Ref Split Active
             </span>
@@ -653,8 +653,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               {/* Top Controls */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-white">Swap</span>
-                  <span className="text-[11px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-white/[0.04]">
+                  <span className="text-sm font-bold text-white">Swap</span>
+                  <span className="text-[11px] font-mono text-[#4BA3FF] px-2 py-0.5 rounded bg-[#1D63FF]/15 border border-[#1D63FF]/35">
                     Cetus Aggregator
                   </span>
                 </div>
@@ -662,10 +662,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowMarketChart((v) => !v)}
-                    className={`p-1.5 rounded-md border text-xs transition-colors ${
+                    className={`p-1.5 rounded-md border text-xs transition-all ${
                       showMarketChart
-                        ? 'bg-[#38BDF8]/15 border-[#38BDF8]/30 text-[#38BDF8]'
-                        : 'bg-[#0C0E12] border-white/[0.06] text-slate-400 hover:text-white'
+                        ? 'bg-[#1D63FF] border-[#3B82F6] text-white'
+                        : 'bg-[#05080F] border-white/[0.1] text-slate-300 hover:text-white'
                     }`}
                     title="Toggle live price chart"
                   >
@@ -674,7 +674,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowSettings((v) => !v)}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#0C0E12] border border-white/[0.06] text-xs font-mono text-slate-300 hover:text-white"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#05080F] border border-white/[0.1] text-xs font-mono text-slate-200 hover:text-white"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
                     <span>{slippagePct}%</span>
@@ -684,7 +684,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
               {showSettings && (
                 <div className="panel-carbon-sub rounded-lg p-2.5 flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-400">Max Slippage</span>
+                  <span className="text-xs text-slate-300">Max Slippage</span>
                   <div className="flex items-center gap-1">
                     {[0.1, 0.5, 1.0].map((v) => (
                       <button
@@ -693,8 +693,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         onClick={() => setSlippagePct(v)}
                         className={`px-2 py-1 rounded text-xs font-mono ${
                           slippagePct === v
-                            ? 'bg-[#38BDF8] text-[#090B0E] font-semibold'
-                            : 'bg-white/[0.04] text-slate-300 hover:text-white'
+                            ? 'bg-[#1D63FF] text-white font-semibold'
+                            : 'bg-white/[0.06] text-slate-300 hover:text-white'
                         }`}
                       >
                         {v}%
@@ -706,7 +706,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
               {/* You Pay */}
               <div className="panel-carbon-sub rounded-lg p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="flex items-center justify-between text-xs text-slate-300">
                   <span>You Pay</span>
                   <div className="flex items-center gap-1.5 font-mono tabular-nums">
                     <Wallet className="w-3 h-3" />
@@ -716,7 +716,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       onClick={() =>
                         setAmountIn((fromBal * 0.5).toFixed(fromToken.decimals > 6 ? 4 : 2))
                       }
-                      className="px-1.5 py-0.5 rounded bg-white/[0.05] hover:bg-white/[0.1] text-[10px] text-slate-300"
+                      className="px-1.5 py-0.5 rounded bg-white/[0.08] hover:bg-white/[0.15] text-[10px] text-white font-semibold"
                     >
                       HALF
                     </button>
@@ -726,7 +726,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         const maxAmt = fromToken.symbol === 'SUI' ? Math.max(0, fromBal - 0.05) : fromBal;
                         setAmountIn(maxAmt.toFixed(fromToken.decimals > 6 ? 4 : 2));
                       }}
-                      className="px-1.5 py-0.5 rounded bg-white/[0.05] hover:bg-white/[0.1] text-[10px] text-[#38BDF8]"
+                      className="px-1.5 py-0.5 rounded bg-[#1D63FF]/25 hover:bg-[#1D63FF]/40 text-[10px] text-[#4BA3FF] font-bold"
                     >
                       MAX
                     </button>
@@ -740,7 +740,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     value={amountIn}
                     onChange={(e) => setAmountIn(e.target.value)}
                     placeholder="0.0"
-                    className="w-full bg-transparent text-2xl font-mono tabular-nums font-medium text-white outline-none"
+                    className="w-full bg-transparent text-2xl font-mono tabular-nums font-bold text-white outline-none"
                   />
                   <button
                     type="button"
@@ -748,7 +748,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       setTokenQuery('');
                       setTokenPickerFor('from');
                     }}
-                    className="shrink-0 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#161B24] hover:bg-[#1E2531] border border-white/[0.08] text-sm font-semibold text-white"
+                    className="shrink-0 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#121A2C] hover:bg-[#1A2540] border border-white/[0.14] text-sm font-bold text-white"
                   >
                     <img
                       src={fromToken.logo}
@@ -756,7 +756,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       className="w-5 h-5 rounded-full"
                     />
                     <span>{fromToken.symbol}</span>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-300" />
                   </button>
                 </div>
               </div>
@@ -769,7 +769,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     setFromToken(toToken);
                     setToToken(fromToken);
                   }}
-                  className="p-2 rounded-lg bg-[#101318] border border-white/[0.1] text-slate-300 hover:text-[#38BDF8] hover:border-[#38BDF8]/40 transition-colors"
+                  className="p-2 rounded-lg bg-[#0B101D] border border-white/[0.14] text-white hover:text-[#4BA3FF] hover:border-[#2970FF] transition-colors"
                 >
                   <ArrowDownUp className="w-3.5 h-3.5" />
                 </button>
@@ -777,7 +777,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
               {/* You Receive */}
               <div className="panel-carbon-sub rounded-lg p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="flex items-center justify-between text-xs text-slate-300">
                   <span>You Receive</span>
                   <div className="flex items-center gap-1.5 font-mono tabular-nums">
                     <Wallet className="w-3 h-3" />
@@ -785,9 +785,9 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-2xl font-mono tabular-nums font-medium text-white truncate">
+                  <div className="text-2xl font-mono tabular-nums font-bold text-white truncate">
                     {isQuoting ? (
-                      <span className="text-slate-500 text-lg">Quoting...</span>
+                      <span className="text-slate-400 text-lg">Quoting...</span>
                     ) : (
                       formattedOut
                     )}
@@ -798,36 +798,36 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       setTokenQuery('');
                       setTokenPickerFor('to');
                     }}
-                    className="shrink-0 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#161B24] hover:bg-[#1E2531] border border-white/[0.08] text-sm font-semibold text-white"
+                    className="shrink-0 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#121A2C] hover:bg-[#1A2540] border border-white/[0.14] text-sm font-bold text-white"
                   >
                     <img src={toToken.logo} alt={toToken.symbol} className="w-5 h-5 rounded-full" />
                     <span>{toToken.symbol}</span>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-300" />
                   </button>
                 </div>
               </div>
 
               {/* Route & Fee Details */}
               <div className="panel-carbon-sub rounded-lg p-3 space-y-1.5 text-xs font-mono">
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-slate-300">
                   <span>Best Route</span>
-                  <span className="text-slate-200 truncate max-w-[220px]">
+                  <span className="text-white truncate max-w-[220px]">
                     {quote ? quote.dexHops.join(' + ') : '—'}
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-slate-300">
                   <span>Volt Tier Fee ({traderTier.name})</span>
-                  <span className="text-[#38BDF8] tabular-nums">
+                  <span className="text-[#4BA3FF] font-semibold tabular-nums">
                     {(traderTier.feeRate * 100).toFixed(2)}%
                     {activeReferrer ? ` (${Math.round(refTier.revSharePct * 100)}% → Ref)` : ''}
                   </span>
                 </div>
                 {quote && (
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-slate-300">
                     <span>Price Impact</span>
                     <span
-                      className={`tabular-nums ${
-                        quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-emerald-400'
+                      className={`tabular-nums font-semibold ${
+                        quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-[#00E599]'
                       }`}
                     >
                       {quote.priceImpactPct.toFixed(2)}%
@@ -837,7 +837,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               </div>
 
               {quoteError && (
-                <div className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                <div className="text-xs text-[#FF4D6A] bg-[#F6465D]/15 border border-[#F6465D]/35 rounded-lg px-3 py-2">
                   {quoteError}
                 </div>
               )}
@@ -846,7 +846,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 type="button"
                 disabled={isSwapping || isQuoting || !quote}
                 onClick={executeMarketSwap}
-                className="w-full py-3 rounded-lg bg-[#38BDF8] hover:bg-[#56CCF9] disabled:bg-white/[0.06] disabled:text-slate-500 text-[#090B0E] font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl btn-deepbook disabled:bg-white/[0.08] disabled:text-slate-400 disabled:shadow-none font-bold text-sm transition-all flex items-center justify-center gap-2"
               >
                 {isSwapping && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>
@@ -876,10 +876,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     setActivePool(pool);
                     setLimitPrice('');
                   }}
-                  className={`px-2.5 py-1.5 rounded-md text-xs font-mono whitespace-nowrap transition-colors ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap transition-all ${
                     activePool.poolName === pool.poolName
-                      ? 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30 font-semibold'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent'
+                      ? 'bg-[#1D63FF] text-white shadow-[0_0_14px_rgba(29,99,255,0.45)] font-bold'
+                      : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
                   }`}
                 >
                   {pool.baseSymbol}/{pool.quoteSymbol}
@@ -964,12 +964,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           className="relative w-full grid grid-cols-3 px-1.5 py-0.5 rounded hover:bg-white/[0.04] text-left"
                         >
                           <div
-                            className="absolute inset-y-0 right-0 bg-rose-500/12 pointer-events-none"
+                            className="absolute inset-y-0 right-0 bg-[#F6465D]/20 pointer-events-none"
                             style={{ width: `${pct}%` }}
                           />
-                          <span className="relative text-rose-400">{lv.price.toFixed(4)}</span>
-                          <span className="relative text-right text-slate-200">{lv.size.toFixed(2)}</span>
-                          <span className="relative text-right text-slate-400">
+                          <span className="relative text-[#FF4D6A] font-semibold">{lv.price.toFixed(4)}</span>
+                          <span className="relative text-right text-white">{lv.size.toFixed(2)}</span>
+                          <span className="relative text-right text-slate-300">
                             {lv.totalSize.toFixed(1)}
                           </span>
                         </button>
@@ -978,11 +978,11 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </div>
 
                   {/* Spread Mid */}
-                  <div className="py-1.5 px-2 my-1 rounded bg-[#0C0E12] border border-white/[0.05] flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">
+                  <div className="py-1.5 px-2 my-1 rounded bg-[#05080F] border border-white/[0.1] flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">
                       {orderbook.midPrice > 0 ? orderbook.midPrice.toFixed(4) : '—'}
                     </span>
-                    <span className="text-[10px] text-slate-500">
+                    <span className="text-[10px] text-slate-300">
                       Spread {orderbook.spreadPct.toFixed(3)}%
                     </span>
                   </div>
@@ -997,15 +997,15 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           key={`bid-${idx}`}
                           type="button"
                           onClick={() => setLimitPrice(lv.price.toString())}
-                          className="relative w-full grid grid-cols-3 px-1.5 py-0.5 rounded hover:bg-white/[0.04] text-left"
+                          className="relative w-full grid grid-cols-3 px-1.5 py-0.5 rounded hover:bg-white/[0.05] text-left"
                         >
                           <div
-                            className="absolute inset-y-0 right-0 bg-emerald-500/12 pointer-events-none"
+                            className="absolute inset-y-0 right-0 bg-[#00D98B]/20 pointer-events-none"
                             style={{ width: `${pct}%` }}
                           />
-                          <span className="relative text-emerald-400">{lv.price.toFixed(4)}</span>
-                          <span className="relative text-right text-slate-200">{lv.size.toFixed(2)}</span>
-                          <span className="relative text-right text-slate-400">
+                          <span className="relative text-[#00E599] font-semibold">{lv.price.toFixed(4)}</span>
+                          <span className="relative text-right text-white">{lv.size.toFixed(2)}</span>
+                          <span className="relative text-right text-slate-300">
                             {lv.totalSize.toFixed(1)}
                           </span>
                         </button>
@@ -1015,18 +1015,18 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 </div>
               ) : (
                 <div className="flex-1 p-2 overflow-y-auto text-[11px] font-mono tabular-nums space-y-1">
-                  <div className="grid grid-cols-3 text-slate-500 px-1 pb-1">
+                  <div className="grid grid-cols-3 text-slate-400 px-1 pb-1">
                     <span>Price</span>
                     <span className="text-right">Size</span>
                     <span className="text-right">Time</span>
                   </div>
                   {trades.map((tr) => (
                     <div key={tr.tradeId} className="grid grid-cols-3 px-1 py-0.5">
-                      <span className={tr.type === 'buy' ? 'text-emerald-400' : 'text-rose-400'}>
+                      <span className={tr.type === 'buy' ? 'text-[#00E599] font-semibold' : 'text-[#FF4D6A] font-semibold'}>
                         {tr.price.toFixed(4)}
                       </span>
-                      <span className="text-right text-slate-200">{tr.baseVolume.toFixed(2)}</span>
-                      <span className="text-right text-slate-500">
+                      <span className="text-right text-white">{tr.baseVolume.toFixed(2)}</span>
+                      <span className="text-right text-slate-300">
                         {new Date(tr.timestamp).toLocaleTimeString([], {
                           hour: '2-digit',
                           minute: '2-digit',
@@ -1042,14 +1042,14 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
             {/* Right: DeepBook v3 Limit Ticket + BalanceManager Vault */}
             <div className="lg:col-span-3 panel-carbon rounded-lg p-3 flex flex-col justify-between gap-3">
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#0C0E12] border border-white/[0.05]">
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#05080F] border border-white/[0.08]">
                   <button
                     type="button"
                     onClick={() => setLimitSide('buy')}
-                    className={`py-2 rounded text-xs font-semibold transition-colors ${
+                    className={`py-2 rounded text-xs font-bold transition-colors ${
                       limitSide === 'buy'
-                        ? 'bg-emerald-500 text-[#090B0E]'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-[#00D98B] text-[#02060A] shadow-[0_0_16px_rgba(0,217,139,0.28)]'
+                        : 'text-slate-300 hover:text-white'
                     }`}
                   >
                     Buy {activePool.baseSymbol}
@@ -1057,10 +1057,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   <button
                     type="button"
                     onClick={() => setLimitSide('sell')}
-                    className={`py-2 rounded text-xs font-semibold transition-colors ${
+                    className={`py-2 rounded text-xs font-bold transition-colors ${
                       limitSide === 'sell'
-                        ? 'bg-rose-500 text-white'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-[#F6465D] text-white shadow-[0_0_16px_rgba(246,70,93,0.28)]'
+                        : 'text-slate-300 hover:text-white'
                     }`}
                   >
                     Sell {activePool.baseSymbol}
@@ -1069,12 +1069,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
                 {/* Price */}
                 <div className="panel-carbon-sub rounded-lg p-2.5 space-y-1">
-                  <div className="flex justify-between text-[11px] text-slate-400">
+                  <div className="flex justify-between text-[11px] text-slate-300">
                     <span>Limit Price</span>
                     <button
                       type="button"
                       onClick={() => orderbook.midPrice > 0 && setLimitPrice(orderbook.midPrice.toFixed(4))}
-                      className="text-[#38BDF8] font-mono hover:underline"
+                      className="text-[#4BA3FF] font-mono font-semibold hover:underline"
                     >
                       Mid {orderbook.midPrice > 0 ? orderbook.midPrice.toFixed(4) : ''}
                     </button>
@@ -1142,27 +1142,27 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </div>
                 </div>
 
-                <label className="flex items-center justify-between text-xs text-slate-400 cursor-pointer">
+                <label className="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
                   <span>Post-Only (Maker Rebate)</span>
                   <input
                     type="checkbox"
                     checked={postOnly}
                     onChange={(e) => setPostOnly(e.target.checked)}
-                    className="accent-[#38BDF8]"
+                    className="accent-[#1D63FF]"
                   />
                 </label>
 
-                <div className="text-xs font-mono space-y-1 text-slate-400 pt-1">
+                <div className="text-xs font-mono space-y-1 text-slate-300 pt-1">
                   <div className="flex justify-between">
                     <span>Order Total</span>
-                    <span className="text-white tabular-nums">
+                    <span className="text-white font-semibold tabular-nums">
                       {((Number(limitPrice) || 0) * (Number(limitQty) || 0)).toFixed(4)}{' '}
                       {activePool.quoteSymbol}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Volt Fee ({traderTier.name})</span>
-                    <span className="text-[#38BDF8]">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+                    <span className="text-[#4BA3FF] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
                   </div>
                 </div>
 
@@ -1170,10 +1170,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   type="button"
                   disabled={isPlacingLimit}
                   onClick={executePlaceLimit}
-                  className={`w-full py-2.5 rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-2 ${
+                  className={`w-full py-2.5 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 ${
                     limitSide === 'buy'
-                      ? 'bg-emerald-500 hover:bg-emerald-400 text-[#090B0E]'
-                      : 'bg-rose-500 hover:bg-rose-400 text-white'
+                      ? 'bg-[#00D98B] hover:bg-[#1EE89F] text-[#02060A] shadow-[0_0_18px_rgba(0,217,139,0.28)]'
+                      : 'bg-[#F6465D] hover:bg-[#FF5B72] text-white shadow-[0_0_18px_rgba(246,70,93,0.28)]'
                   } disabled:opacity-50`}
                 >
                   {isPlacingLimit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -1186,13 +1186,13 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               </div>
 
               {/* DeepBook BalanceManager Custody Summary */}
-              <div className="panel-carbon-sub rounded-lg p-2.5 space-y-2 border-t border-white/[0.06]">
+              <div className="panel-carbon-sub rounded-lg p-2.5 space-y-2 border-t border-white/[0.1]">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />
+                  <span className="text-slate-300 flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#4BA3FF]" />
                     <span>DeepBook BalanceManager</span>
                   </span>
-                  <span className="font-mono text-slate-300">
+                  <span className="font-mono text-white">
                     {managerIds[0] ? `${managerIds[0].slice(0, 6)}...` : '1-Tx Auto'}
                   </span>
                 </div>
@@ -1200,13 +1200,13 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 {managerState && (
                   <>
                     <div className="grid grid-cols-2 gap-2 text-[11px] font-mono tabular-nums">
-                      <div className="bg-[#101318] rounded px-2 py-1">
-                        <div className="text-slate-500">{activePool.baseSymbol}</div>
-                        <div className="text-white">{managerState.baseBalance.toFixed(4)}</div>
+                      <div className="bg-[#0B101D] rounded px-2 py-1 border border-white/[0.08]">
+                        <div className="text-slate-400">{activePool.baseSymbol}</div>
+                        <div className="text-white font-semibold">{managerState.baseBalance.toFixed(4)}</div>
                       </div>
-                      <div className="bg-[#101318] rounded px-2 py-1">
-                        <div className="text-slate-500">{activePool.quoteSymbol}</div>
-                        <div className="text-white">{managerState.quoteBalance.toFixed(4)}</div>
+                      <div className="bg-[#0B101D] rounded px-2 py-1 border border-white/[0.08]">
+                        <div className="text-slate-400">{activePool.quoteSymbol}</div>
+                        <div className="text-white font-semibold">{managerState.quoteBalance.toFixed(4)}</div>
                       </div>
                     </div>
 
@@ -1214,7 +1214,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       <select
                         value={depositCoinSide}
                         onChange={(e) => setDepositCoinSide(e.target.value as 'base' | 'quote')}
-                        className="bg-[#101318] border border-white/[0.08] rounded px-1.5 py-1 text-[11px] font-mono text-white outline-none"
+                        className="bg-[#0B101D] border border-white/[0.12] rounded px-1.5 py-1 text-[11px] font-mono text-white outline-none"
                       >
                         <option value="quote">{activePool.quoteSymbol}</option>
                         <option value="base">{activePool.baseSymbol}</option>
@@ -1224,13 +1224,13 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         placeholder="Amt"
                         value={depositAmt}
                         onChange={(e) => setDepositAmt(e.target.value)}
-                        className="w-full min-w-0 bg-[#101318] border border-white/[0.08] rounded px-2 py-1 text-[11px] font-mono text-white outline-none"
+                        className="w-full min-w-0 bg-[#0B101D] border border-white/[0.12] rounded px-2 py-1 text-[11px] font-mono text-white outline-none"
                       />
                       <button
                         type="button"
                         disabled={isVaultBusy || !depositAmt}
                         onClick={handleDepositManager}
-                        className="px-2 py-1 rounded bg-white/[0.08] hover:bg-white/[0.14] text-[11px] font-semibold text-white shrink-0"
+                        className="px-2 py-1 rounded bg-white/[0.1] hover:bg-white/[0.18] text-[11px] font-semibold text-white shrink-0"
                       >
                         Dep
                       </button>
@@ -1238,7 +1238,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         type="button"
                         disabled={isVaultBusy}
                         onClick={handleWithdrawManagerAll}
-                        className="px-2 py-1 rounded bg-[#38BDF8]/15 hover:bg-[#38BDF8]/25 text-[#38BDF8] text-[11px] font-semibold shrink-0"
+                        className="px-2 py-1 rounded bg-[#1D63FF] hover:bg-[#2E74FF] text-white text-[11px] font-semibold shrink-0"
                         title="Withdraw all & settled funds to wallet"
                       >
                         Withdraw
@@ -1348,7 +1348,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               value={tokenQuery}
               onChange={(e) => setTokenQuery(e.target.value)}
               placeholder="Search symbol or coin type..."
-              className="w-full px-3 py-2 rounded-lg bg-[#0C0E12] border border-white/[0.08] text-xs text-white outline-none focus:border-[#38BDF8]"
+              className="w-full px-3 py-2 rounded-lg bg-[#05080F] border border-white/[0.12] text-xs text-white outline-none focus:border-[#2970FF]"
             />
             <div className="max-h-72 overflow-y-auto space-y-1">
               {filteredTokens.map((t) => {

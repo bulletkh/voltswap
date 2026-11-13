@@ -1,8 +1,8 @@
-import { Transaction, type TransactionObjectArgument } from '@mysten/sui/transactions';
+import { coinWithBalance, Transaction, type TransactionObjectArgument } from '@mysten/sui/transactions';
 import { bcs } from '@mysten/sui/bcs';
 import { toBase64 } from '@mysten/sui/utils';
 import { TRADER_TIERS, VOLT_TREASURY_ADDRESS, type TraderTierConfig } from './constants';
-import { safeNormalizeAddress } from './suiClient';
+import { safeNormalizeAddress, safeNormalizeCoinType, SUI_COIN_TYPE } from './suiClient';
 
 export const REFERRAL_STORAGE_KEY = 'volt_ref_address';
 export const VOLUME_STORAGE_PREFIX = 'volt_vol_usd_';
@@ -228,6 +228,42 @@ export function appendFeeToJsonV2Ptb(
     pushSplitAndTransfer(split.referrerUnits, split.referrer);
   } else {
     pushSplitAndTransfer(split.totalFeeUnits, VOLT_TREASURY_ADDRESS);
+  }
+
+  return split;
+}
+
+/**
+ * Collects Volt protocol fee for any Sui coin type (`tx.gas` for SUI, or `coinWithBalance`
+ * for non-SUI coins) with zero dangling zero-balance Coin objects.
+ */
+export function addCoinFeeToTx(
+  tx: Transaction,
+  params: {
+    coinType: string;
+    feeAtomic: bigint;
+    sender: string;
+    refSharePct?: number;
+  }
+): FeeSplitSummary {
+  const { coinType, feeAtomic, sender, refSharePct = 0.25 } = params;
+  if (feeAtomic <= 0n) {
+    return { totalFeeUnits: 0n, treasuryUnits: 0n, referrerUnits: 0n, referrer: null };
+  }
+
+  if (safeNormalizeCoinType(coinType) === safeNormalizeCoinType(SUI_COIN_TYPE)) {
+    return appendVoltFeeCoinSplit(tx, tx.gas, feeAtomic, sender, refSharePct);
+  }
+
+  const split = computeFeeSplit(feeAtomic, sender, refSharePct);
+  const feeCoin = coinWithBalance({ type: coinType, balance: feeAtomic })(tx);
+
+  if (split.referrer && split.referrerUnits > 0n && split.treasuryUnits > 0n) {
+    const [refCoin] = tx.splitCoins(feeCoin, [split.referrerUnits]);
+    tx.transferObjects([refCoin], split.referrer);
+    tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
+  } else {
+    tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
   }
 
   return split;

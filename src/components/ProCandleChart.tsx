@@ -47,38 +47,38 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
 
     const chart = createChart(el, {
       layout: {
-        background: { type: ColorType.Solid, color: '#0C0E12' },
-        textColor: '#94A3B8',
+        background: { type: ColorType.Solid, color: '#030509' },
+        textColor: '#CBD5E1',
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.035)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.035)' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.055)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.055)' },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: 'rgba(56, 189, 248, 0.35)', width: 1, style: 2 },
-        horzLine: { color: 'rgba(56, 189, 248, 0.35)', width: 1, style: 2 },
+        vertLine: { color: 'rgba(41, 112, 255, 0.55)', width: 1, style: 2 },
+        horzLine: { color: 'rgba(41, 112, 255, 0.55)', width: 1, style: 2 },
       },
       rightPriceScale: {
-        borderColor: 'rgba(255, 255, 255, 0.06)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         scaleMargins: { top: 0.12, bottom: 0.22 },
       },
       timeScale: {
-        borderColor: 'rgba(255, 255, 255, 0.06)',
+        borderColor: 'rgba(255, 255, 255, 0.1)',
         timeVisible: true,
         secondsVisible: false,
       },
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10B981',
-      downColor: '#EF4444',
-      borderUpColor: '#10B981',
-      borderDownColor: '#EF4444',
-      wickUpColor: '#10B981',
-      wickDownColor: '#EF4444',
+      upColor: '#00D98B',
+      downColor: '#F6465D',
+      borderUpColor: '#00D98B',
+      borderDownColor: '#F6465D',
+      wickUpColor: '#00E599',
+      wickDownColor: '#FF556B',
     });
 
     const volSeries = chart.addSeries(HistogramSeries, {
@@ -143,7 +143,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
     const volData = candles.map((c) => ({
       time: c.time as UTCTimestamp,
       value: c.volume,
-      color: c.close >= c.open ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)',
+      color: c.close >= c.open ? 'rgba(0, 217, 139, 0.32)' : 'rgba(246, 70, 93, 0.32)',
     }));
 
     candleSeriesRef.current.setData(formatted);
@@ -166,28 +166,28 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
   const decimals = displayPrice >= 1000 ? 1 : displayPrice >= 10 ? 2 : displayPrice >= 0.5 ? 4 : 6;
 
   return (
-    <div className="panel-carbon rounded-lg flex flex-col overflow-hidden">
-      <div className="px-3 py-2 border-b border-white/[0.06] flex flex-wrap items-center justify-between gap-2 bg-[#101318]">
+    <div className="panel-carbon rounded-xl flex flex-col overflow-hidden">
+      <div className="px-3 py-2 border-b border-white/[0.1] flex flex-wrap items-center justify-between gap-2 bg-[#070B14]">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-white tracking-tight">{symbolLabel}</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.04] text-slate-400 border border-white/[0.05]">
+            <span className="text-xs font-bold text-white tracking-tight">{symbolLabel}</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1D63FF]/15 text-[#4BA3FF] border border-[#1D63FF]/35">
               {sourceLabel}
             </span>
           </div>
           {activeBar && (
-            <div className="hidden sm:flex items-center gap-2.5 text-[11px] font-mono tabular-nums text-slate-400">
+            <div className="hidden sm:flex items-center gap-2.5 text-[11px] font-mono tabular-nums text-slate-300">
               <span>
-                O <span className="text-slate-200">{activeBar.open.toFixed(decimals)}</span>
+                O <span className="text-white">{activeBar.open.toFixed(decimals)}</span>
               </span>
               <span>
-                H <span className="text-emerald-400">{activeBar.high.toFixed(decimals)}</span>
+                H <span className="text-[#00E599]">{activeBar.high.toFixed(decimals)}</span>
               </span>
               <span>
-                L <span className="text-rose-400">{activeBar.low.toFixed(decimals)}</span>
+                L <span className="text-[#FF4D6A]">{activeBar.low.toFixed(decimals)}</span>
               </span>
               <span>
-                C <span className="text-white">{activeBar.close.toFixed(decimals)}</span>
+                C <span className="text-white font-semibold">{activeBar.close.toFixed(decimals)}</span>
               </span>
             </div>
           )}
@@ -199,10 +199,10 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
               key={tf}
               type="button"
               onClick={() => onTimeframeChange(tf)}
-              className={`px-2 py-1 rounded text-[11px] font-mono transition-colors ${
+              className={`px-2 py-1 rounded text-[11px] font-mono font-semibold transition-all ${
                 timeframe === tf
-                  ? 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30'
-                  : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent'
+                  ? 'bg-[#1D63FF] text-white shadow-[0_0_12px_rgba(29,99,255,0.4)]'
+                  : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
               }`}
             >
               {tf}
@@ -211,10 +211,10 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
         </div>
       </div>
 
-      <div className={`relative w-full ${heightClass} bg-[#0C0E12]`}>
+      <div className={`relative w-full ${heightClass} bg-[#030509]`}>
         <div ref={containerRef} className="w-full h-full" />
         {isLoading && candles.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0C0E12]/80 text-xs font-mono text-slate-400">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#030509]/85 text-xs font-mono text-slate-300">
             Loading live candles...
           </div>
         )}

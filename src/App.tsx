@@ -105,9 +105,9 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#090B0E] text-slate-100 flex flex-col">
-      {/* Top Institutional Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#090B0E]/90 backdrop-blur-md">
+    <div className="min-h-screen text-white flex flex-col">
+      {/* Top DeepBook-Inspired Navigation Bar */}
+      <header className="sticky top-0 z-40 border-b border-white/[0.1] bg-[#030509]/92 backdrop-blur-md">
         <div className="max-w-[1440px] mx-auto px-3 sm:px-5 h-14 flex items-center justify-between gap-3">
           {/* Brand */}
           <div className="flex items-center gap-6">
@@ -116,19 +116,19 @@ export function App() {
               onClick={() => setActiveTab('swap')}
               className="flex items-center gap-2 text-left"
             >
-              <div className="w-7 h-7 rounded-lg bg-[#38BDF8] text-[#090B0E] flex items-center justify-center font-black text-sm">
+              <div className="w-7 h-7 rounded-lg btn-deepbook flex items-center justify-center font-black text-sm">
                 ⚡
               </div>
               <div className="leading-none">
                 <span className="text-sm font-bold tracking-tight text-white">VOLT</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-slate-400 ml-1.5">
+                <span className="hidden sm:inline text-[10px] font-mono text-[#4BA3FF] ml-1.5">
                   SUI CLOB
                 </span>
               </div>
             </button>
 
             {/* Primary Nav */}
-            <nav className="hidden md:flex items-center gap-1">
+            <nav className="hidden md:flex items-center gap-1.5">
               {navItems.map((item) => {
                 const active = activeTab === item.id;
                 return (
@@ -136,10 +136,10 @@ export function App() {
                     key={item.id}
                     type="button"
                     onClick={() => setActiveTab(item.id)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
                       active
-                        ? 'bg-[#101318] text-[#38BDF8] border border-white/[0.08]'
-                        : 'text-slate-400 hover:text-white hover:bg-white/[0.03] border border-transparent'
+                        ? 'bg-[#1D63FF] text-white shadow-[0_0_20px_rgba(29,99,255,0.45)] border border-[#3B82F6]/60'
+                        : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
                     }`}
                   >
                     {item.icon}
@@ -156,9 +156,9 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setPortfolioOpen(true)}
-                className="px-2.5 py-1.5 rounded-lg bg-[#101318] hover:bg-[#161B24] border border-white/[0.08] text-xs font-medium text-slate-200 inline-flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-[#0A0F1A] hover:bg-[#131C30] border border-white/[0.14] text-xs font-semibold text-white inline-flex items-center gap-1.5"
               >
-                <Wallet className="w-3.5 h-3.5 text-[#38BDF8]" />
+                <Wallet className="w-3.5 h-3.5 text-[#4BA3FF]" />
                 <span className="hidden sm:inline">Portfolio</span>
               </button>
             )}
@@ -167,7 +167,7 @@ export function App() {
         </div>
 
         {/* Mobile Tab Strip */}
-        <div className="md:hidden border-t border-white/[0.05] px-2 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div className="md:hidden border-t border-white/[0.08] px-2 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar">
           {navItems.map((item) => {
             const active = activeTab === item.id;
             return (
@@ -175,10 +175,10 @@ export function App() {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1.5 ${
                   active
-                    ? 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30'
-                    : 'text-slate-400 border border-transparent'
+                    ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)]'
+                    : 'text-slate-300 border border-transparent'
                 }`}
               >
                 {item.icon}
@@ -225,39 +225,39 @@ export function App() {
       </main>
 
       {/* Minimal Footer */}
-      <footer className="border-t border-white/[0.05] py-3 px-4 text-[11px] font-mono text-slate-500">
+      <footer className="border-t border-white/[0.08] py-3 px-4 text-[11px] font-mono text-slate-400">
         <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className="text-slate-300 font-semibold">Volt Protocol</span>
+            <span className="text-white font-semibold">Volt Protocol</span>
             <span>Cetus Aggregator · DeepBook v3 CLOB · Aftermath Perps</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-[#38BDF8]" />
-            <span>Non-custodial Sui Move Execution</span>
+            <Sparkles className="w-3 h-3 text-[#4BA3FF]" />
+            <span className="text-slate-200">Non-custodial Sui Move Execution</span>
           </div>
         </div>
       </footer>
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] panel-carbon rounded-xl p-3.5 shadow-2xl border border-white/[0.1] animate-slide-up">
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] panel-carbon rounded-xl p-3.5 shadow-2xl border border-white/[0.16] animate-slide-up">
           <div className="flex items-start gap-2.5">
             {toast.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-4 h-4 text-[#00E599] shrink-0 mt-0.5" />
             ) : toast.type === 'error' ? (
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-[#FF4D6A] shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-[#38BDF8] shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-[#4BA3FF] shrink-0 mt-0.5" />
             )}
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-white">{toast.title}</div>
-              <div className="text-xs text-slate-400 mt-0.5 break-words">{toast.message}</div>
+              <div className="text-xs font-bold text-white">{toast.title}</div>
+              <div className="text-xs text-slate-300 mt-0.5 break-words">{toast.message}</div>
               {toast.actionUrl && toast.actionLabel && (
                 <a
                   href={toast.actionUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-mono text-[#38BDF8] hover:underline mt-1.5"
+                  className="inline-flex items-center gap-1 text-[11px] font-mono text-[#4BA3FF] hover:underline mt-1.5"
                 >
                   <span>{toast.actionLabel}</span>
                   <ExternalLink className="w-3 h-3" />

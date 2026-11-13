@@ -1,6 +1,6 @@
 import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
 import { SuiGrpcClient } from '@mysten/sui/grpc';
-import { deepbook, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
+import { DeepBookClient, deepbook, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
 import { fromBase64, toBase64 } from '@mysten/sui/utils';
 import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
 
@@ -106,12 +106,15 @@ if (suiMkt) {
   const walletUsdc = Number(usdcEntry?.balance || 0) / 1e6;
   const rawPos = posRes?.accounts?.[0]?.positions || [];
   const freeUsd = Number(posRes?.accounts?.[0]?.availableCollateralUsd || 0);
-  const hasPosition = rawPos.some((p) => p.marketId === suiMkt.market.objectId);
+  const existingSuiPos = rawPos.find((p) => p.marketId === suiMkt.market.objectId);
+  const hasPosition = Boolean(existingSuiPos);
   const suiPrice = Number(suiMkt?.market?.indexPrice || 0.8);
 
   if (freeUsd >= 0.25) {
+    const lev = existingSuiPos?.leverage ? Math.round(Number(existingSuiPos.leverage)) : 14;
+    const side = existingSuiPos && Number(existingSuiPos.baseAssetAmount) < 0 ? 1 : 0;
     const marginToUse = Number(Math.max(0.2, Math.min(0.75, freeUsd * 0.85)).toFixed(4));
-    const targetSizeSui = Math.max(1, Math.floor((marginToUse * 14) / suiPrice));
+    const targetSizeSui = Math.max(1, Math.floor((marginToUse * lev) / suiPrice));
     const orderRes = await fetch(
       'https://aftermath.finance/api/perpetuals/account/transactions/place-market-order',
       {
@@ -121,9 +124,9 @@ if (suiMkt) {
           walletAddress: WALLET,
           accountId: ACCOUNT_ID,
           marketId: suiMkt.market.objectId,
-          side: 0,
+          side,
           size: `${BigInt(targetSizeSui) * 1_000_000_000n}n`,
-          leverage: 14,
+          leverage: lev,
           reduceOnly: false,
           collateralChange: marginToUse,
           hasPosition,
@@ -132,16 +135,16 @@ if (suiMkt) {
         }),
       }
     );
-    const { txKind } = await orderRes.json();
+    const { txKind } = orderRes.ok ? await orderRes.json() : { txKind: null };
     if (!txKind) {
-      fail('Aftermath place-market-order txKind', 'Empty txKind');
+      fail('Aftermath place-market-order txKind', `Empty txKind (HTTP ${orderRes.status})`);
     } else {
       const tx = Transaction.fromKind(fromBase64(txKind));
       const effects = await simulateGrpcOrGql(tx);
       if (effects?.status === 'SUCCESS') {
         pass(
           'Aftermath place-market-order Mainnet gRPC simulation',
-          `SUI 14x Long ${targetSizeSui} SUI (freeUsd=$${freeUsd.toFixed(2)}, margin=$${marginToUse})`
+          `SUI ${lev}x ${side === 1 ? 'Short' : 'Long'} ${targetSizeSui} SUI (freeUsd=$${freeUsd.toFixed(2)}, margin=$${marginToUse})`
         );
       } else {
         fail('Aftermath place-market-order Mainnet gRPC simulation', JSON.stringify(effects));
@@ -315,6 +318,61 @@ try {
   }
 } catch (e) {
   fail('DeepBook v3 Limit Order SUI_USDC Mainnet gRPC simulation', e?.stack || e?.message || String(e));
+}
+
+// 5. DeepBook v3 Margin Pool Supply + Partial Withdraw Mainnet gRPC simulation (with Volt Fee + Referral split)
+try {
+  const dbMargin = new DeepBookClient({ client: grpcClient, network: 'mainnet', address: WALLET });
+  const txMargin = new Transaction();
+  txMargin.setSender(WALLET);
+  const [feeTreas, feeRef] = txMargin.splitCoins(txMargin.gas, [187_500n, 62_500n]);
+  txMargin.transferObjects([feeTreas], '0x7ef65a3b007b79e3b8d9a29f2d5e8584b589186b3a9483b7519c53088c317b93');
+  txMargin.transferObjects([feeRef], '0x1111111111111111111111111111111111111111111111111111111111111111');
+  const cap = dbMargin.marginPool.mintSupplierCap()(txMargin);
+  dbMargin.marginPool.supplyToMarginPool('SUI', cap, 0.2)(txMargin);
+  const withdrawnCoin = dbMargin.marginPool.withdrawFromMarginPool('SUI', cap, 0.05)(txMargin);
+  txMargin.transferObjects([withdrawnCoin, cap], WALLET);
+
+  const marginEffects = await simulateGrpcOrGql(txMargin);
+  if (marginEffects?.status === 'SUCCESS') {
+    pass('DeepBook v3 MarginPool Supply+Withdraw Mainnet gRPC simulation', 'mintCap+fee+supply+withdraw ok');
+  } else {
+    fail('DeepBook v3 MarginPool Supply+Withdraw Mainnet gRPC simulation', JSON.stringify(marginEffects));
+  }
+} catch (e) {
+  fail('DeepBook v3 MarginPool Supply+Withdraw Mainnet gRPC simulation', e?.stack || e?.message || String(e));
+}
+
+// 6. On-Site LST Yield Zap (SUI -> haSUI) Quote & Swap Tx simulation
+try {
+  const agg = new AggregatorClient({ client: grpcClient });
+  const haSuiType = '0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d::hasui::HASUI';
+  const router = await agg.findRouters({
+    from: SUI_TYPE,
+    target: haSuiType,
+    amount: 500_000_000n,
+    byAmountIn: true,
+  });
+  if (!router || router.insufficientLiquidity || BigInt(router.amountOut || 0) <= 0n) {
+    fail('On-Site LST Yield Zap (SUI -> haSUI)', 'No route returned');
+  } else {
+    const lstTx = new Transaction();
+    lstTx.setSender(WALLET);
+    await agg.fastRouterSwap({
+      router,
+      txb: lstTx,
+      slippage: 0.015,
+      refreshAllCoins: true,
+    });
+    const lstEffects = await simulateGrpcOrGql(lstTx);
+    if (lstEffects?.status === 'SUCCESS') {
+      pass('On-Site LST Yield Zap (SUI -> haSUI) Mainnet simulation', `out=${router.amountOut}`);
+    } else {
+      fail('On-Site LST Yield Zap (SUI -> haSUI) Mainnet simulation', JSON.stringify(lstEffects));
+    }
+  }
+} catch (e) {
+  fail('On-Site LST Yield Zap (SUI -> haSUI)', e?.stack || e?.message || String(e));
 }
 
 if (failures > 0) {

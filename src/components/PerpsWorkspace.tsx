@@ -439,14 +439,16 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 key={m.marketId}
                 type="button"
                 onClick={() => setSelectedSymbol(m.symbol)}
-                className={`px-2.5 py-1.5 rounded-md text-xs font-mono whitespace-nowrap flex items-center gap-1.5 transition-colors ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap flex items-center gap-1.5 transition-all ${
                   active
-                    ? 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30 font-semibold'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent'
+                    ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)] font-bold'
+                    : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
                 }`}
               >
                 <span>{m.symbol}-PERP</span>
-                <span className="text-[10px] text-slate-500">{m.maxLeverage}x</span>
+                <span className={`text-[10px] ${active ? 'text-blue-100' : 'text-slate-400'}`}>
+                  {m.maxLeverage}x
+                </span>
               </button>
             );
           })}
@@ -455,16 +457,18 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         {activeMarket && (
           <div className="flex flex-wrap items-center gap-4 text-xs font-mono tabular-nums">
             <div>
-              <span className="text-slate-500 mr-1">Mark</span>
-              <span className="text-white font-semibold">
+              <span className="text-slate-400 mr-1">Mark</span>
+              <span className="text-white font-bold">
                 ${markPrice.toFixed(markPrice >= 100 ? 2 : 4)}
               </span>
             </div>
             <div>
-              <span className="text-slate-500 mr-1">24h</span>
+              <span className="text-slate-400 mr-1">24h</span>
               <span
                 className={
-                  activeMarket.priceChange24hPct >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  activeMarket.priceChange24hPct >= 0
+                    ? 'text-[#00E599] font-semibold'
+                    : 'text-[#FF4D6A] font-semibold'
                 }
               >
                 {activeMarket.priceChange24hPct >= 0 ? '+' : ''}
@@ -472,14 +476,14 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               </span>
             </div>
             <div className="hidden md:block">
-              <span className="text-slate-500 mr-1">24h Vol</span>
-              <span className="text-slate-200">
+              <span className="text-slate-400 mr-1">24h Vol</span>
+              <span className="text-white font-semibold">
                 ${(activeMarket.volume24hUsd / 1e6).toFixed(2)}M
               </span>
             </div>
             <div className="hidden sm:block">
-              <span className="text-slate-500 mr-1">Funding/1h</span>
-              <span className="text-emerald-400">
+              <span className="text-slate-400 mr-1">Funding/1h</span>
+              <span className="text-[#00E599] font-semibold">
                 {(activeMarket.estimatedFundingRate * 100).toFixed(4)}%
               </span>
             </div>
@@ -523,14 +527,14 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 return (
                   <div key={`a-${i}`} className="relative grid grid-cols-3 px-1.5 py-0.5 rounded">
                     <div
-                      className="absolute inset-y-0 right-0 bg-rose-500/12"
+                      className="absolute inset-y-0 right-0 bg-[#F6465D]/20"
                       style={{ width: `${w}%` }}
                     />
-                    <span className="relative text-rose-400">
+                    <span className="relative text-[#FF4D6A] font-semibold">
                       {lv.price.toFixed(lv.price >= 100 ? 2 : 4)}
                     </span>
-                    <span className="relative text-right text-slate-200">{lv.size.toFixed(2)}</span>
-                    <span className="relative text-right text-slate-400">
+                    <span className="relative text-right text-white">{lv.size.toFixed(2)}</span>
+                    <span className="relative text-right text-slate-300">
                       {lv.totalSize.toFixed(1)}
                     </span>
                   </div>
@@ -538,11 +542,11 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               })}
             </div>
 
-            <div className="py-1.5 px-2 my-1 rounded bg-[#0C0E12] border border-white/[0.05] flex items-center justify-between">
-              <span className="text-xs font-semibold text-white">
+            <div className="py-1.5 px-2 my-1 rounded bg-[#05080F] border border-white/[0.1] flex items-center justify-between">
+              <span className="text-xs font-bold text-white">
                 ${markPrice.toFixed(markPrice >= 100 ? 2 : 4)}
               </span>
-              <span className="text-[10px] text-slate-500">Index</span>
+              <span className="text-[10px] text-slate-300">Index</span>
             </div>
 
             <div className="space-y-0.5">
@@ -552,14 +556,14 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 return (
                   <div key={`b-${i}`} className="relative grid grid-cols-3 px-1.5 py-0.5 rounded">
                     <div
-                      className="absolute inset-y-0 right-0 bg-emerald-500/12"
+                      className="absolute inset-y-0 right-0 bg-[#00D98B]/20"
                       style={{ width: `${w}%` }}
                     />
-                    <span className="relative text-emerald-400">
+                    <span className="relative text-[#00E599] font-semibold">
                       {lv.price.toFixed(lv.price >= 100 ? 2 : 4)}
                     </span>
-                    <span className="relative text-right text-slate-200">{lv.size.toFixed(2)}</span>
-                    <span className="relative text-right text-slate-400">
+                    <span className="relative text-right text-white">{lv.size.toFixed(2)}</span>
+                    <span className="relative text-right text-slate-300">
                       {lv.totalSize.toFixed(1)}
                     </span>
                   </div>
@@ -573,12 +577,14 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         <div className="lg:col-span-3 panel-carbon rounded-lg p-3 flex flex-col justify-between gap-3">
           <div className="space-y-3">
             {/* Long / Short */}
-            <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#0C0E12] border border-white/[0.05]">
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#05080F] border border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => setSide('long')}
-                className={`py-2 rounded text-xs font-semibold transition-colors ${
-                  side === 'long' ? 'bg-emerald-500 text-[#090B0E]' : 'text-slate-400 hover:text-white'
+                className={`py-2 rounded text-xs font-bold transition-colors ${
+                  side === 'long'
+                    ? 'bg-[#00D98B] text-[#02060A] shadow-[0_0_16px_rgba(0,217,139,0.28)]'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Long / Buy
@@ -586,8 +592,10 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               <button
                 type="button"
                 onClick={() => setSide('short')}
-                className={`py-2 rounded text-xs font-semibold transition-colors ${
-                  side === 'short' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'
+                className={`py-2 rounded text-xs font-bold transition-colors ${
+                  side === 'short'
+                    ? 'bg-[#F6465D] text-white shadow-[0_0_16px_rgba(246,70,93,0.28)]'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Short / Sell
@@ -597,10 +605,10 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             {/* Leverage */}
             <div className="panel-carbon-sub rounded-lg p-2.5 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400">
+                <span className="text-slate-300">
                   Leverage (Max {activeMarket?.maxLeverage ?? 14}x)
                 </span>
-                <span className="font-mono font-semibold text-[#38BDF8]">{leverage}x</span>
+                <span className="font-mono font-bold text-[#4BA3FF]">{leverage}x</span>
               </div>
               <input
                 type="range"
@@ -667,7 +675,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               </div>
               <div className="flex justify-between">
                 <span>Volt Fee ({traderTier.name})</span>
-                <span className="text-[#38BDF8]">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+                <span className="text-[#4BA3FF] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
               </div>
             </div>
 
@@ -675,10 +683,10 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               type="button"
               disabled={isSubmitting || isCollateralBusy}
               onClick={executePerpOrder}
-              className={`w-full py-2.5 rounded-lg font-semibold text-xs transition-colors flex items-center justify-center gap-2 ${
+              className={`w-full py-2.5 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 ${
                 side === 'long'
-                  ? 'bg-emerald-500 hover:bg-emerald-400 text-[#090B0E]'
-                  : 'bg-rose-500 hover:bg-rose-400 text-white'
+                  ? 'bg-[#00D98B] hover:bg-[#1EE89F] text-[#02060A] shadow-[0_0_18px_rgba(0,217,139,0.28)]'
+                  : 'bg-[#F6465D] hover:bg-[#FF5B72] text-white shadow-[0_0_18px_rgba(246,70,93,0.28)]'
               } disabled:opacity-50`}
             >
               {(isSubmitting || isCollateralBusy) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -702,16 +710,16 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 Wallet: {walletUsdc.toFixed(2)} USDC
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
-              <div className="bg-[#101318] rounded px-2 py-1">
-                <div className="text-[10px] text-slate-500">Equity</div>
-                <div className="text-white font-semibold">
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+              <div className="bg-[#05080F] border border-white/[0.08] rounded px-2 py-1">
+                <div className="text-[10px] text-slate-400">Equity</div>
+                <div className="text-white font-bold">
                   ${(afState?.totalEquityUsd ?? 0).toFixed(2)}
                 </div>
               </div>
-              <div className="bg-[#101318] rounded px-2 py-1">
-                <div className="text-[10px] text-slate-500">Free Margin</div>
-                <div className="text-emerald-400 font-semibold">
+              <div className="bg-[#05080F] border border-white/[0.08] rounded px-2 py-1">
+                <div className="text-[10px] text-slate-400">Free Margin</div>
+                <div className="text-[#00E599] font-bold">
                   ${(afState?.availableCollateralUsd ?? 0).toFixed(2)}
                 </div>
               </div>
@@ -724,9 +732,9 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     setCollateralAmt('');
                     setCollateralModal('deposit');
                   }}
-                  className="py-1.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-white flex items-center justify-center gap-1"
+                  className="py-1.5 rounded bg-[#1D63FF] hover:bg-[#2E74FF] text-xs font-bold text-white flex items-center justify-center gap-1"
                 >
-                  <ArrowDownToLine className="w-3 h-3 text-[#38BDF8]" />
+                  <ArrowDownToLine className="w-3 h-3 text-white" />
                   Deposit
                 </button>
                 <button
@@ -735,9 +743,9 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     setCollateralAmt((afState?.availableCollateralUsd ?? 0).toFixed(2));
                     setCollateralModal('withdraw');
                   }}
-                  className="py-1.5 rounded bg-white/[0.06] hover:bg-white/[0.12] text-xs font-semibold text-white flex items-center justify-center gap-1"
+                  className="py-1.5 rounded bg-white/[0.08] hover:bg-white/[0.15] border border-white/[0.12] text-xs font-bold text-white flex items-center justify-center gap-1"
                 >
-                  <ArrowUpFromLine className="w-3 h-3 text-emerald-400" />
+                  <ArrowUpFromLine className="w-3 h-3 text-[#00E599]" />
                   Withdraw
                 </button>
               </div>
@@ -868,7 +876,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             <div className="panel-carbon-sub rounded-lg p-3 space-y-1">
               <div className="flex justify-between text-xs text-slate-400">
                 <span>Amount (USDC)</span>
-                <button
+                  <button
                   type="button"
                   onClick={() =>
                     setCollateralAmt(
@@ -878,7 +886,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       ).toFixed(2)
                     )
                   }
-                  className="text-[#38BDF8] font-mono inline-flex items-center gap-1"
+                  className="text-[#4BA3FF] font-mono inline-flex items-center gap-1 font-semibold"
                 >
                   <Wallet className="w-3 h-3" />
                   Max{' '}
@@ -896,14 +904,14 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 value={collateralAmt}
                 onChange={(e) => setCollateralAmt(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-transparent text-xl font-mono text-white outline-none"
+                className="w-full bg-transparent text-xl font-mono font-bold text-white outline-none"
               />
             </div>
             <button
               type="button"
               disabled={isCollateralBusy || !collateralAmt}
               onClick={handleCollateralSubmit}
-              className="w-full py-2.5 rounded-lg bg-[#38BDF8] hover:bg-[#56CCF9] disabled:opacity-50 text-[#090B0E] font-semibold text-sm flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg btn-deepbook disabled:opacity-50 font-bold text-sm flex items-center justify-center gap-2"
             >
               {isCollateralBusy && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>
