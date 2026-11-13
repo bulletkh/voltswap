@@ -1575,6 +1575,50 @@ try {
   fail('On-Chain Volume & Tier GraphQL + Aftermath Sync', e?.stack || e?.message || String(e));
 }
 
+// ---------------------------------------------------------------------------
+// 19) Serverless Leaderboard & Treasury On-Chain GraphQL Cold-Start Indexer
+// ---------------------------------------------------------------------------
+try {
+  const { default: leaderboardHandler } = await import('../api/leaderboard.js');
+  let capturedStatus = 200;
+  let capturedPayload = null;
+  const mockReq = { method: 'GET', body: {} };
+  const mockRes = {
+    setHeader() {},
+    status(code) {
+      capturedStatus = code;
+      return this;
+    },
+    json(data) {
+      capturedPayload = data;
+      return this;
+    },
+    end() {
+      return this;
+    },
+  };
+  await leaderboardHandler(mockReq, mockRes);
+  if (
+    capturedStatus === 200 &&
+    capturedPayload &&
+    Array.isArray(capturedPayload.leaderboard) &&
+    capturedPayload.leaderboard.length > 0 &&
+    capturedPayload.totalProtocolVolume > 0
+  ) {
+    pass(
+      'Serverless Leaderboard Cold-Start On-Chain Indexer',
+      `source=${capturedPayload.source} traders=${capturedPayload.leaderboard.length} flow=$${capturedPayload.totalProtocolVolume}`
+    );
+  } else {
+    fail(
+      'Serverless Leaderboard Cold-Start On-Chain Indexer',
+      `status=${capturedStatus} payload=${JSON.stringify(capturedPayload)}`
+    );
+  }
+} catch (e) {
+  fail('Serverless Leaderboard Cold-Start On-Chain Indexer', e?.stack || e?.message || String(e));
+}
+
 if (failures > 0) {
   console.error(`\n${failures} simulation check(s) failed.`);
   process.exit(1);

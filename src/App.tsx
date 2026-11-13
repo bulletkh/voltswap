@@ -4,6 +4,7 @@ import {
   Award,
   CheckCircle2,
   ExternalLink,
+  KeyRound,
   Layers,
   Shield,
   Sparkles,
@@ -17,6 +18,7 @@ import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { ConnectButton } from '@mysten/dapp-kit-react/ui';
 import { VOLT_TREASURY_ADDRESS } from './constants';
 import { captureReferralFromUrl } from './voltFee';
+import { fetchSessionStatus, type SessionStatusSnapshot } from './deepbookSessions';
 import { useSyncedWalletVolume } from './onChainVolume';
 import { SwapWorkspace } from './components/SwapWorkspace';
 import { PerpsWorkspace } from './components/PerpsWorkspace';
@@ -24,6 +26,7 @@ import { PredictWorkspace } from './components/PredictWorkspace';
 import { EarnWorkspace } from './components/EarnWorkspace';
 import { TiersReferralsWorkspace } from './components/TiersReferralsWorkspace';
 import { PortfolioDrawer } from './components/PortfolioDrawer';
+import { ActivitySessionsModal } from './components/ActivitySessionsModal';
 import { TreasuryDashboard } from './TreasuryDashboard';
 import { PnlShareModal, type PnlTradeData } from './PnlShareModal';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
@@ -48,13 +51,34 @@ export function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('swap');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<SessionStatusSnapshot | null>(null);
   const [pnlTrade, setPnlTrade] = useState<PnlTradeData | null>(null);
-  const { volumeUsd: syncedVolumeUsd } = useSyncedWalletVolume(account?.address);
+  const { volumeUsd: syncedVolumeUsd, summary: volumeSummary } = useSyncedWalletVolume(
+    account?.address
+  );
   const [trackedVolumeUsd, setTrackedVolumeUsd] = useState<number>(0);
+
+  const refreshSessionStatus = useCallback(async () => {
+    if (!account?.address) {
+      setSessionStatus(null);
+      return;
+    }
+    try {
+      const snap = await fetchSessionStatus(account.address);
+      setSessionStatus(snap);
+    } catch {
+      // ignore transient RPC errors
+    }
+  }, [account?.address]);
 
   useEffect(() => {
     captureReferralFromUrl();
   }, []);
+
+  useEffect(() => {
+    refreshSessionStatus();
+  }, [refreshSessionStatus]);
 
   useEffect(() => {
     setTrackedVolumeUsd(syncedVolumeUsd);
@@ -111,7 +135,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#000000] text-slate-100 flex flex-col">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#000000] text-slate-100 flex flex-col">
       {/* Top Institutional DeepBook-Style Navigation Bar */}
       <header className="sticky top-0 z-40 border-b border-[#1A1E26] bg-[#000000]/95 backdrop-blur-md">
         <div className="w-full mx-auto px-3 sm:px-5 h-[52px] flex items-center justify-between gap-4">
@@ -155,14 +179,36 @@ export function App() {
               <span>Mainnet</span>
             </div>
             {account && (
-              <button
-                type="button"
-                onClick={() => setPortfolioOpen(true)}
-                className="px-3 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#1E232E] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
-              >
-                <Wallet className="w-3.5 h-3.5 text-[#2B7FFF]" />
-                <span className="hidden sm:inline">Portfolio</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActivityOpen(true)}
+                  className="px-2.5 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#1E232E] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
+                  title="Multi-Market Order Ledger & 1-Click Session Keys"
+                >
+                  <KeyRound
+                    className={`w-3.5 h-3.5 ${
+                      sessionStatus?.isActiveNow ? 'text-[#08D189]' : 'text-[#60A5FA]'
+                    }`}
+                  />
+                  <span className="hidden xl:inline">
+                    {sessionStatus?.isActiveNow ? '1-Click Ready' : 'Activity & Sessions'}
+                  </span>
+                  {(volumeSummary?.trades.length ?? 0) > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-[#2B7FFF]/18 text-[#60A5FA] text-[10px] font-mono">
+                      {volumeSummary?.trades.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPortfolioOpen(true)}
+                  className="px-3 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#1E232E] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
+                >
+                  <Wallet className="w-3.5 h-3.5 text-[#2B7FFF]" />
+                  <span className="hidden sm:inline">Portfolio</span>
+                </button>
+              </>
             )}
             <ConnectButton />
           </div>
@@ -193,7 +239,7 @@ export function App() {
 
       {/* Main Workspace */}
       <main
-        className={`flex-1 w-full flex flex-col ${
+        className={`flex-1 w-full min-w-0 overflow-x-hidden flex flex-col ${
           activeTab === 'swap' || activeTab === 'perps' || activeTab === 'predict'
             ? ''
             : 'max-w-[1440px] mx-auto px-3 sm:px-6 py-4'
@@ -292,6 +338,16 @@ export function App() {
       )}
 
       <PortfolioDrawer isOpen={portfolioOpen} onClose={() => setPortfolioOpen(false)} />
+
+      <ActivitySessionsModal
+        isOpen={activityOpen}
+        onClose={() => setActivityOpen(false)}
+        sessionStatus={sessionStatus}
+        onRefreshSession={refreshSessionStatus}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+        onOpenPortfolio={() => setPortfolioOpen(true)}
+        onNotify={notify}
+      />
 
       <PnlShareModal
         isOpen={Boolean(pnlTrade)}

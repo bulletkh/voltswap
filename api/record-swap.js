@@ -1,10 +1,38 @@
-// Vercel Serverless Function: POST /api/record-swap
-// Cryptographically and On-Chain Verified Swap Recorder with Instant Telegram Notification
+// Vercel Serverless Function: GET & POST /api/record-swap
+// Persists trade ledger in Vercel KV / Upstash (when configured) + Sui Mainnet GraphQL fallback, with instant Telegram notifications.
 
-const TG_BOT_TOKEN = "8823047918:AAE9IesCCkFYV5jkcsUELc4DrDvZbWFbnHs";
-const TG_CHAT_ID = "141393418"; // @ser_ivakhnenko
+import {
+  fetchOnChainTreasuryLedger,
+  hasKvStore,
+  kvCommand,
+  kvPipeline,
+} from './_chainIndexer.js';
+
+const TG_BOT_TOKEN = process.env.VOLT_TG_BOT_TOKEN || '8823047918:AAE9IesCCkFYV5jkcsUELc4DrDvZbWFbnHs';
+const TG_CHAT_ID = process.env.VOLT_TG_CHAT_ID || '141393418';
+
+const KV_SWAPS_LIST_KEY = 'volt:swaps:v1';
+const KV_TRADERS_VOL_KEY = 'volt:leaderboard:traders:v1';
+const KV_AFFILIATES_VOL_KEY = 'volt:leaderboard:affiliates:v1';
+const KV_AFFILIATES_REFS_KEY = 'volt:leaderboard:refs:v1';
 
 let swapHistory = [];
+
+async function loadKvSwaps(limit = 100) {
+  if (!hasKvStore()) return [];
+  const raw = await kvCommand(['LRANGE', KV_SWAPS_LIST_KEY, '0', String(limit - 1)]);
+  if (!Array.isArray(raw)) return [];
+  const parsed = [];
+  for (const item of raw) {
+    try {
+      const obj = typeof item === 'string' ? JSON.parse(item) : item;
+      if (obj && obj.digest) parsed.push(obj);
+    } catch {
+      // ignore malformed entry
+    }
+  }
+  return parsed;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -20,19 +48,37 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const totalVolume = swapHistory.reduce((acc, s) => acc + (parseFloat(s.volumeUsd) || 0), 0);
-    const totalFees = swapHistory.reduce((acc, s) => {
+    const [kvSwaps, chainLedger] = await Promise.all([
+      loadKvSwaps(100),
+      fetchOnChainTreasuryLedger(false),
+    ]);
+
+    const byDigest = new Map();
+    for (const s of [...kvSwaps, ...swapHistory, ...(chainLedger.records || [])]) {
+      if (s && s.digest && !byDigest.has(s.digest)) {
+        byDigest.set(s.digest, s);
+      }
+    }
+
+    const merged = Array.from(byDigest.values()).sort(
+      (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()
+    );
+
+    const totalVolume = merged.reduce((acc, s) => acc + (parseFloat(s.volumeUsd) || 0), 0);
+    const totalFees = merged.reduce((acc, s) => {
+      if (typeof s.feeEarnedUsd === 'number') return acc + s.feeEarnedUsd;
       const vol = parseFloat(s.volumeUsd) || 0;
-      const rate = parseFloat(s.feeRate) || 0.0016;
-      return acc + (vol * rate);
+      const rate = parseFloat(s.feeRate) || 0.0025;
+      return acc + vol * rate;
     }, 0);
 
     return res.status(200).json({
       success: true,
-      totalSwapsRecorded: swapHistory.length,
-      totalVolumeUsd: totalVolume,
-      totalFeesEarnedUsd: totalFees,
-      history: swapHistory.slice(-50).reverse()
+      persistence: hasKvStore() ? 'kv+onchain' : 'onchain-graphql',
+      totalSwapsRecorded: merged.length,
+      totalVolumeUsd: Number(totalVolume.toFixed(2)),
+      totalFeesEarnedUsd: Number(totalFees.toFixed(4)),
+      history: merged.slice(0, 60),
     });
   }
 
@@ -50,47 +96,44 @@ export default async function handler(req, res) {
         feeRate = null,
         tierName = null,
         tierEmoji = null,
-        discountPct = null
+        discountPct = null,
       } = req.body || {};
 
       if (!address || !digest || !fromToken || !toToken || !fromAmount) {
-        return res.status(400).json({ error: "Missing required swap parameters" });
+        return res.status(400).json({ error: 'Missing required swap parameters' });
       }
 
-      // Check valid digest format (base58, typically 43-45 chars)
       if (typeof digest !== 'string' || digest.length < 30) {
-        return res.status(400).json({ error: "Invalid transaction digest" });
+        return res.status(400).json({ error: 'Invalid transaction digest' });
       }
 
-      // Calculate volume if missing or 0
       let numVol = parseFloat(volumeUsd) || 0;
       if (numVol <= 0) {
         const amt = parseFloat(fromAmount) || 1.0;
-        numVol = amt * 0.85; // safe fallback based on SUI price
+        numVol = amt * 0.85;
       }
 
-      // Compute dynamic fee rate according to user's trader tier
-      // Plankton: 0.16% (Market) / 0.25% (Swap+) / 0.05% (Perps)
-      // Guest: 0.20% (Market) / 0.30% (Swap+) / 0.05% (Perps)
       const isMarket = String(swapMode).toLowerCase().includes('market');
-      const isPerps = String(swapMode).toLowerCase().includes('perps');
+      const isPerps = String(swapMode).toLowerCase().includes('perp');
       let parsedFeeRate = parseFloat(feeRate);
       if (isNaN(parsedFeeRate) || parsedFeeRate <= 0) {
-        parsedFeeRate = isPerps ? 0.0005 : (isMarket ? 0.0016 : 0.0025); // Default to Plankton
+        parsedFeeRate = isPerps ? 0.0005 : isMarket ? 0.002 : 0.0025;
       }
 
       const activeTierEmoji = tierEmoji || '🦐';
       const activeTierName = tierName || 'Plankton';
-      const parsedDiscount = discountPct !== null && !isNaN(parseInt(discountPct, 10))
-        ? parseInt(discountPct, 10)
-        : (activeTierName.toLowerCase().includes('plankton') ? 17 : 0);
+      const parsedDiscount =
+        discountPct !== null && !isNaN(parseInt(discountPct, 10))
+          ? parseInt(discountPct, 10)
+          : activeTierName.toLowerCase().includes('plankton')
+            ? 20
+            : 0;
 
       const feeEarnedUsd = (numVol * parsedFeeRate).toFixed(4);
       const feePctFormatted = (parsedFeeRate * 100).toFixed(2);
 
-      // Prevent exact duplicate processing within the same memory instance
-      if (swapHistory.some(s => s.digest === digest)) {
-        return res.status(200).json({ message: "Already recorded", digest });
+      if (swapHistory.some((s) => s.digest === digest)) {
+        return res.status(200).json({ message: 'Already recorded', digest });
       }
 
       const swapRecord = {
@@ -101,18 +144,34 @@ export default async function handler(req, res) {
         fromAmount,
         volumeUsd: numVol,
         feeRate: parsedFeeRate,
+        feeEarnedUsd: Number(feeEarnedUsd),
         tierName: activeTierName,
         tierEmoji: activeTierEmoji,
         discountPct: parsedDiscount,
         swapMode,
         referrer,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       swapHistory.push(swapRecord);
+      if (swapHistory.length > 250) swapHistory = swapHistory.slice(-250);
 
-      // Send Telegram notification immediately
-      const shortAddr = address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
+      if (hasKvStore()) {
+        const cmds = [
+          ['LPUSH', KV_SWAPS_LIST_KEY, JSON.stringify(swapRecord)],
+          ['LTRIM', KV_SWAPS_LIST_KEY, '0', '499'],
+          ['HINCRBYFLOAT', KV_TRADERS_VOL_KEY, address.toLowerCase(), numVol.toFixed(4)],
+        ];
+        if (referrer && typeof referrer === 'string' && referrer.startsWith('0x')) {
+          const refKey = referrer.toLowerCase();
+          cmds.push(['HINCRBYFLOAT', KV_AFFILIATES_VOL_KEY, refKey, numVol.toFixed(4)]);
+          cmds.push(['SADD', `${KV_AFFILIATES_REFS_KEY}:${refKey}`, address.toLowerCase()]);
+        }
+        await kvPipeline(cmds);
+      }
+
+      const shortAddr =
+        address.length > 12 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address;
       const modeLabel = (swapMode || 'market').toUpperCase();
 
       const headerTitle = isPerps
@@ -125,12 +184,15 @@ export default async function handler(req, res) {
         : `💱 <b>Swap:</b> ${fromAmount} ${fromToken} ➔ ${toToken}\n` +
           `💰 <b>Est. Volume:</b> $${numVol.toFixed(2)} USD\n`;
 
-      const text = `${headerTitle}\n\n` +
+      const text =
+        `${headerTitle}\n\n` +
         `👤 <b>Trader:</b> <code>${shortAddr}</code>\n` +
-        `🏷️ <b>Trader Rank:</b> ${activeTierEmoji} <b>${activeTierName}</b>` + (parsedDiscount > 0 ? ` <i>(-${parsedDiscount}% Fee Discount)</i>` : '') + `\n` +
+        `🏷️ <b>Trader Rank:</b> ${activeTierEmoji} <b>${activeTierName}</b>` +
+        (parsedDiscount > 0 ? ` <i>(-${parsedDiscount}% Fee Discount)</i>` : '') +
+        `\n` +
         tradeLine +
         `💵 <b>Protocol Fee (${feePctFormatted}%):</b> +$${feeEarnedUsd} USD\n` +
-        `🎯 <b>Execution Engine:</b> <b>${isPerps ? 'Bluefin CLOB / Sui PTB' : modeLabel}</b>\n\n` +
+        `🎯 <b>Execution Engine:</b> <b>${isPerps ? 'Aftermath Perps / Sui PTB' : modeLabel}</b>\n\n` +
         `🔗 <a href="https://suiscan.xyz/mainnet/tx/${digest}">View on Suiscan</a>`;
 
       try {
@@ -141,22 +203,24 @@ export default async function handler(req, res) {
             chat_id: TG_CHAT_ID,
             text,
             parse_mode: 'HTML',
-            disable_web_page_preview: true
-          })
+            disable_web_page_preview: true,
+          }),
         });
-        const tgData = await tgRes.json();
-        console.log('TG Send Result:', tgData.ok);
+        await tgRes.json().catch(() => null);
       } catch (tgErr) {
         console.error('Failed to send TG alert:', tgErr);
       }
 
       return res.status(200).json({
         success: true,
-        record: swapRecord
+        persistence: hasKvStore() ? 'kv+onchain' : 'onchain-graphql',
+        record: swapRecord,
       });
     } catch (e) {
       console.error('Record swap error:', e);
       return res.status(500).json({ error: e.message });
     }
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }

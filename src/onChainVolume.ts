@@ -7,6 +7,7 @@ import { DEFAULT_DEEPBOOK_POOLS, DEEPBOOK_INDEXER, fetchDeepBookPools } from './
 import { rpcFetchGraphql, safeNormalizeAddress, safeNormalizeCoinType, SUI_COIN_TYPE } from './suiClient';
 import {
   getWalletVolumeUsd,
+  resolveTraderTier,
   setSyncedWalletVolume,
   VOLT_VOLUME_EVENT,
   VOLT_VOLUME_RECORDED_EVENT,
@@ -757,4 +758,195 @@ export function useSyncedWalletVolume(walletAddress?: string | null) {
   }, [walletAddress, refresh]);
 
   return { volumeUsd, summary, isSyncing, refresh };
+}
+
+export interface ProtocolLeaderboardEntry {
+  rank: number;
+  address: string;
+  fullAddress?: string;
+  volumeUsd: number;
+  tradesCount: number;
+  referrals: number;
+  tier: string;
+}
+
+export interface ProtocolAffiliateEntry {
+  rank: number;
+  address: string;
+  fullAddress?: string;
+  referredVolumeUsd: number;
+  referrals: number;
+  tier: string;
+}
+
+export interface ProtocolLeaderboardData {
+  leaderboard: ProtocolLeaderboardEntry[];
+  affiliates: ProtocolAffiliateEntry[];
+  totalProtocolVolume: number;
+  totalFeesUsd: number;
+  source: 'kv+onchain' | 'onchain-graphql';
+  fetchedAt: number;
+}
+
+let cachedLeaderboard: ProtocolLeaderboardData | null = null;
+const LEADERBOARD_TTL_MS = 30_000;
+
+async function fetchTreasuryGraphqlNodes(): Promise<{
+  nodes: GqlTxNode[];
+  coinMap: Map<string, CoinPriceEntry>;
+}> {
+  const query = `query($a: SuiAddress!) {
+    transactions(filter: { affectedAddress: $a }, last: 50) {
+      nodes {
+        digest
+        sender { address }
+        effects {
+          status
+          timestamp
+          balanceChanges {
+            nodes {
+              owner { address }
+              coinType { repr }
+              amount
+            }
+          }
+          events {
+            nodes {
+              contents { type { repr } json }
+            }
+          }
+        }
+      }
+    }
+  }`;
+  const [gqlRes, priceOverrides] = await Promise.all([
+    rpcFetchGraphql<{ transactions?: { nodes?: GqlTxNode[] } }>(query, {
+      a: VOLT_TREASURY_ADDRESS,
+    }).catch(() => null),
+    fetchLivePriceOverrides(),
+  ]);
+  const nodes: GqlTxNode[] = gqlRes?.transactions?.nodes || [];
+  return { nodes, coinMap: buildCoinMap(priceOverrides) };
+}
+
+/**
+ * Fetches global Volt protocol trader & affiliate leaderboard.
+ * Uses serverless /api/leaderboard (KV + On-Chain) on Vercel deployments and
+ * falls back cleanly to direct Sui Mainnet GraphQL indexing on localhost / Vite preview.
+ */
+export async function fetchProtocolLeaderboard(force = false): Promise<ProtocolLeaderboardData> {
+  if (
+    !force &&
+    cachedLeaderboard &&
+    Date.now() - cachedLeaderboard.fetchedAt < LEADERBOARD_TTL_MS
+  ) {
+    return cachedLeaderboard;
+  }
+
+  const isLocalHost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+  if (!isLocalHost && typeof window !== 'undefined') {
+    try {
+      const apiRes = await fetch('/api/leaderboard');
+      const ct = apiRes.headers.get('content-type') || '';
+      if (apiRes.ok && ct.includes('application/json')) {
+        const json = await apiRes.json();
+        if (Array.isArray(json?.leaderboard)) {
+          cachedLeaderboard = {
+            leaderboard: json.leaderboard,
+            affiliates: Array.isArray(json.affiliates) ? json.affiliates : [],
+            totalProtocolVolume: Number(json.totalProtocolVolume || 0),
+            totalFeesUsd: Number(json.totalFeesUsd || 0),
+            source: json.source === 'kv+onchain' ? 'kv+onchain' : 'onchain-graphql',
+            fetchedAt: Date.now(),
+          };
+          return cachedLeaderboard;
+        }
+      }
+    } catch {
+      // Fall through to direct Sui Mainnet GraphQL query
+    }
+  }
+
+  const { nodes, coinMap } = await fetchTreasuryGraphqlNodes();
+  const treasuryLower = VOLT_TREASURY_ADDRESS.toLowerCase();
+  const traderMap = new Map<string, { fullAddress: string; volumeUsd: number; tradesCount: number }>();
+  let totalVolume = 0;
+  let totalFees = 0;
+
+  for (const tx of nodes) {
+    if (tx?.effects?.status && tx.effects.status !== 'SUCCESS') continue;
+    const sender = safeNormalizeAddress(tx?.sender?.address);
+    if (!sender) continue;
+    const senderLower = sender.toLowerCase();
+
+    const bcs = tx?.effects?.balanceChanges?.nodes || [];
+    const events = tx?.effects?.events?.nodes || [];
+    const evTypes = events.map((e) => String(e?.contents?.type?.repr || ''));
+
+    let feeUsd = 0;
+    let maxFlowUsd = 0;
+    for (const bc of bcs) {
+      const owner = String(bc?.owner?.address || '').toLowerCase();
+      const d = estimateCoinDeltaUsd(String(bc?.coinType?.repr || ''), bc?.amount, coinMap);
+      if (owner === treasuryLower && d.amount > 0 && senderLower !== treasuryLower) {
+        feeUsd += d.usd;
+      }
+      if (owner === senderLower && (d.isStable || d.isSui)) {
+        maxFlowUsd = Math.max(maxFlowUsd, d.usd);
+      }
+    }
+
+    const isProtocolTx = evTypes.some(
+      (t) =>
+        t.includes('::SwapEvent') ||
+        t.includes('ConfirmSwapEvent') ||
+        t.includes('::AssetSwap') ||
+        t.includes('::order_info::OrderFilled') ||
+        t.includes('::margin_manager') ||
+        t.includes('::queue_events::OrderEnqueued') ||
+        t.includes('FilledTakerOrder')
+    );
+
+    if (!isProtocolTx && feeUsd <= 0) continue;
+    const txVol = maxFlowUsd > 0 ? maxFlowUsd : feeUsd > 0 ? feeUsd / 0.0025 : 0;
+    if (txVol <= 0.01) continue;
+
+    const prev = traderMap.get(senderLower) || {
+      fullAddress: sender,
+      volumeUsd: 0,
+      tradesCount: 0,
+    };
+    prev.volumeUsd += txVol;
+    prev.tradesCount += 1;
+    traderMap.set(senderLower, prev);
+
+    totalVolume += txVol;
+    totalFees += feeUsd > 0 ? feeUsd : txVol * 0.0025;
+  }
+
+  const leaderboard: ProtocolLeaderboardEntry[] = Array.from(traderMap.values())
+    .sort((a, b) => b.volumeUsd - a.volumeUsd)
+    .slice(0, 50)
+    .map((u, idx) => ({
+      rank: idx + 1,
+      address: `${u.fullAddress.slice(0, 6)}...${u.fullAddress.slice(-4)}`,
+      fullAddress: u.fullAddress,
+      volumeUsd: Number(u.volumeUsd.toFixed(2)),
+      tradesCount: u.tradesCount,
+      referrals: 0,
+      tier: resolveTraderTier(u.volumeUsd, false).name,
+    }));
+
+  cachedLeaderboard = {
+    leaderboard,
+    affiliates: [],
+    totalProtocolVolume: Number(totalVolume.toFixed(2)),
+    totalFeesUsd: Number(totalFees.toFixed(4)),
+    source: 'onchain-graphql',
+    fetchedAt: Date.now(),
+  };
+  return cachedLeaderboard;
 }

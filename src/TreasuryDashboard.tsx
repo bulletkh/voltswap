@@ -217,18 +217,24 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         }
       } catch (e) {}
 
-      // 3. Fetch real protocol swap ledger (merging serverless API + local swaps)
+      // 3. Fetch real protocol swap ledger (merging serverless KV+onchain API + local swaps)
       let apiSwaps: RealSwapItem[] = [];
-      try {
-        const swapRes = await fetch('/api/record-swap');
-        if (swapRes.ok) {
-          const data = await swapRes.json();
-          if (data && Array.isArray(data.history)) {
-            apiSwaps = data.history;
+      const isLocalHost =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (!isLocalHost) {
+        try {
+          const swapRes = await fetch('/api/record-swap');
+          const ct = swapRes.headers.get('content-type') || '';
+          if (swapRes.ok && ct.includes('application/json')) {
+            const data = await swapRes.json();
+            if (data && Array.isArray(data.history)) {
+              apiSwaps = data.history;
+            }
           }
+        } catch (e) {
+          console.error('Failed to query record-swap API:', e);
         }
-      } catch (e) {
-        console.error('Failed to query record-swap API:', e);
       }
 
       // Also read local swaps from browser storage

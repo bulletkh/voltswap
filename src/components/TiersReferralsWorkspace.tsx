@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   Award,
@@ -9,12 +9,17 @@ import {
   ShieldCheck,
   Sparkles,
   TrendingDown,
+  Trophy,
   Users,
   Zap,
 } from 'lucide-react';
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { TRADER_TIERS } from '../constants';
-import { useSyncedWalletVolume } from '../onChainVolume';
+import {
+  fetchProtocolLeaderboard,
+  useSyncedWalletVolume,
+  type ProtocolLeaderboardData,
+} from '../onChainVolume';
 import {
   getValidReferrerForSender,
   REFERRAL_TIERS,
@@ -34,6 +39,24 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
   const account = useCurrentAccount();
   const [subTab, setSubTab] = useState<TiersSubTab>('traders');
   const [copied, setCopied] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<ProtocolLeaderboardData | null>(null);
+  const [isLoadingBoard, setIsLoadingBoard] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingBoard(true);
+    fetchProtocolLeaderboard(false)
+      .then((data) => {
+        if (!cancelled) setLeaderboardData(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setIsLoadingBoard(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const {
     volumeUsd: syncedVolumeUsd,
@@ -525,6 +548,84 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           </div>
         </div>
       )}
+
+      {/* Live Protocol Volume Leaderboard (KV + Sui Mainnet GraphQL Verified) */}
+      <div className="panel-carbon rounded-2xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
+          <span className="text-sm font-bold text-white flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-[#2B7FFF]" />
+            Verified Protocol Volume Leaderboard
+          </span>
+          <div className="flex items-center gap-3 text-xs font-mono">
+            {leaderboardData && (
+              <span className="text-[#8E98A8]">
+                On-Chain Flow:{' '}
+                <span className="text-white font-semibold">
+                  ${leaderboardData.totalProtocolVolume.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                </span>
+              </span>
+            )}
+            <span className="px-2 py-0.5 rounded bg-[#08D189]/12 border border-[#08D189]/30 text-[#08D189] text-[10px]">
+              {leaderboardData?.source === 'kv+onchain' ? 'KV + Sui GraphQL' : 'Sui Mainnet GraphQL'}
+            </span>
+          </div>
+        </div>
+
+        {isLoadingBoard && !leaderboardData ? (
+          <div className="p-5 text-xs font-mono text-slate-400 bg-[#000000]">
+            Indexing verified Sui Mainnet protocol transactions...
+          </div>
+        ) : !leaderboardData || leaderboardData.leaderboard.length === 0 ? (
+          <div className="p-5 text-xs font-mono text-slate-400 bg-[#000000]">
+            No recent treasury-routed fills indexed in the latest window.
+          </div>
+        ) : (
+          <div className="divide-y divide-[#161A22] bg-[#000000]">
+            {leaderboardData.leaderboard.slice(0, 8).map((row) => (
+              <div
+                key={row.fullAddress || row.address}
+                className="px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono hover:bg-white/[0.02]"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`w-6 text-center font-bold ${
+                      row.rank === 1
+                        ? 'text-amber-400'
+                        : row.rank === 2
+                          ? 'text-slate-200'
+                          : row.rank === 3
+                            ? 'text-amber-600'
+                            : 'text-[#8E98A8]'
+                    }`}
+                  >
+                    #{row.rank}
+                  </span>
+                  <span className="text-white font-semibold">{row.address}</span>
+                  <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/12 text-[#60A5FA] text-[11px]">
+                    {row.tier}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 tabular-nums">
+                  <span className="text-[#8E98A8]">{row.tradesCount} tx</span>
+                  <span className="text-white font-bold">
+                    ${row.volumeUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  {row.fullAddress && (
+                    <a
+                      href={`https://suiscan.xyz/mainnet/account/${row.fullAddress}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#60A5FA] hover:underline inline-flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Footer Verification Strip */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#8E98A8] px-1 pt-1">

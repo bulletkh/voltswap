@@ -783,8 +783,8 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
   const svgW = containerRef.current?.clientWidth || 800;
 
   const wrapperClass = isFullscreen
-    ? 'fixed inset-0 z-50 flex flex-col w-screen h-screen bg-[#000000]'
-    : 'flex flex-col w-full bg-[#000000]';
+    ? 'fixed inset-0 z-50 flex flex-col w-screen h-screen overflow-hidden bg-[#000000]'
+    : 'flex flex-col w-full min-w-0 overflow-hidden bg-[#000000]';
 
   const chartHeightClass = isFullscreen ? 'flex-1 min-h-0' : heightClass;
 
@@ -938,7 +938,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
       </div>
 
       {/* Flush Main Canvas Row: Left Drawing Rail + Pure Black Chart */}
-      <div className={`relative w-full flex ${chartHeightClass}`}>
+      <div className={`relative w-full min-w-0 overflow-hidden flex ${chartHeightClass}`}>
         {engineMode === 'volt' ? (
           <>
             {/* Flush Vertical Drawing Toolbar */}
@@ -1045,7 +1045,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
               <div
                 ref={containerRef}
                 onDoubleClick={forceAutoFit}
-                className="w-full h-full"
+                className="absolute inset-0"
               />
 
               {/* Synchronized SVG Overlay */}
