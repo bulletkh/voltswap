@@ -34,16 +34,17 @@ import {
   buildDepositManagerTx,
   buildPlaceDeepBookLimitOrderTx,
   buildPlaceDeepBookMarketOrderTx,
-  buildWithdrawAllManagerTx,
+  buildWithdrawAllManagersAndCancelTx,
   DEFAULT_DEEPBOOK_POOLS,
   discoverBalanceManagers,
+  fetchAllDeepBookManagerStates,
   fetchDeepBookCandles,
-  fetchDeepBookManagerState,
   fetchDeepBookOrderbook,
   fetchDeepBookPools,
   fetchDeepBookTrades,
   type DeepBookCandle,
   type DeepBookManagerState,
+  type DeepBookOpenOrder,
   type DeepBookOrderbook,
   type DeepBookPoolMeta,
   type DeepBookTrade,
@@ -128,7 +129,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [bookTab, setBookTab] = useState<'book' | 'trades'>('book');
 
   const [managerIds, setManagerIds] = useState<string[]>([]);
-  const [managerState, setManagerState] = useState<DeepBookManagerState | null>(null);
+  const [managerStates, setManagerStates] = useState<DeepBookManagerState[]>([]);
   const [spotOrderStyle, setSpotOrderStyle] = useState<'market' | 'limit'>('market');
   const [spotMarketSlippage, setSpotMarketSlippage] = useState<number>(1.5);
   const [limitSide, setLimitSide] = useState<'buy' | 'sell'>('buy');
@@ -336,26 +337,44 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     refreshMarginAccount();
   }, [refreshMarginAccount]);
 
-  // Discover & sync DeepBook v3 BalanceManager + Open Orders
+  // Discover & sync DeepBook v3 BalanceManagers + Open Orders
   const refreshDeepBookAccount = useCallback(async () => {
     if (!account?.address || mode !== 'limit') {
       setManagerIds([]);
-      setManagerState(null);
+      setManagerStates([]);
       return;
     }
     try {
       const ids = await discoverBalanceManagers(account.address);
       setManagerIds(ids);
       if (ids.length > 0) {
-        const state = await fetchDeepBookManagerState(account.address, ids[0], activePool);
-        setManagerState(state);
+        const states = await fetchAllDeepBookManagerStates(account.address, ids, activePool);
+        setManagerStates(states);
       } else {
-        setManagerState(null);
+        setManagerStates([]);
       }
     } catch {
       // ignore transient errors
     }
   }, [account?.address, mode, activePool]);
+
+  const managerState = useMemo(() => {
+    if (managerStates.length === 0) return null;
+    const preferred =
+      limitSide === 'buy'
+        ? [...managerStates].sort((a, b) => (b.quoteBalance + b.settledQuote) - (a.quoteBalance + a.settledQuote))[0]
+        : [...managerStates].sort((a, b) => (b.baseBalance + b.settledBase) - (a.baseBalance + a.settledBase))[0];
+    return preferred || managerStates[0];
+  }, [managerStates, limitSide]);
+
+  const vaultSummary = useMemo(() => {
+    const freeBase = managerStates.reduce((s, m) => s + m.baseBalance, 0);
+    const freeQuote = managerStates.reduce((s, m) => s + m.quoteBalance, 0);
+    const settledBase = managerStates.reduce((s, m) => s + m.settledBase, 0);
+    const settledQuote = managerStates.reduce((s, m) => s + m.settledQuote, 0);
+    const openOrders = managerStates.flatMap((m) => m.openOrders);
+    return { freeBase, freeQuote, settledBase, settledQuote, openOrders };
+  }, [managerStates]);
 
   useEffect(() => {
     refreshDeepBookAccount();
@@ -492,7 +511,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
       const tx = buildPlaceDeepBookLimitOrderTx({
         owner: account.address,
-        managerId: managerIds[0] || null,
+        managerId: managerState?.managerId || managerIds[0] || null,
         pool: activePool,
         price: p,
         quantity: q,
@@ -558,15 +577,16 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    if (!account?.address || !managerIds[0]) return;
+  const handleCancelOrder = async (ord: DeepBookOpenOrder) => {
+    const targetManagerId = ord.managerId || managerState?.managerId || managerIds[0];
+    if (!account?.address || !targetManagerId) return;
     setIsVaultBusy(true);
     try {
       const tx = buildCancelDeepBookOrderTx({
         owner: account.address,
-        managerId: managerIds[0],
+        managerId: targetManagerId,
         poolName: activePool.poolName,
-        orderId,
+        orderId: ord.orderId,
         baseSymbol: activePool.baseSymbol,
         quoteSymbol: activePool.quoteSymbol,
         withdrawAfterCancel: true,
@@ -622,7 +642,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       const tx = buildPlaceDeepBookMarketOrderTx({
         owner: account.address,
         pool: activePool,
-        managerId: managerIds[0],
+        managerId: managerState?.managerId || managerIds[0],
         managerBaseBalance: managerState?.baseBalance ?? 0,
         managerQuoteBalance: managerState?.quoteBalance ?? 0,
         quantity: q,
@@ -675,7 +695,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   };
 
   const handleDepositManager = async () => {
-    if (!account?.address || !managerIds[0]) return;
+    const targetManagerId = managerState?.managerId || managerIds[0];
+    if (!account?.address || !targetManagerId) return;
     const amt = Number(depositAmt);
     if (!Number.isFinite(amt) || amt <= 0) return;
     const coinKey = depositCoinSide === 'base' ? activePool.baseSymbol : activePool.quoteSymbol;
@@ -683,7 +704,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     try {
       const tx = buildDepositManagerTx({
         owner: account.address,
-        managerId: managerIds[0],
+        managerId: targetManagerId,
         coinKey,
         amount: amt,
       });
@@ -705,22 +726,40 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     }
   };
 
-  const handleWithdrawManagerAll = async () => {
-    if (!account?.address || !managerIds[0]) return;
+  const handleWithdrawManagerAll = async (cancelOpenOrders = false) => {
+    if (!account?.address || managerStates.length === 0) return;
+    const targets = managerStates
+      .filter(
+        (m) =>
+          m.baseBalance > 0 ||
+          m.quoteBalance > 0 ||
+          m.settledBase > 0 ||
+          m.settledQuote > 0 ||
+          (cancelOpenOrders && m.openOrders.length > 0)
+      )
+      .map((m) => ({
+        managerId: m.managerId,
+        openOrderIds: cancelOpenOrders ? m.openOrders.map((o) => o.orderId) : [],
+      }));
+
+    const finalTargets =
+      targets.length > 0
+        ? targets
+        : [{ managerId: managerStates[0].managerId, openOrderIds: [] }];
+
     setIsVaultBusy(true);
     try {
-      const tx = buildWithdrawAllManagerTx({
+      const tx = buildWithdrawAllManagersAndCancelTx({
         owner: account.address,
-        managerId: managerIds[0],
-        poolName: activePool.poolName,
-        coinKeys: [activePool.baseSymbol, activePool.quoteSymbol],
+        pool: activePool,
+        managers: finalTargets,
       });
       const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
       const digest = extractTxDigest(res);
       onNotify(
         'success',
-        'Withdrawn to Wallet',
-        `Settled and free ${activePool.baseSymbol}/${activePool.quoteSymbol} moved to your wallet.`,
+        cancelOpenOrders ? 'Orders Cancelled & Funds Withdrawn' : 'Withdrawn to Wallet',
+        `All ${activePool.baseSymbol}/${activePool.quoteSymbol} funds across ${finalTargets.length} DeepBook vault(s) returned to your wallet.`,
         'Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -1548,162 +1587,176 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     </button>
                   </div>
 
-                  {/* DeepBook BalanceManager Custody Summary */}
-                  <div className="panel-carbon-sub rounded-xl p-3 space-y-2 border-t border-white/[0.1]">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300 flex items-center gap-1.5">
-                        <ShieldCheck className="w-4 h-4 text-[#18C8FF]" />
-                        <span>DeepBook BalanceManager</span>
-                      </span>
-                      <span className="font-mono text-white">
-                        {managerIds[0] ? `${managerIds[0].slice(0, 6)}...` : '1-Tx Auto'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">
-                      Shared for all Spot Market &amp; Limit pairs. Pre-deposit is optional — orders auto-draw from your wallet; Market auto-settles back to wallet.
-                    </p>
+                    {/* DeepBook BalanceManager Custody Summary */}
+                    <div className="panel-carbon-sub rounded-xl p-3 space-y-2 border-t border-white/[0.1]">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-300 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-[#18C8FF]" />
+                          <span>DeepBook BalanceManager</span>
+                        </span>
+                        <span className="font-mono text-white">
+                          {managerIds.length > 1
+                            ? `${managerIds.length} Vaults`
+                            : managerIds[0]
+                              ? `${managerIds[0].slice(0, 6)}...`
+                              : '1-Tx Auto'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-snug">
+                        Shared for all Spot Market &amp; Limit pairs. Pre-deposit is optional — orders auto-draw from your wallet; Market auto-settles back to wallet.
+                      </p>
 
-                    {managerState && (
-                      <>
-                        <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
-                          <div className="bg-[#121821] rounded-lg px-2.5 py-1.5 border border-white/[0.08]">
-                            <div className="text-slate-400">{activePool.baseSymbol}</div>
-                            <div className="text-white font-semibold">{managerState.baseBalance.toFixed(4)}</div>
+                      {managerState && (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
+                            <div className="bg-[#121821] rounded-lg px-2.5 py-1.5 border border-white/[0.08]">
+                              <div className="text-slate-400">Free {activePool.baseSymbol}</div>
+                              <div className="text-white font-semibold">{vaultSummary.freeBase.toFixed(4)}</div>
+                            </div>
+                            <div className="bg-[#121821] rounded-lg px-2.5 py-1.5 border border-white/[0.08]">
+                              <div className="text-slate-400">Free {activePool.quoteSymbol}</div>
+                              <div className="text-white font-semibold">{vaultSummary.freeQuote.toFixed(4)}</div>
+                            </div>
                           </div>
-                          <div className="bg-[#121821] rounded-lg px-2.5 py-1.5 border border-white/[0.08]">
-                            <div className="text-slate-400">{activePool.quoteSymbol}</div>
-                            <div className="text-white font-semibold">{managerState.quoteBalance.toFixed(4)}</div>
-                          </div>
-                        </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <select
-                            value={depositCoinSide}
-                            onChange={(e) => setDepositCoinSide(e.target.value as 'base' | 'quote')}
-                            className="bg-[#121821] border border-white/[0.12] rounded-lg px-2 py-1.5 text-xs font-mono text-white outline-none"
-                          >
-                            <option value="quote">{activePool.quoteSymbol}</option>
-                            <option value="base">{activePool.baseSymbol}</option>
-                          </select>
-                          <input
-                            type="number"
-                            placeholder="Amt"
-                            value={depositAmt}
-                            onChange={(e) => setDepositAmt(e.target.value)}
-                            className="w-full min-w-0 bg-[#121821] border border-white/[0.12] rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none"
-                          />
-                          <button
-                            type="button"
-                            disabled={isVaultBusy || !depositAmt}
-                            onClick={handleDepositManager}
-                            className="px-2.5 py-1.5 rounded-lg bg-white/[0.1] hover:bg-white/[0.18] text-xs font-semibold text-white shrink-0"
-                          >
-                            Dep
-                          </button>
-                          <button
-                            type="button"
-                            disabled={isVaultBusy}
-                            onClick={handleWithdrawManagerAll}
-                            className="px-2.5 py-1.5 rounded-lg btn-deepbook text-xs shrink-0"
-                            title="Withdraw all & settled funds to wallet"
-                          >
-                            Withdraw
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Bottom Dock: Open Spot Limit Orders OR Isolated Margin Manager Account */}
-          {mode === 'margin' ? (
-            <DeepBookMarginAccountBar
-              pool={activePool}
-              position={marginPosition}
-              riskConfig={marginRiskConfig}
-              isLoading={marginLoading}
-              onRefresh={refreshMarginAccount}
-              onNotify={onNotify}
-            />
-          ) : (
-            <div className="panel-carbon rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-white">
-                    Open Limit Orders ({managerState?.openOrders.length ?? 0})
-                  </span>
-                  {managerState && (managerState.settledBase > 0 || managerState.settledQuote > 0) && (
-                    <button
-                      type="button"
-                      onClick={handleWithdrawManagerAll}
-                      disabled={isVaultBusy}
-                      className="px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono"
-                    >
-                      Claim Settled ({managerState.settledBase.toFixed(4)} {activePool.baseSymbol} /{' '}
-                      {managerState.settledQuote.toFixed(4)} {activePool.quoteSymbol})
-                    </button>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={refreshDeepBookAccount}
-                  className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/[0.06]"
-                  title="Refresh DeepBook state"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
-
-              {!account ? (
-                <div className="text-sm text-slate-400 py-4 text-center">
-                  Connect your Sui wallet to view open DeepBook v3 limit orders.
-                </div>
-              ) : !managerState || managerState.openOrders.length === 0 ? (
-                <div className="text-sm text-slate-400 py-4 text-center">
-                  No open limit orders on {activePool.baseSymbol}/{activePool.quoteSymbol}.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs sm:text-sm font-mono tabular-nums">
-                    <thead>
-                      <tr className="text-slate-400 border-b border-white/[0.08]">
-                        <th className="text-left py-2">Side</th>
-                        <th className="text-right py-2">Price ({activePool.quoteSymbol})</th>
-                        <th className="text-right py-2">Qty ({activePool.baseSymbol})</th>
-                        <th className="text-right py-2">Filled</th>
-                        <th className="text-right py-2">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {managerState.openOrders.map((ord) => (
-                        <tr key={ord.orderId} className="border-b border-white/[0.04]">
-                          <td className={`py-2.5 font-semibold ${ord.isBid ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {ord.isBid ? 'BUY' : 'SELL'}
-                          </td>
-                          <td className="text-right py-2.5 text-white">{ord.price.toFixed(4)}</td>
-                          <td className="text-right py-2.5 text-slate-200">{ord.quantity.toFixed(4)}</td>
-                          <td className="text-right py-2.5 text-slate-400">{ord.filledQuantity.toFixed(4)}</td>
-                          <td className="text-right py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={depositCoinSide}
+                              onChange={(e) => setDepositCoinSide(e.target.value as 'base' | 'quote')}
+                              className="bg-[#121821] border border-white/[0.12] rounded-lg px-2 py-1.5 text-xs font-mono text-white outline-none"
+                            >
+                              <option value="quote">{activePool.quoteSymbol}</option>
+                              <option value="base">{activePool.baseSymbol}</option>
+                            </select>
+                            <input
+                              type="number"
+                              placeholder="Amt"
+                              value={depositAmt}
+                              onChange={(e) => setDepositAmt(e.target.value)}
+                              className="w-full min-w-0 bg-[#121821] border border-white/[0.12] rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none"
+                            />
+                            <button
+                              type="button"
+                              disabled={isVaultBusy || !depositAmt}
+                              onClick={handleDepositManager}
+                              className="px-2.5 py-1.5 rounded-lg bg-white/[0.1] hover:bg-white/[0.18] text-xs font-semibold text-white shrink-0"
+                            >
+                              Dep
+                            </button>
                             <button
                               type="button"
                               disabled={isVaultBusy}
-                              onClick={() => handleCancelOrder(ord.orderId)}
-                              className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 text-xs font-semibold"
+                              onClick={() => handleWithdrawManagerAll(false)}
+                              className="px-2.5 py-1.5 rounded-lg btn-deepbook text-xs shrink-0"
+                              title="Withdraw unlocked & settled funds across all DeepBook vaults to wallet"
                             >
-                              Cancel & Settle
+                              Withdraw
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+
+            {/* Bottom Dock: Open Spot Limit Orders OR Isolated Margin Manager Account */}
+            {mode === 'margin' ? (
+              <DeepBookMarginAccountBar
+                pool={activePool}
+                position={marginPosition}
+                riskConfig={marginRiskConfig}
+                isLoading={marginLoading}
+                onRefresh={refreshMarginAccount}
+                onNotify={onNotify}
+              />
+            ) : (
+              <div className="panel-carbon rounded-2xl p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="text-sm font-bold text-white">
+                      Open Limit Orders ({vaultSummary.openOrders.length})
+                    </span>
+                    {vaultSummary.openOrders.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleWithdrawManagerAll(true)}
+                        disabled={isVaultBusy}
+                        className="px-3 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-xs font-semibold"
+                      >
+                        Cancel All &amp; Withdraw to Wallet
+                      </button>
+                    )}
+                    {(vaultSummary.settledBase > 0 || vaultSummary.settledQuote > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => handleWithdrawManagerAll(false)}
+                        disabled={isVaultBusy}
+                        className="px-3 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-mono"
+                      >
+                        Claim Settled ({vaultSummary.settledBase.toFixed(4)} {activePool.baseSymbol} /{' '}
+                        {vaultSummary.settledQuote.toFixed(4)} {activePool.quoteSymbol})
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshDeepBookAccount}
+                    className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/[0.06]"
+                    title="Refresh DeepBook state"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {!account ? (
+                  <div className="text-sm text-slate-400 py-4 text-center">
+                    Connect your Sui wallet to view open DeepBook v3 limit orders.
+                  </div>
+                ) : vaultSummary.openOrders.length === 0 ? (
+                  <div className="text-sm text-slate-400 py-4 text-center">
+                    No open limit orders on {activePool.baseSymbol}/{activePool.quoteSymbol}.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs sm:text-sm font-mono tabular-nums">
+                      <thead>
+                        <tr className="text-slate-400 border-b border-white/[0.08]">
+                          <th className="text-left py-2">Side</th>
+                          <th className="text-right py-2">Price ({activePool.quoteSymbol})</th>
+                          <th className="text-right py-2">Qty ({activePool.baseSymbol})</th>
+                          <th className="text-right py-2">Filled</th>
+                          <th className="text-right py-2">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vaultSummary.openOrders.map((ord) => (
+                          <tr key={`${ord.managerId || ''}_${ord.orderId}`} className="border-b border-white/[0.04]">
+                            <td className={`py-2.5 font-semibold ${ord.isBid ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {ord.isBid ? 'BUY' : 'SELL'}
+                            </td>
+                            <td className="text-right py-2.5 text-white">{ord.price.toFixed(4)}</td>
+                            <td className="text-right py-2.5 text-slate-200">{ord.quantity.toFixed(4)}</td>
+                            <td className="text-right py-2.5 text-slate-400">{ord.filledQuantity.toFixed(4)}</td>
+                            <td className="text-right py-2.5">
+                              <button
+                                type="button"
+                                disabled={isVaultBusy}
+                                onClick={() => handleCancelOrder(ord)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 text-xs font-semibold"
+                              >
+                                Cancel & Settle
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
         </div>
       )}
 

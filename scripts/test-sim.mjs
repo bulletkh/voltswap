@@ -313,6 +313,10 @@ try {
       ],
       typeArguments: [SUI_TYPE, USDC_TYPE],
     });
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
+      arguments: [manager, tx.object(mainnetPackageIds.REGISTRY_ID)],
+    });
     tx.add(dbExt.deepbook.balanceManager.shareBalanceManager(manager));
   }
 
@@ -666,8 +670,8 @@ try {
       dbClient.marginManager.depositDuringInitialization({
         manager,
         poolKey: 'SUI_USDC',
-        coinType: suiPool.quoteCoin,
-        amount: 1.2,
+        coinType: suiPool.baseCoin,
+        amount: 1.8,
       })
     );
     tx.moveCall({
@@ -791,6 +795,10 @@ try {
   });
   tx.transferObjects([outBase, outQuote], WALLET);
   tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
+    arguments: [manager, tx.object(mainnetPackageIds.REGISTRY_ID)],
+  });
+  tx.moveCall({
     target: '0x2::transfer::public_share_object',
     arguments: [manager],
     typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`],
@@ -798,12 +806,122 @@ try {
 
   const mktEff = await simulateGrpcOrGql(tx);
   if (mktEff?.status === 'SUCCESS') {
-    pass('DeepBook v3 1-TX Spot Market Order (SUI_USDC)', 'Create + Deposit + MarketSell + Settle + WithdrawAll + Share');
+    pass('DeepBook v3 1-TX Spot Market Order (SUI_USDC)', 'Create + Deposit + MarketSell + Settle + WithdrawAll + Register + Share');
   } else {
     fail('DeepBook v3 1-TX Spot Market Order (SUI_USDC)', JSON.stringify(mktEff));
   }
 } catch (e) {
   fail('DeepBook v3 1-TX Spot Market Order (SUI_USDC)', e?.stack || e?.message || String(e));
+}
+
+// 10. DeepBook v3 GraphQL Manager Discovery + Multi-Vault Cancel/Withdraw Recovery Simulation
+try {
+  const dbExt10 = grpcClient.$extend(deepbook({ address: WALLET }));
+  const regIds = await dbExt10.deepbook.getBalanceManagerIds(WALLET);
+  const gqlRes = await fetch(GQL_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: `query($addr: SuiAddress!) {
+        transactions(filter: { sentAddress: $addr }, last: 50) {
+          nodes {
+            effects {
+              objectChanges {
+                nodes {
+                  address
+                  outputState {
+                    asMoveObject {
+                      contents { type { repr } json }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }`,
+      variables: { addr: WALLET },
+    }),
+  }).then((r) => r.json());
+
+  const gqlMgrIds = [];
+  for (const txNode of gqlRes?.data?.transactions?.nodes || []) {
+    for (const ch of txNode?.effects?.objectChanges?.nodes || []) {
+      const contents = ch?.outputState?.asMoveObject?.contents;
+      const repr = String(contents?.type?.repr || '');
+      const mgrOwner = String(contents?.json?.owner || '');
+      if (
+        repr.includes('::balance_manager::BalanceManager') &&
+        mgrOwner.toLowerCase() === WALLET.toLowerCase()
+      ) {
+        gqlMgrIds.push(String(ch.address));
+      }
+    }
+  }
+  const allDiscovered = Array.from(new Set([...regIds, ...gqlMgrIds]));
+
+  if (allDiscovered.length > 0) {
+    const mgrMap = {};
+    allDiscovered.forEach((id, i) => {
+      mgrMap[`M${i}`] = { address: id };
+    });
+    const sweepClient = new SuiGrpcClient({ network: 'mainnet', baseUrl: 'https://fullnode.mainnet.sui.io:443' }).$extend(
+      deepbook({ address: WALLET, balanceManagers: mgrMap })
+    );
+    const sweepTx = new Transaction();
+    sweepTx.setSender(WALLET);
+    const outs = [];
+    for (let i = 0; i < allDiscovered.length; i++) {
+      const key = `M${i}`;
+      const mgrArg = sweepTx.object(allDiscovered[i]);
+      const proof = sweepTx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
+        arguments: [mgrArg],
+      });
+      const openIds = await sweepClient.deepbook.accountOpenOrders('SUI_USDC', key).catch(() => []);
+      for (const orderId of openIds) {
+        sweepTx.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::pool::cancel_order`,
+          arguments: [
+            sweepTx.object(SUI_USDC_POOL_ID),
+            mgrArg,
+            proof,
+            sweepTx.pure.u128(BigInt(orderId)),
+            sweepTx.object('0x6'),
+          ],
+          typeArguments: [SUI_TYPE, USDC_TYPE],
+        });
+      }
+      sweepTx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::pool::withdraw_settled_amounts`,
+        arguments: [sweepTx.object(SUI_USDC_POOL_ID), mgrArg, proof],
+        typeArguments: [SUI_TYPE, USDC_TYPE],
+      });
+      outs.push(
+        sweepTx.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+          arguments: [mgrArg],
+          typeArguments: [SUI_TYPE],
+        }),
+        sweepTx.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+          arguments: [mgrArg],
+          typeArguments: [USDC_TYPE],
+        })
+      );
+    }
+    if (outs.length > 0) sweepTx.transferObjects(outs, WALLET);
+    const sweepEff = await simulateGrpcOrGql(sweepTx);
+    if (sweepEff?.status === 'SUCCESS') {
+      pass('DeepBook v3 Multi-Vault Cancel & Withdraw Recovery', `${allDiscovered.length} vault(s) discovered & swept`);
+    } else {
+      fail('DeepBook v3 Multi-Vault Cancel & Withdraw Recovery', JSON.stringify(sweepEff));
+    }
+  } else {
+    pass('DeepBook v3 Multi-Vault Discovery (GraphQL)', '0 vaults on wallet (clean state)');
+  }
+} catch (e) {
+  fail('DeepBook v3 Multi-Vault Cancel & Withdraw Recovery', e?.stack || e?.message || String(e));
 }
 
 if (failures > 0) {

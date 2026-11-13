@@ -1,11 +1,13 @@
-import { deepbook, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
+import { deepbook, mainnetPackageIds, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
 import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
+import { normalizeSuiAddress } from '@mysten/sui/utils';
 import { suiGrpcClient } from './suiClient';
 import { appendVoltFeeCoinSplit, addCoinFeeToTx } from './voltFee';
 
 export const DEEPBOOK_INDEXER = 'https://deepbook-indexer.mainnet.mystenlabs.com';
-export const DEEPBOOK_PACKAGE_ID =
-  '0xbca0cefe720330e7bb4f2283438b68de6a0e656688db4ac90d61e71fe6151fe8';
+export const DEEPBOOK_PACKAGE_ID = mainnetPackageIds.DEEPBOOK_PACKAGE_ID;
+export const DEEPBOOK_REGISTRY_ID = mainnetPackageIds.REGISTRY_ID;
+const SUI_GRAPHQL_URL = 'https://graphql.mainnet.sui.io/graphql';
 
 export interface DeepBookPoolMeta {
   poolId: string;
@@ -53,6 +55,7 @@ export interface DeepBookTrade {
 }
 
 export interface DeepBookOpenOrder {
+  managerId?: string;
   orderId: string;
   clientOrderId: string;
   isBid: boolean;
@@ -318,9 +321,77 @@ export function createDeepBookClient(owner: string, managerId?: string) {
   );
 }
 
+/**
+ * Discovers ALL DeepBook v3 BalanceManager IDs owned by `owner`:
+ * merges official DeepBook Registry IDs with any unregistered BalanceManager objects
+ * created by past 1-tx flows via Sui GraphQL object history.
+ */
 export async function discoverBalanceManagers(owner: string): Promise<string[]> {
+  const normOwner = normalizeSuiAddress(owner).toLowerCase();
   const extended = createDeepBookClient(owner);
-  return extended.deepbook.getBalanceManagerIds(owner);
+
+  const [registryIds, gqlIds] = await Promise.all([
+    extended.deepbook.getBalanceManagerIds(owner).catch(() => [] as string[]),
+    (async () => {
+      try {
+        const query = `query($addr: SuiAddress!) {
+          transactions(filter: { sentAddress: $addr }, last: 50) {
+            nodes {
+              effects {
+                objectChanges {
+                  nodes {
+                    address
+                    outputState {
+                      asMoveObject {
+                        contents { type { repr } json }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }`;
+        const res = await fetch(SUI_GRAPHQL_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, variables: { addr: owner } }),
+        });
+        if (!res.ok) return [] as string[];
+        const payload = await res.json();
+        const found: string[] = [];
+        for (const txNode of payload?.data?.transactions?.nodes || []) {
+          for (const ch of txNode?.effects?.objectChanges?.nodes || []) {
+            const contents = ch?.outputState?.asMoveObject?.contents;
+            const repr = String(contents?.type?.repr || '');
+            const mgrOwner = String(contents?.json?.owner || '');
+            if (
+              repr.includes('::balance_manager::BalanceManager') &&
+              mgrOwner &&
+              normalizeSuiAddress(mgrOwner).toLowerCase() === normOwner
+            ) {
+              found.push(normalizeSuiAddress(String(ch.address)));
+            }
+          }
+        }
+        return found;
+      } catch {
+        return [] as string[];
+      }
+    })(),
+  ]);
+
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const rawId of [...registryIds, ...gqlIds]) {
+    if (!rawId) continue;
+    const norm = normalizeSuiAddress(rawId);
+    if (!seen.has(norm)) {
+      seen.add(norm);
+      merged.push(norm);
+    }
+  }
+  return merged;
 }
 
 export async function fetchDeepBookManagerState(
@@ -348,6 +419,7 @@ export async function fetchDeepBookManagerState(
       const rawQty = Number(ord.quantity || 0);
       const rawFilled = Number(ord.filled_quantity || 0);
       return {
+        managerId,
         orderId: String(ord.order_id),
         clientOrderId: String(ord.client_order_id),
         isBid: Boolean(norm?.isBid ?? BigInt(ord.order_id) >> 127n === 0n),
@@ -378,6 +450,15 @@ export async function fetchDeepBookManagerState(
   };
 }
 
+export async function fetchAllDeepBookManagerStates(
+  owner: string,
+  managerIds: string[],
+  pool: DeepBookPoolMeta
+): Promise<DeepBookManagerState[]> {
+  if (!managerIds.length) return [];
+  return Promise.all(managerIds.map((id) => fetchDeepBookManagerState(owner, id, pool)));
+}
+
 export function buildDepositManagerTx(params: {
   owner: string;
   managerId: string;
@@ -388,6 +469,58 @@ export function buildDepositManagerTx(params: {
   const tx = new Transaction();
   tx.setSender(params.owner);
   tx.add(ext.deepbook.balanceManager.depositIntoManager('MAIN', params.coinKey, params.amount));
+  return tx;
+}
+
+export function buildWithdrawAllManagersAndCancelTx(params: {
+  owner: string;
+  pool: DeepBookPoolMeta;
+  managers: Array<{ managerId: string; openOrderIds: string[] }>;
+}): Transaction {
+  const tx = new Transaction();
+  tx.setSender(params.owner);
+  const coinsToReturn: any[] = [];
+
+  for (const item of params.managers) {
+    const mgr = tx.object(item.managerId);
+    const proof = tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
+      arguments: [mgr],
+    });
+    for (const orderId of item.openOrderIds) {
+      tx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::pool::cancel_order`,
+        arguments: [
+          tx.object(params.pool.poolId),
+          mgr,
+          proof,
+          tx.pure.u128(BigInt(orderId)),
+          tx.object('0x6'),
+        ],
+        typeArguments: [params.pool.baseCoinId, params.pool.quoteCoinId],
+      });
+    }
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::pool::withdraw_settled_amounts`,
+      arguments: [tx.object(params.pool.poolId), mgr, proof],
+      typeArguments: [params.pool.baseCoinId, params.pool.quoteCoinId],
+    });
+    const outBase = tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+      arguments: [mgr],
+      typeArguments: [params.pool.baseCoinId],
+    });
+    const outQuote = tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+      arguments: [mgr],
+      typeArguments: [params.pool.quoteCoinId],
+    });
+    coinsToReturn.push(outBase, outQuote);
+  }
+
+  if (coinsToReturn.length > 0) {
+    tx.transferObjects(coinsToReturn, params.owner);
+  }
   return tx;
 }
 
@@ -543,6 +676,11 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
         tx.object('0x6'),
       ],
       typeArguments: [params.pool.baseCoinId, params.pool.quoteCoinId],
+    });
+
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
+      arguments: [manager, tx.object(DEEPBOOK_REGISTRY_ID)],
     });
 
     tx.add(ext.deepbook.balanceManager.shareBalanceManager(manager));
@@ -715,6 +853,10 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
   }
 
   if (isNewManager) {
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
+      arguments: [targetManagerArg, tx.object(DEEPBOOK_REGISTRY_ID)],
+    });
     tx.moveCall({
       target: '0x2::transfer::public_share_object',
       arguments: [targetManagerArg],
