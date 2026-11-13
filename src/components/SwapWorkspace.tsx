@@ -42,12 +42,14 @@ import {
   fetchDeepBookOrderbook,
   fetchDeepBookPools,
   fetchDeepBookTrades,
+  fetchVoltSpotReferrals,
   type DeepBookCandle,
   type DeepBookManagerState,
   type DeepBookOpenOrder,
   type DeepBookOrderbook,
   type DeepBookPoolMeta,
   type DeepBookTrade,
+  type VoltSpotReferral,
 } from '../deepbookV3';
 import { fetchSwapPairCandles } from '../spotCandles';
 import { ProCandleChart, type ChartTimeframe } from './ProCandleChart';
@@ -130,6 +132,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
   const [managerIds, setManagerIds] = useState<string[]>([]);
   const [managerStates, setManagerStates] = useState<DeepBookManagerState[]>([]);
+  const [spotReferrals, setSpotReferrals] = useState<Record<string, VoltSpotReferral>>({});
   const [spotOrderStyle, setSpotOrderStyle] = useState<'market' | 'limit'>('market');
   const [spotMarketSlippage, setSpotMarketSlippage] = useState<number>(1.5);
   const [limitSide, setLimitSide] = useState<'buy' | 'sell'>('buy');
@@ -222,12 +225,13 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     };
   }, [mode, amountIn, fromToken, toToken, traderTier.feeRate]);
 
-  // Load DeepBook v3 Pools once
+  // Load DeepBook v3 Pools & native Spot Referral caps once
   useEffect(() => {
     fetchDeepBookPools().then((list) => {
       setPools(list);
       setActivePool((curr) => list.find((p) => p.poolName === curr.poolName) || list[0]);
     });
+    fetchVoltSpotReferrals().then(setSpotReferrals).catch(() => {});
   }, []);
 
   // Load DeepBook Candles (needed in Limit/Margin mode OR when Market chart toggle is on)
@@ -521,6 +525,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         payWithDeep: (managerState?.deepBalance ?? 0) >= 0.5,
         feeMist,
         refSharePct: refTier.revSharePct,
+        spotReferralId: spotReferrals[activePool.poolName]?.referralId || null,
+        existingManagerReferralId: managerState?.referralId || null,
       });
 
       const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
@@ -652,6 +658,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         payWithDeep: false,
         settleToWallet: true,
         feeBps,
+        spotReferralId: spotReferrals[activePool.poolName]?.referralId || null,
+        existingManagerReferralId: managerState?.referralId || null,
       });
 
       const sim = await simulateTxBeforeWallet(tx);

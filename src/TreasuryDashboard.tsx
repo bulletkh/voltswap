@@ -14,10 +14,36 @@ import {
   Lock,
   Clock,
   Target,
+  Loader2,
+  AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
+import { useDAppKit } from '@mysten/dapp-kit-react';
 import { VOLT_TREASURY_ADDRESS } from './constants';
-import { fetchWalletBalances, readBalanceFromMap, SUI_COIN_TYPE } from './suiClient';
+import { extractTxDigest, fetchWalletBalances, readBalanceFromMap, SUI_COIN_TYPE } from './suiClient';
+import { simulateTxBeforeWallet } from './suiSimulate';
+import {
+  fetchPredictProtocolStatus,
+  buildInitPredictMonetizationTx,
+  buildClaimPredictBuilderFeesTx,
+  type PredictProtocolStatus,
+} from './deepbookPredict';
+import {
+  fetchVoltMarginSupplyReferrals,
+  buildMintMarginSupplyReferralsTx,
+  buildWithdrawMarginReferralFeesTx,
+  type VoltMarginSupplyReferral,
+} from './earnPools';
+import {
+  fetchVoltSpotReferrals,
+  buildMintSpotReferralsTx,
+  buildClaimSpotReferralRewardsTx,
+  type VoltSpotReferral,
+} from './deepbookV3';
 import { playClickSound } from './audioFx';
+
+const MARGIN_REFERRAL_COINS = ['USDC', 'SUI', 'DEEP', 'WAL', 'USDSUI', 'SUIUSDE', 'XBTC'] as const;
+const SPOT_REFERRAL_POOLS = ['SUI_USDC', 'DEEP_SUI', 'DEEP_USDC', 'WAL_USDC'] as const;
 
 interface TreasuryDashboardProps {
   suiClient?: any;
@@ -43,8 +69,9 @@ interface RealSwapItem {
 export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
   suiClient,
   currentAccount,
-  showNotification: _showNotification
+  showNotification
 }) => {
+  const dAppKit = useDAppKit();
   const [suiPriceUsd, setSuiPriceUsd] = useState<number>(0.8318);
   const [treasurySuiBalance, setTreasurySuiBalance] = useState<number>(0);
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(true);
@@ -52,6 +79,77 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
   const [allCoinBalances, setAllCoinBalances] = useState<Array<{ coinType: string; totalBalance: string }>>([]);
   const [recordedSwaps, setRecordedSwaps] = useState<RealSwapItem[]>([]);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // DeepBook Native Monetization (Predict BuilderCode + Margin SupplyReferral + Spot PoolReferral)
+  const [predictStatus, setPredictStatus] = useState<PredictProtocolStatus | null>(null);
+  const [marginReferrals, setMarginReferrals] = useState<VoltMarginSupplyReferral[]>([]);
+  const [spotReferrals, setSpotReferrals] = useState<VoltSpotReferral[]>([]);
+  const [monetizationLoading, setMonetizationLoading] = useState<boolean>(true);
+  const [monetizationBusy, setMonetizationBusy] = useState<string | null>(null);
+
+  const isTreasurySigner = useMemo(
+    () => Boolean(currentAccount?.address && currentAccount.address.toLowerCase() === VOLT_TREASURY_ADDRESS.toLowerCase()),
+    [currentAccount?.address]
+  );
+
+  const loadDeepBookMonetization = async () => {
+    setMonetizationLoading(true);
+    try {
+      const [pStatus, mRefs, sRefs] = await Promise.all([
+        fetchPredictProtocolStatus(),
+        fetchVoltMarginSupplyReferrals(VOLT_TREASURY_ADDRESS),
+        fetchVoltSpotReferrals(VOLT_TREASURY_ADDRESS),
+      ]);
+      setPredictStatus(pStatus);
+      setMarginReferrals(
+        Object.values(mRefs).filter((v): v is VoltMarginSupplyReferral => Boolean(v))
+      );
+      setSpotReferrals(Object.values(sRefs));
+    } catch {
+      // keep existing snapshot
+    } finally {
+      setMonetizationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDeepBookMonetization();
+  }, []);
+
+  const runMonetizationTx = async (
+    busyKey: string,
+    buildTx: () => any,
+    successTitle: string,
+    successMsg: string
+  ) => {
+    if (!currentAccount?.address) {
+      showNotification('warning', 'Connect Wallet', 'Connect the Treasury wallet to execute admin transactions.');
+      return;
+    }
+    setMonetizationBusy(busyKey);
+    try {
+      const tx = buildTx();
+      const sim = await simulateTxBeforeWallet(tx, { sender: currentAccount.address });
+      if (!sim.ok) {
+        showNotification('error', 'Simulation Failed', sim.errorMessage || 'On-chain preflight aborted.');
+        return;
+      }
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
+      showNotification(
+        'success',
+        successTitle,
+        successMsg,
+        digest ? 'Suiscan' : undefined,
+        digest ? `https://suiscan.xyz/mainnet/tx/${digest}` : undefined
+      );
+      await loadDeepBookMonetization();
+    } catch (err: any) {
+      showNotification('error', 'Admin Tx Failed', err?.message || 'Wallet rejected transaction.');
+    } finally {
+      setMonetizationBusy(null);
+    }
+  };
 
   // Authenticate owner: Treasury vault address or the Creator's active wallet
   const isOwnerConnected = useMemo(() => {
@@ -670,6 +768,289 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
             </table>
           </div>
         )}
+      </div>
+
+      {/* DeepBook v3 Native Monetization & Referrals */}
+      <div className="bg-[#101722] border border-[#18C8FF]/25 rounded-3xl p-6 shadow-2xl space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-[#18C8FF]" />
+              <span>DeepBook v3 Native Monetization (Zero Principal Cut)</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              On-chain BuilderCode + Predict Referrer + MarginPool SupplyReferral + Spot PoolReferral owned by Treasury.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadDeepBookMonetization}
+            className="px-3 py-1.5 rounded-xl bg-[#0A1019] border border-white/10 text-xs text-slate-300 hover:text-white inline-flex items-center gap-1.5"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${monetizationLoading ? 'animate-spin' : ''}`} />
+            Refresh Status
+          </button>
+        </div>
+
+        {!isTreasurySigner && (
+          <div className="rounded-2xl bg-amber-500/10 border border-amber-400/35 px-4 py-3 text-xs text-amber-200 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              Switch active Sui wallet to <span className="font-mono font-bold text-white">{VOLT_TREASURY_ADDRESS.slice(0, 10)}...{VOLT_TREASURY_ADDRESS.slice(-6)}</span> to initialize or claim Treasury-owned referral objects (`0x075978...`, `0xd9f1d77a...`, Margin &amp; Spot referrals). Currently connected as `{currentAccount?.address?.slice(0, 8)}...`.
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* 1. Predict BuilderCode + Account Referrer */}
+          <div className="rounded-2xl bg-[#0A1019] border border-white/10 p-4 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Target className="w-4 h-4 text-[#00E599]" />
+                  DeepBook Predict
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#18C8FF]/15 text-[#18C8FF]">
+                  v{predictStatus?.versionWatermark ?? 4} {predictStatus?.builderFeeCutoverActive ? 'BuilderFee Live' : '10% Ref Live'}
+                </span>
+              </div>
+
+              <div className="text-[11px] font-mono space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">BuilderCode:</span>
+                  <span className={predictStatus?.builderCodeExists ? 'text-[#00E599]' : 'text-amber-300'}>
+                    {predictStatus?.builderCodeExists ? 'Active' : 'Not Minted'} ({predictStatus?.builderCodeId.slice(0, 8)}...)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Referrer Acc:</span>
+                  <span className={predictStatus?.referrerWrapperExists ? 'text-[#00E599]' : 'text-amber-300'}>
+                    {predictStatus?.referrerWrapperExists ? 'Active' : 'Not Minted'} ({predictStatus?.referrerWrapperId.slice(0, 8)}...)
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Claimable Builder Fee:</span>
+                  <span className="text-white font-bold">
+                    ${(predictStatus?.claimableBuilderUsdc ?? 0).toFixed(4)} USDC
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              {(!predictStatus?.builderCodeExists || !predictStatus?.referrerWrapperExists) && (
+                <button
+                  type="button"
+                  disabled={!isTreasurySigner || monetizationBusy !== null}
+                  onClick={() =>
+                    runMonetizationTx(
+                      'init-predict',
+                      () =>
+                        buildInitPredictMonetizationTx({
+                          sender: currentAccount!.address,
+                          createBuilderCode: !predictStatus?.builderCodeExists,
+                          createReferrerAccount: !predictStatus?.referrerWrapperExists,
+                        }),
+                      'Predict Monetization Initialized',
+                      'Volt BuilderCode + Referrer AccountWrapper shared on Sui Mainnet.'
+                    )
+                  }
+                  className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-[#18C8FF] text-[#05101A] hover:brightness-110 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                >
+                  {monetizationBusy === 'init-predict' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Initialize Predict Referrals (1 PTB)
+                </button>
+              )}
+              {predictStatus?.builderCodeExists && (
+                <button
+                  type="button"
+                  disabled={!isTreasurySigner || monetizationBusy !== null}
+                  onClick={() =>
+                    runMonetizationTx(
+                      'claim-predict',
+                      () => buildClaimPredictBuilderFeesTx(currentAccount!.address),
+                      'Predict Builder Fees Claimed',
+                      'USDC builder fees swept directly into Treasury wallet.'
+                    )
+                  }
+                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                >
+                  {monetizationBusy === 'claim-predict' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Claim Builder USDC
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 2. MarginPool SupplyReferral */}
+          <div className="rounded-2xl bg-[#0A1019] border border-white/10 p-4 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-[#18C8FF]" />
+                  Margin SupplyReferrals
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#00E599]/15 text-[#00E599]">
+                  {marginReferrals.length}/{MARGIN_REFERRAL_COINS.length} Live
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {MARGIN_REFERRAL_COINS.map((coin) => {
+                  const found = marginReferrals.find((r) => r.coinKey === coin);
+                  return (
+                    <span
+                      key={coin}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-mono border ${
+                        found
+                          ? 'bg-[#00E599]/12 border-[#00E599]/40 text-[#00E599]'
+                          : 'bg-white/[0.03] border-white/10 text-slate-500'
+                      }`}
+                    >
+                      {coin} {found ? '✓' : '·'}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              {(() => {
+                const missing = MARGIN_REFERRAL_COINS.filter(
+                  (c) => !marginReferrals.some((r) => r.coinKey === c)
+                );
+                return missing.length > 0 ? (
+                  <button
+                    type="button"
+                    disabled={!isTreasurySigner || monetizationBusy !== null}
+                    onClick={() =>
+                      runMonetizationTx(
+                        'mint-margin',
+                        () =>
+                          buildMintMarginSupplyReferralsTx({
+                            sender: currentAccount!.address,
+                            coinKeys: [...missing],
+                          }),
+                        'Margin SupplyReferrals Minted',
+                        `Activated native DeepBook MarginPool referral shares for ${missing.join(', ')}.`
+                      )
+                    }
+                    className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-[#18C8FF] text-[#05101A] hover:brightness-110 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                  >
+                    {monetizationBusy === 'mint-margin' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Mint Missing Margin Refs ({missing.length})
+                  </button>
+                ) : null;
+              })()}
+              {marginReferrals.length > 0 && (
+                <button
+                  type="button"
+                  disabled={!isTreasurySigner || monetizationBusy !== null}
+                  onClick={() =>
+                    runMonetizationTx(
+                      'claim-margin',
+                      () =>
+                        buildWithdrawMarginReferralFeesTx({
+                          sender: currentAccount!.address,
+                          referrals: marginReferrals,
+                        }),
+                      'Margin Referral Fees Withdrawn',
+                      'All accumulated native MarginPool referral interest claimed to Treasury.'
+                    )
+                  }
+                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                >
+                  {monetizationBusy === 'claim-margin' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Withdraw All Margin Ref Fees
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 3. Spot CLOB DeepBookPoolReferral */}
+          <div className="rounded-2xl bg-[#0A1019] border border-white/10 p-4 space-y-3 flex flex-col justify-between">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Coins className="w-4 h-4 text-amber-300" />
+                  Spot PoolReferrals (0.5x)
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-[#00E599]/15 text-[#00E599]">
+                  {spotReferrals.length}/{SPOT_REFERRAL_POOLS.length} Live
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {SPOT_REFERRAL_POOLS.map((pool) => {
+                  const found = spotReferrals.find((r) => r.poolKey === pool);
+                  return (
+                    <span
+                      key={pool}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-mono border ${
+                        found
+                          ? 'bg-[#00E599]/12 border-[#00E599]/40 text-[#00E599]'
+                          : 'bg-white/[0.03] border-white/10 text-slate-500'
+                      }`}
+                    >
+                      {pool} {found ? '✓' : '·'}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              {(() => {
+                const missing = SPOT_REFERRAL_POOLS.filter(
+                  (p) => !spotReferrals.some((r) => r.poolKey === p)
+                );
+                return missing.length > 0 ? (
+                  <button
+                    type="button"
+                    disabled={!isTreasurySigner || monetizationBusy !== null}
+                    onClick={() =>
+                      runMonetizationTx(
+                        'mint-spot',
+                        () =>
+                          buildMintSpotReferralsTx({
+                            sender: currentAccount!.address,
+                            poolKeys: [...missing],
+                            multiplier: 0.5,
+                          }),
+                        'Spot PoolReferrals Minted',
+                        `Created DeepBookPoolReferral objects (0.5x multiplier) for ${missing.join(', ')}.`
+                      )
+                    }
+                    className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-[#18C8FF] text-[#05101A] hover:brightness-110 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                  >
+                    {monetizationBusy === 'mint-spot' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Mint Missing Spot Refs ({missing.length})
+                  </button>
+                ) : null;
+              })()}
+              {spotReferrals.length > 0 && (
+                <button
+                  type="button"
+                  disabled={!isTreasurySigner || monetizationBusy !== null}
+                  onClick={() =>
+                    runMonetizationTx(
+                      'claim-spot',
+                      () =>
+                        buildClaimSpotReferralRewardsTx({
+                          sender: currentAccount!.address,
+                          referrals: spotReferrals,
+                        }),
+                      'Spot Referral Rewards Claimed',
+                      'DEEP, base, and quote Spot CLOB referral rewards swept to Treasury.'
+                    )
+                  }
+                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-40 inline-flex items-center justify-center gap-1.5"
+                >
+                  {monetizationBusy === 'claim-spot' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Claim All Spot Ref Rewards
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Protocol Ownership & Direct Sui Management */}

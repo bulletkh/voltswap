@@ -6,8 +6,8 @@ import {
 } from '@mysten/deepbook-v3';
 import { Transaction } from '@mysten/sui/transactions';
 import { buildCetusSwapTx, fetchCetusQuote } from './cetusSwap';
+import { VOLT_TREASURY_ADDRESS } from './constants';
 import { suiGrpcClient, SUI_COIN_TYPE, USDC_COIN_TYPE } from './suiClient';
-import { addCoinFeeToTx, calcFeeUnits } from './voltFee';
 
 export type EarnFilterTab = 'onsite' | 'margin' | 'lst';
 
@@ -54,16 +54,11 @@ export interface LstVaultLiveStat extends LstVaultOption {
   exchangeRateToBase: number | null; // e.g., 1 haSUI = 1.084 SUI
 }
 
-export interface ExternalEcosystemPool {
-  id: string;
-  symbol: string;
-  protocol: string;
-  category: 'lending' | 'lst' | 'lp';
-  tvlUsd: number;
-  apyTotal: number;
-  apyBase: number;
-  apyReward: number;
-  externalUrl: string;
+export interface VoltMarginSupplyReferral {
+  coinKey: keyof typeof mainnetMarginPools;
+  marginPoolId: string;
+  referralId: string;
+  owner: string;
 }
 
 export const LST_VAULT_OPTIONS: LstVaultOption[] = [
@@ -353,56 +348,99 @@ export async function fetchUserDeepBookMarginPositions(owner: string): Promise<{
   return { supplierCapIds, positions };
 }
 
+const MARGIN_REFERRAL_CACHE_KEY = 'volt_margin_supply_referrals_v1';
+let marginReferralCache: Partial<Record<keyof typeof mainnetMarginPools, VoltMarginSupplyReferral>> | null = null;
+
+function readCachedMarginReferrals(): Partial<Record<keyof typeof mainnetMarginPools, VoltMarginSupplyReferral>> {
+  if (marginReferralCache) return marginReferralCache;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem(MARGIN_REFERRAL_CACHE_KEY);
+      if (raw) {
+        marginReferralCache = JSON.parse(raw);
+        if (marginReferralCache) return marginReferralCache;
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return {};
+}
+
+function writeCachedMarginReferrals(map: Partial<Record<keyof typeof mainnetMarginPools, VoltMarginSupplyReferral>>) {
+  marginReferralCache = map;
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(MARGIN_REFERRAL_CACHE_KEY, JSON.stringify(map));
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
+
 /**
- * Builds an atomic Sui Mainnet PTB supplying to a DeepBook v3 Margin Pool.
- * Reuses `existingSupplierCapId` or mints a fresh `SupplierCap` in the same PTB,
- * charging Volt Tiered Fee + Atomic Referral split on the deposited asset.
+ * Discovers DeepBook v3 MarginPool SupplyReferral caps created by Volt Treasury directly from Sui on-chain events.
  */
-export function buildDeepBookMarginSupplyTx(params: {
+export async function fetchVoltMarginSupplyReferrals(
+  owner: string = VOLT_TREASURY_ADDRESS
+): Promise<Partial<Record<keyof typeof mainnetMarginPools, VoltMarginSupplyReferral>>> {
+  const cached = readCachedMarginReferrals();
+  try {
+    const normOwner = owner.toLowerCase();
+    const eventType = `${mainnetPackageIds.MARGIN_V1}::margin_pool::SupplyReferralMinted`;
+    const res = await fetch('https://graphql.mainnet.sui.io/graphql', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        query: `{
+          events(filter: { sender: "${owner}", type: "${eventType}" }, last: 50) {
+            nodes { contents { json } }
+          }
+        }`,
+      }),
+    });
+    if (!res.ok) return cached;
+    const json = await res.json().catch(() => null);
+    const nodes: any[] = json?.data?.events?.nodes || [];
+
+    const poolIdToKey = new Map<string, keyof typeof mainnetMarginPools>();
+    for (const [k, v] of Object.entries(mainnetMarginPools)) {
+      if (v?.address) poolIdToKey.set(v.address.toLowerCase(), k as keyof typeof mainnetMarginPools);
+    }
+
+    const next: Partial<Record<keyof typeof mainnetMarginPools, VoltMarginSupplyReferral>> = { ...cached };
+    for (const n of nodes) {
+      const ev = n?.contents?.json;
+      if (!ev) continue;
+      if (String(ev.owner || '').toLowerCase() !== normOwner) continue;
+      const coinKey = poolIdToKey.get(String(ev.margin_pool_id || '').toLowerCase());
+      const refId = String(ev.supply_referral_id || '');
+      if (coinKey && refId) {
+        next[coinKey] = {
+          coinKey,
+          marginPoolId: String(ev.margin_pool_id),
+          referralId: refId,
+          owner: String(ev.owner),
+        };
+      }
+    }
+    writeCachedMarginReferrals(next);
+    return next;
+  } catch {
+    return cached;
+  }
+}
+
+/**
+ * Mints native DeepBook v3 MarginPool SupplyReferral shared objects for Volt Treasury in a single PTB.
+ */
+export function buildMintMarginSupplyReferralsTx(params: {
   sender: string;
-  coinKey: keyof typeof mainnetMarginPools;
-  coinType: string;
-  decimals: number;
-  amountHuman: number;
-  existingSupplierCapId?: string | null;
-  feeRate: number;
-  refSharePct?: number;
-}): { tx: Transaction; netDepositHuman: number } {
-  const {
-    sender,
-    coinKey,
-    coinType,
-    decimals,
-    amountHuman,
-    existingSupplierCapId,
-    feeRate,
-    refSharePct = 0.25,
-  } = params;
-
-  const scalar = Math.pow(10, decimals);
-  const grossAtomic = BigInt(Math.floor(amountHuman * scalar));
-  if (grossAtomic <= 0n) {
-    throw new Error('Enter a positive amount to supply.');
-  }
-
-  const feeAtomic = calcFeeUnits(grossAtomic, feeRate);
-  const netAtomic = grossAtomic - feeAtomic;
-  const netDepositHuman = Number(netAtomic) / scalar;
-  if (netDepositHuman <= 0) {
-    throw new Error('Amount is too small after fee deduction.');
-  }
-
+  coinKeys: Array<keyof typeof mainnetMarginPools>;
+}): Transaction {
+  const { sender, coinKeys } = params;
   const tx = new Transaction();
   tx.setSender(sender);
-
-  if (feeAtomic > 0n) {
-    addCoinFeeToTx(tx, {
-      coinType,
-      feeAtomic,
-      sender,
-      refSharePct,
-    });
-  }
 
   const db = new DeepBookClient({
     client: suiGrpcClient,
@@ -410,11 +448,86 @@ export function buildDeepBookMarginSupplyTx(params: {
     address: sender,
   });
 
+  for (const coinKey of coinKeys) {
+    tx.add(db.marginPool.mintSupplyReferral(coinKey));
+  }
+  return tx;
+}
+
+/**
+ * Withdraws earned native MarginPool supply referral fees directly to the creator treasury wallet.
+ */
+export function buildWithdrawMarginReferralFeesTx(params: {
+  sender: string;
+  referrals: Array<{ coinKey: keyof typeof mainnetMarginPools; referralId: string }>;
+}): Transaction {
+  const { sender, referrals } = params;
+  const tx = new Transaction();
+  tx.setSender(sender);
+
+  const db = new DeepBookClient({
+    client: suiGrpcClient,
+    network: 'mainnet',
+    address: sender,
+  });
+
+  const coins = referrals.map((r) => db.marginPool.withdrawReferralFees(r.coinKey, r.referralId)(tx));
+  if (coins.length > 0) {
+    tx.transferObjects(coins, sender);
+  }
+  return tx;
+}
+
+/**
+ * Builds an atomic Sui Mainnet PTB supplying to a DeepBook v3 Margin Pool
+ * at 0.00% Volt deposit fee, attributing the supply natively via DeepBook's
+ * on-chain `SupplyReferral` so user principal stays 100% intact.
+ */
+export function buildDeepBookMarginSupplyTx(params: {
+  sender: string;
+  coinKey: keyof typeof mainnetMarginPools;
+  coinType?: string;
+  decimals?: number;
+  amountHuman: number;
+  existingSupplierCapId?: string | null;
+  referralId?: string | null;
+  feeRate?: number;
+  refSharePct?: number;
+}): { tx: Transaction; netDepositHuman: number } {
+  const {
+    sender,
+    coinKey,
+    amountHuman,
+    existingSupplierCapId,
+    referralId,
+  } = params;
+
+  const netDepositHuman = Number(amountHuman.toFixed(6));
+  if (!Number.isFinite(netDepositHuman) || netDepositHuman <= 0) {
+    throw new Error('Enter a positive amount to supply.');
+  }
+
+  const tx = new Transaction();
+  tx.setSender(sender);
+
+  const db = new DeepBookClient({
+    client: suiGrpcClient,
+    network: 'mainnet',
+    address: sender,
+  });
+
+  const refArg = referralId && referralId.startsWith('0x') ? referralId : undefined;
+
   if (existingSupplierCapId) {
-    db.marginPool.supplyToMarginPool(coinKey, tx.object(existingSupplierCapId), netDepositHuman)(tx);
+    db.marginPool.supplyToMarginPool(
+      coinKey,
+      tx.object(existingSupplierCapId),
+      netDepositHuman,
+      refArg
+    )(tx);
   } else {
     const cap = db.marginPool.mintSupplierCap()(tx);
-    db.marginPool.supplyToMarginPool(coinKey, cap, netDepositHuman)(tx);
+    db.marginPool.supplyToMarginPool(coinKey, cap, netDepositHuman, refArg)(tx);
     tx.transferObjects([cap], sender);
   }
 
@@ -527,117 +640,6 @@ export async function fetchLstVaultStats(): Promise<LstVaultLiveStat[]> {
       exchangeRateToBase,
     };
   });
-}
-
-const LENDING_PROJECTS = new Set([
-  'suilend',
-  'current',
-  'navi-lending',
-  'scallop-lend',
-  'alpha-lending',
-  'bucket-protocol',
-  'ember',
-]);
-
-const LST_PROJECTS = new Set([
-  'haedal-protocol',
-  'aftermath-liquid-staking',
-  'volo-staked-sui',
-  'springsui',
-]);
-
-function mapProtocolUrl(project: string): string {
-  const p = project.toLowerCase();
-  if (p.includes('suilend') || p.includes('spring') || p.includes('current'))
-    return 'https://app.current.finance/lend';
-  if (p.includes('navi') || p.includes('volo')) return 'https://app.naviprotocol.io';
-  if (p.includes('scallop')) return 'https://app.scallop.io';
-  if (p.includes('bluefin')) return 'https://trade.bluefin.io/pools';
-  if (p.includes('cetus')) return 'https://app.cetus.zone/liquidity';
-  if (p.includes('aftermath')) return 'https://aftermath.finance/stake';
-  if (p.includes('haedal')) return 'https://haedal.xyz/stake';
-  if (p.includes('bucket')) return 'https://app.bucketprotocol.io';
-  if (p.includes('ember')) return 'https://app.ember.so';
-  return 'https://defillama.com/chain/Sui';
-}
-
-function classifyLlamaCategory(project: string, symbol: string): 'lending' | 'lst' | 'lp' {
-  const p = project.toLowerCase();
-  if (LST_PROJECTS.has(p) || /HASUI|AFSUI|VSUI|SSUI/i.test(symbol)) return 'lst';
-  if (LENDING_PROJECTS.has(p) || !symbol.includes('-')) return 'lending';
-  return 'lp';
-}
-
-export async function fetchExternalEcosystemPools(): Promise<ExternalEcosystemPool[]> {
-  const [llamaRes, cetusRes] = await Promise.all([
-    fetch('https://yields.llama.fi/pools').catch(() => null),
-    fetch(
-      'https://api-sui.cetus.zone/v2/sui/stats_pools?is_vaults=false&order_by=-tvl&limit=20'
-    ).catch(() => null),
-  ]);
-
-  const items: ExternalEcosystemPool[] = [];
-  const seen = new Set<string>();
-
-  if (llamaRes?.ok) {
-    const llamaJson = await llamaRes.json().catch(() => ({}));
-    const suiPools: any[] = (llamaJson?.data || []).filter(
-      (p: any) =>
-        p?.chain === 'Sui' &&
-        Number(p?.tvlUsd || 0) >= 250_000 &&
-        Number(p?.apy || 0) > 0 &&
-        Number(p?.apy || 0) < 500
-    );
-
-    suiPools.sort((a, b) => Number(b.tvlUsd || 0) - Number(a.tvlUsd || 0));
-
-    for (const p of suiPools.slice(0, 30)) {
-      const sym = String(p.symbol || '').trim();
-      const proj = String(p.project || 'Sui Protocol').replace(/-/g, ' ');
-      const cat = classifyLlamaCategory(String(p.project || ''), sym);
-      const key = `${proj.toLowerCase()}:${sym.toLowerCase()}`;
-      seen.add(key);
-
-      items.push({
-        id: String(p.pool || key),
-        symbol: sym,
-        protocol: proj.replace(/\b\w/g, (c) => c.toUpperCase()),
-        category: cat,
-        tvlUsd: Number(p.tvlUsd || 0),
-        apyTotal: Number(p.apy || 0),
-        apyBase: Number(p.apyBase || 0),
-        apyReward: Number(p.apyReward || 0),
-        externalUrl: mapProtocolUrl(String(p.project || '')),
-      });
-    }
-  }
-
-  if (cetusRes?.ok) {
-    const cetusJson = await cetusRes.json().catch(() => ({}));
-    const list: any[] = cetusJson?.data?.lp_list || [];
-    for (const pool of list.slice(0, 12)) {
-      const symbol = `${pool.coin_a?.symbol || '?'}-${pool.coin_b?.symbol || '?'}`;
-      const tvl = Number(pool.tvl_in_usd || 0);
-      const apy = Number(pool.total_apr || pool.apr?.total || 0) * 100;
-      if (tvl < 100_000 || apy <= 0) continue;
-      const key = `cetus:${symbol.toLowerCase()}`;
-      if (seen.has(key)) continue;
-
-      items.push({
-        id: String(pool.swap_account || key),
-        symbol,
-        protocol: 'Cetus CLMM',
-        category: 'lp',
-        tvlUsd: tvl,
-        apyTotal: apy,
-        apyBase: apy * 0.7,
-        apyReward: apy * 0.3,
-        externalUrl: 'https://app.cetus.zone/liquidity',
-      });
-    }
-  }
-
-  return items.sort((a, b) => b.tvlUsd - a.tvlUsd);
 }
 
 /**

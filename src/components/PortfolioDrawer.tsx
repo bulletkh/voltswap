@@ -4,6 +4,9 @@ import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { POPULAR_TOKENS } from '../constants';
 import { fetchWalletBalances, readBalanceFromMap } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
+import { useDAppKit as usePredictDAppKit } from '@mysten/dapp-kit-react';
+import { buildPredictWithdrawTx, fetchPredictBoard } from '../deepbookPredict';
+import { extractTxDigest as extractPredictTxDigest } from '../suiClient';
 import { fetchAftermathAccountState, type AfAccountState } from '../aftermathPerps';
 import {
   buildWithdrawAllManagersAndCancelTx,
@@ -99,11 +102,61 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
     }
   };
 
+  const predictDAppKit = usePredictDAppKit();
+  const [predictAvailableUsd, setPredictAvailableUsd] = useState(0);
+  const [predictPendingUsd, setPredictPendingUsd] = useState(0);
+  const [isWithdrawingPredict, setIsWithdrawingPredict] = useState(false);
+  const [predictStatusMsg, setPredictStatusMsg] = useState<string | null>(null);
+
+  const loadPredictState = async (owner?: string) => {
+    if (!owner) {
+      setPredictAvailableUsd(0);
+      setPredictPendingUsd(0);
+      return;
+    }
+    try {
+      const board = await fetchPredictBoard(owner);
+      setPredictAvailableUsd(board.account?.availableUsdc ?? 0);
+      setPredictPendingUsd(board.account?.pendingUsdc ?? 0);
+    } catch {
+      // ignore transient rpc errors
+    }
+  };
+
+  const handleWithdrawPredict = async () => {
+    if (!account?.address || predictAvailableUsd <= 0.001) return;
+    setIsWithdrawingPredict(true);
+    setPredictStatusMsg(null);
+    try {
+      const tx = buildPredictWithdrawTx(account.address, predictAvailableUsd);
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        setPredictStatusMsg(sim.errorMessage || 'Withdraw simulation failed.');
+        return;
+      }
+      const res = await predictDAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractPredictTxDigest(res);
+      setPredictStatusMsg(
+        digest
+          ? `Withdrew $${predictAvailableUsd.toFixed(2)} USDC (tx ${digest.slice(0, 8)}...)`
+          : `Withdrew $${predictAvailableUsd.toFixed(2)} USDC.`
+      );
+      await loadPredictState(account.address);
+      await loadPortfolio();
+    } catch (err: any) {
+      setPredictStatusMsg(err?.message || 'Wallet rejected withdrawal.');
+    } finally {
+      setIsWithdrawingPredict(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && account?.address) {
       setClobStatus(null);
       setClobError(null);
+      setPredictStatusMsg(null);
       loadPortfolio();
+      loadPredictState(account.address);
     }
   }, [isOpen, account?.address]);
 
@@ -167,7 +220,10 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={loadPortfolio}
+              onClick={() => {
+                loadPortfolio();
+                loadPredictState(account?.address);
+              }}
               className="p-2 rounded-xl bg-[#0A1019] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#18C8FF]/50"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -192,14 +248,50 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
               <div className="panel-carbon-sub rounded-2xl p-4 space-y-2.5">
                 <div className="text-sm text-slate-300">Net Estimated Equity</div>
                 <div className="text-3xl font-mono tabular-nums font-bold text-white">
-                  ${(spotUsd + perpsUsd + vaultsUsd + clobVaultsUsd).toFixed(2)}
+                  ${(spotUsd + perpsUsd + vaultsUsd + clobVaultsUsd + predictAvailableUsd + predictPendingUsd).toFixed(2)}
                 </div>
                 <div className="flex items-center justify-between text-xs font-mono text-slate-300 pt-1">
                   <span>Spot: ${spotUsd.toFixed(2)}</span>
                   <span>Vaults: ${(vaultsUsd + clobVaultsUsd).toFixed(2)}</span>
                   <span>Perps: ${perpsUsd.toFixed(2)}</span>
                 </div>
+                {(predictAvailableUsd > 0.001 || predictPendingUsd > 0.001) && (
+                  <div className="flex items-center justify-between text-xs font-mono text-[#00E599] pt-0.5 border-t border-white/[0.06]">
+                    <span>DeepBook Predict USDC</span>
+                    <span>${(predictAvailableUsd + predictPendingUsd).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
+
+              {(predictAvailableUsd > 0.001 || predictPendingUsd > 0.001 || predictStatusMsg) && (
+                <div className="panel-carbon-sub rounded-2xl p-3.5 space-y-2.5 border border-[#00E599]/25">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-white">DeepBook Predict Account</span>
+                    <span className="text-xs font-mono text-[#00E599] tabular-nums">
+                      ${predictAvailableUsd.toFixed(2)} USDC
+                    </span>
+                  </div>
+                  {predictPendingUsd > 0.001 && (
+                    <div className="text-[11px] font-mono text-amber-300">
+                      Pending escrow: ${predictPendingUsd.toFixed(2)} USDC
+                    </div>
+                  )}
+                  {predictStatusMsg && (
+                    <div className="text-[11px] text-[#9CE7FF] font-mono">{predictStatusMsg}</div>
+                  )}
+                  {predictAvailableUsd > 0.001 && (
+                    <button
+                      type="button"
+                      disabled={isWithdrawingPredict}
+                      onClick={handleWithdrawPredict}
+                      className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                    >
+                      {isWithdrawingPredict && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>Withdraw All Predict USDC (${predictAvailableUsd.toFixed(2)})</span>
+                    </button>
+                  )}
+                </div>
+              )}
 
               {hasClobFundsOrOrders && (
                 <div className="space-y-2">

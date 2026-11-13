@@ -1,6 +1,7 @@
-import { deepbook, mainnetPackageIds, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
+import { deepbook, mainnetPackageIds, mainnetPools, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
 import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
 import { normalizeSuiAddress } from '@mysten/sui/utils';
+import { VOLT_TREASURY_ADDRESS } from './constants';
 import { suiGrpcClient } from './suiClient';
 import { appendVoltFeeCoinSplit, addCoinFeeToTx } from './voltFee';
 
@@ -73,7 +74,15 @@ export interface DeepBookManagerState {
   deepBalance: number;
   settledBase: number;
   settledQuote: number;
+  referralId?: string | null;
   openOrders: DeepBookOpenOrder[];
+}
+
+export interface VoltSpotReferral {
+  poolKey: string;
+  poolId: string;
+  referralId: string;
+  owner: string;
 }
 
 export const DEFAULT_DEEPBOOK_POOLS: DeepBookPoolMeta[] = [
@@ -402,12 +411,13 @@ export async function fetchDeepBookManagerState(
   const ext = createDeepBookClient(owner, managerId);
   const db = ext.deepbook;
 
-  const [baseBal, quoteBal, deepBal, details, accountInfo] = await Promise.all([
+  const [baseBal, quoteBal, deepBal, details, accountInfo, referralId] = await Promise.all([
     db.checkManagerBalanceWithAddress(managerId, pool.baseSymbol).catch(() => ({ balance: 0 })),
     db.checkManagerBalanceWithAddress(managerId, pool.quoteSymbol).catch(() => ({ balance: 0 })),
     db.checkManagerBalanceWithAddress(managerId, 'DEEP').catch(() => ({ balance: 0 })),
     db.getAccountOrderDetails(pool.poolName, 'MAIN').catch(() => []),
     db.account(pool.poolName, 'MAIN').catch(() => null),
+    db.getBalanceManagerReferralId('MAIN', pool.poolName).catch(() => null),
   ]);
 
   const baseScale = Math.pow(10, pool.baseDecimals);
@@ -446,8 +456,156 @@ export async function fetchDeepBookManagerState(
     deepBalance: Number(deepBal?.balance || 0),
     settledBase,
     settledQuote,
+    referralId: referralId || null,
     openOrders,
   };
+}
+
+const SPOT_REFERRAL_CACHE_KEY = 'volt_deepbook_spot_referrals_v1';
+let spotReferralCache: Record<string, VoltSpotReferral> | null = null;
+
+function readCachedSpotReferrals(): Record<string, VoltSpotReferral> {
+  if (spotReferralCache) return spotReferralCache;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = window.localStorage.getItem(SPOT_REFERRAL_CACHE_KEY);
+      if (raw) {
+        spotReferralCache = JSON.parse(raw);
+        if (spotReferralCache) return spotReferralCache;
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return {};
+}
+
+function writeCachedSpotReferrals(map: Record<string, VoltSpotReferral>) {
+  spotReferralCache = map;
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(SPOT_REFERRAL_CACHE_KEY, JSON.stringify(map));
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
+
+/**
+ * Discovers DeepBook v3 Spot PoolReferral shared objects minted by Volt Treasury.
+ */
+export async function fetchVoltSpotReferrals(
+  owner: string = VOLT_TREASURY_ADDRESS
+): Promise<Record<string, VoltSpotReferral>> {
+  const cached = readCachedSpotReferrals();
+  try {
+    const normOwner = owner.toLowerCase();
+    const eventType =
+      '0x00c1a56ec8c4c623a848b2ed2f03d23a25d17570b670c22106f336eb933785cc::balance_manager::DeepBookReferralCreatedEvent';
+    const res = await fetch(SUI_GRAPHQL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `{
+          events(filter: { sender: "${owner}", type: "${eventType}" }, last: 50) {
+            nodes { contents { json } }
+          }
+        }`,
+      }),
+    });
+    if (!res.ok) return cached;
+    const json = await res.json().catch(() => null);
+    const nodes: any[] = json?.data?.events?.nodes || [];
+
+    const poolIdToKey = new Map<string, string>();
+    for (const [key, info] of Object.entries(mainnetPools as Record<string, { address: string }>)) {
+      if (info?.address) poolIdToKey.set(info.address.toLowerCase(), key);
+    }
+
+    const dbClient = createDeepBookClient(owner);
+    const next: Record<string, VoltSpotReferral> = { ...cached };
+    for (const n of nodes) {
+      const ev = n?.contents?.json;
+      if (!ev || String(ev.owner || '').toLowerCase() !== normOwner) continue;
+      const refId = String(ev.referral_id || '');
+      if (!refId) continue;
+      const poolId = await dbClient.deepbook
+        .balanceManagerReferralPoolId(refId)
+        .catch(() => null);
+      if (!poolId) continue;
+      const poolKey = poolIdToKey.get(poolId.toLowerCase());
+      if (poolKey) {
+        next[poolKey] = { poolKey, poolId, referralId: refId, owner: String(ev.owner) };
+      }
+    }
+    writeCachedSpotReferrals(next);
+    return next;
+  } catch {
+    return cached;
+  }
+}
+
+/**
+ * Mints DeepBook v3 native Spot PoolReferral objects for one or more pools.
+ * Note: DeepBook v3 enforces multiplier multiples of 0.1 (e.g. 0.5, 1.0).
+ */
+export function buildMintSpotReferralsTx(params: {
+  sender: string;
+  poolKeys: string[];
+  multiplier?: number;
+}): Transaction {
+  const { sender, poolKeys, multiplier = 0.5 } = params;
+  const snappedMult = Math.min(1, Math.max(0.1, Math.round(multiplier * 10) / 10));
+  const tx = new Transaction();
+  tx.setSender(sender);
+  const ext = createDeepBookClient(sender);
+  for (const poolKey of poolKeys) {
+    tx.add(ext.deepbook.deepBook.mintReferral(poolKey, snappedMult));
+  }
+  return tx;
+}
+
+/**
+ * Claims accrued native Spot PoolReferral rewards (base/quote/DEEP) to creator wallet.
+ */
+export function buildClaimSpotReferralRewardsTx(params: {
+  sender: string;
+  referrals: Array<{ poolKey: string; referralId: string }>;
+}): Transaction {
+  const { sender, referrals } = params;
+  const tx = new Transaction();
+  tx.setSender(sender);
+  const ext = createDeepBookClient(sender);
+  const coinsToSend: any[] = [];
+  for (const r of referrals) {
+    const { baseRewards, quoteRewards, deepRewards } = ext.deepbook.deepBook.claimPoolReferralRewards(
+      r.poolKey,
+      r.referralId
+    )(tx);
+    coinsToSend.push(baseRewards, quoteRewards, deepRewards);
+  }
+  if (coinsToSend.length > 0) {
+    tx.transferObjects(coinsToSend, sender);
+  }
+  return tx;
+}
+
+function attachSpotReferralInTx(
+  tx: Transaction,
+  managerArg: any,
+  spotReferralId: string | null | undefined,
+  owner: string
+) {
+  if (!spotReferralId || !spotReferralId.startsWith('0x')) return;
+  const tradeCap = tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::mint_trade_cap`,
+    arguments: [managerArg],
+  });
+  tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::set_balance_manager_referral`,
+    arguments: [managerArg, tx.object(spotReferralId), tradeCap],
+  });
+  tx.transferObjects([tradeCap], owner);
 }
 
 export async function fetchAllDeepBookManagerStates(
@@ -580,6 +738,8 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
   payWithDeep?: boolean;
   feeMist?: bigint;
   refSharePct?: number;
+  spotReferralId?: string | null;
+  existingManagerReferralId?: string | null;
 }): Transaction {
   const tx = new Transaction();
   tx.setSender(params.owner);
@@ -609,6 +769,9 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
 
   if (params.managerId) {
     const ext = createDeepBookClient(params.owner, params.managerId);
+    if (params.spotReferralId && !params.existingManagerReferralId) {
+      attachSpotReferralInTx(tx, tx.object(params.managerId), params.spotReferralId, params.owner);
+    }
     if (shortfall > 0.000001) {
       tx.add(
         ext.deepbook.balanceManager.depositIntoManager(
@@ -683,6 +846,7 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
       arguments: [manager, tx.object(DEEPBOOK_REGISTRY_ID)],
     });
 
+    attachSpotReferralInTx(tx, manager, params.spotReferralId, params.owner);
     tx.add(ext.deepbook.balanceManager.shareBalanceManager(manager));
   }
 
@@ -712,6 +876,8 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
   payWithDeep?: boolean;
   settleToWallet?: boolean;
   feeBps?: number;
+  spotReferralId?: string | null;
+  existingManagerReferralId?: string | null;
 }): Transaction {
   const {
     owner,
@@ -726,6 +892,8 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
     payWithDeep = false,
     settleToWallet = true,
     feeBps = 25,
+    spotReferralId,
+    existingManagerReferralId,
   } = params;
 
   const tx = new Transaction();
@@ -764,6 +932,9 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
 
   if (managerId) {
     targetManagerArg = tx.object(managerId);
+    if (spotReferralId && !existingManagerReferralId) {
+      attachSpotReferralInTx(tx, targetManagerArg, spotReferralId, owner);
+    }
     if (isBid) {
       const deficit = Math.max(0, requiredQuote - managerQuoteBalance);
       const deficitRaw = BigInt(Math.ceil(deficit * quoteScale));
@@ -857,6 +1028,7 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
       target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
       arguments: [targetManagerArg, tx.object(DEEPBOOK_REGISTRY_ID)],
     });
+    attachSpotReferralInTx(tx, targetManagerArg, spotReferralId, owner);
     tx.moveCall({
       target: '0x2::transfer::public_share_object',
       arguments: [targetManagerArg],

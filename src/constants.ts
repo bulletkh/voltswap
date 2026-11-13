@@ -1,5 +1,13 @@
 export const VOLT_TREASURY_ADDRESS = '0x7211d7a33c32b8a848fd5d87dc0630b7d40d3d324856a748aff454c2955cab12';
 
+// Deterministic shared DeepBook Predict BuilderCode for VOLT_TREASURY_ADDRESS (index = 0)
+export const VOLT_PREDICT_BUILDER_CODE_ID =
+  '0x075978e7076bd84afbb9e5fc4f5742387f512a60b37d15e4c414c76d206725c7';
+
+// Deterministic AccountWrapper of VOLT_TREASURY_ADDRESS (predict referrer_account_id in v4/v5)
+export const VOLT_PREDICT_REFERRER_WRAPPER_ID =
+  '0xd9f1d77a15688d375b7233c2c1f4f59b7e432efe5c492244f633df7ddb500c69';
+
 export interface Chain {
   id: string;
   name: string;

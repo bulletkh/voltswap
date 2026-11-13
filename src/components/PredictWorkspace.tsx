@@ -1,0 +1,1152 @@
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Clock,
+  RefreshCw,
+  Loader2,
+  ArrowDownToLine,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  Zap,
+} from 'lucide-react';
+import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
+import { rawToUsdc, usdcToRaw, snapStrike, MAINNET_CONFIG, type MintPlan } from '@mysten/deepbook-v3/predict';
+import {
+  fetchPredictBoard,
+  fetchPredictStrikeLadder,
+  pickDefaultValidStrike,
+  quotePredictTrade,
+  buildPredictPlaceBetTx,
+  buildPredictEarlySellTx,
+  buildPredictWithdrawTx,
+  buildPredictClaimRecordTx,
+  PREDICT_ORDER_USD_MIN,
+  PREDICT_BUILDER_FEE_PCT,
+  type PredictBoardState,
+  type PredictMarketBoardItem,
+  type PredictStrikeQuote,
+  type PredictUserOrderRecord,
+} from '../deepbookPredict';
+import { type DeepBookCandle } from '../deepbookV3';
+import { extractTxDigest, fetchWalletBalances, readBalanceFromMap } from '../suiClient';
+import { simulateTxBeforeWallet } from '../suiSimulate';
+import { VOLT_TREASURY_ADDRESS } from '../constants';
+import { addWalletVolumeUsd, getValidReferrerForSender, resolveTraderTier } from '../voltFee';
+import { ProCandleChart, type ChartTimeframe } from './ProCandleChart';
+import type { PnlTradeData } from '../PnlShareModal';
+
+interface PredictWorkspaceProps {
+  onNotify: (
+    type: 'success' | 'error' | 'info' | 'warning',
+    title: string,
+    message: string,
+    actionLabel?: string,
+    actionUrl?: string
+  ) => void;
+  onTradeRecorded: (trade: PnlTradeData) => void;
+  onVolumeUpdated?: (newVolUsd: number) => void;
+}
+
+async function fetchBtcPredictCandles(tf: ChartTimeframe): Promise<DeepBookCandle[]> {
+  try {
+    const res = await fetch(
+      `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=160`
+    );
+    if (!res.ok) return [];
+    const rows: any[] = await res.json();
+    return rows.map((r) => ({
+      time: Math.floor(Number(r[0]) / 1000),
+      open: Number(r[1]),
+      high: Number(r[2]),
+      low: Number(r[3]),
+      close: Number(r[4]),
+      volume: Number(r[5]),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function formatCountdown(msLeft: number): string {
+  if (msLeft <= 0) return '00:00';
+  const totalSec = Math.floor(msLeft / 1000);
+  const mins = Math.floor(totalSec / 60);
+  const secs = totalSec % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function formatWindowLabel(market: PredictMarketBoardItem, nowMs: number): string {
+  const diffMin = Math.max(1, Math.round((Number(market.market.expiryMs) - nowMs) / 60_000));
+  if (diffMin >= 60) {
+    const hrs = Math.round(diffMin / 60);
+    return `${hrs}h`;
+  }
+  return `${diffMin}m`;
+}
+
+export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
+  onNotify,
+  onTradeRecorded,
+  onVolumeUpdated,
+}) => {
+  const account = useCurrentAccount();
+  const dAppKit = useDAppKit();
+
+  const [board, setBoard] = useState<PredictBoardState | null>(null);
+  const [isLoadingBoard, setIsLoadingBoard] = useState(true);
+  const [selectedMarketId, setSelectedMarketId] = useState<string>('');
+  const [ladder, setLadder] = useState<PredictStrikeQuote[]>([]);
+  const [isLoadingLadder, setIsLoadingLadder] = useState(false);
+
+  const [side, setSide] = useState<'up' | 'down' | 'range'>('up');
+  const [strikeInput, setStrikeInput] = useState<string>('');
+  const [lowerStrikeInput, setLowerStrikeInput] = useState<string>('');
+  const [upperStrikeInput, setUpperStrikeInput] = useState<string>('');
+  const [amountInput, setAmountInput] = useState<string>('2');
+  const [slippageCents, setSlippageCents] = useState<number | 'auto'>('auto');
+
+  const [quotePlan, setQuotePlan] = useState<MintPlan | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [isQuoting, setIsQuoting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [busyRecordKey, setBusyRecordKey] = useState<string | null>(null);
+
+  const [walletUsdc, setWalletUsdc] = useState<number>(0);
+  const [btcCandles, setBtcCandles] = useState<DeepBookCandle[]>([]);
+  const [candlesLoading, setCandlesLoading] = useState<boolean>(true);
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>('1m');
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [bottomTab, setBottomTab] = useState<'orders' | 'positions'>('orders');
+
+  const strikeInitializedRef = useRef<string>('');
+
+  const loadBoard = useCallback(async () => {
+    try {
+      const [nextBoard, balMap] = await Promise.all([
+        fetchPredictBoard(account?.address),
+        account?.address ? fetchWalletBalances(account.address) : Promise.resolve({}),
+      ]);
+      setBoard(nextBoard);
+      if (account?.address) {
+        setWalletUsdc(readBalanceFromMap(balMap, MAINNET_CONFIG.quoteCoinType, 6));
+      } else {
+        setWalletUsdc(0);
+      }
+
+      if (nextBoard.markets.length > 0) {
+        setSelectedMarketId((prev) => {
+          if (prev && nextBoard.markets.some((m) => m.market.id === prev)) {
+            return prev;
+          }
+          // Prefer ~2-5m active window when available, otherwise first open window
+          const ideal =
+            nextBoard.markets.find(
+              (m) => m.acceptingMints && Number(m.market.expiryMs) - Date.now() >= 60_000
+            ) || nextBoard.markets[0];
+          return ideal.market.id;
+        });
+      }
+    } catch {
+      // Keep stale board cleanly on transient RPC lag
+    } finally {
+      setIsLoadingBoard(false);
+    }
+  }, [account?.address]);
+
+  useEffect(() => {
+    loadBoard();
+    const poll = setInterval(loadBoard, 8_000);
+    return () => clearInterval(poll);
+  }, [loadBoard]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCandlesLoading(true);
+    const loadCandles = async () => {
+      const data = await fetchBtcPredictCandles(timeframe);
+      if (!cancelled) {
+        if (data.length > 0) setBtcCandles(data);
+        setCandlesLoading(false);
+      }
+    };
+    loadCandles();
+    const timer = setInterval(loadCandles, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [timeframe]);
+
+  const selectedMarket = useMemo<PredictMarketBoardItem | null>(() => {
+    if (!board || board.markets.length === 0) return null;
+    return board.markets.find((m) => m.market.id === selectedMarketId) || board.markets[0];
+  }, [board, selectedMarketId]);
+
+  useEffect(() => {
+    if (!selectedMarket) {
+      setLadder([]);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingLadder(true);
+    fetchPredictStrikeLadder(selectedMarket.market, selectedMarket.forwardPrice)
+      .then((rows) => {
+        if (cancelled) return;
+        setLadder(rows);
+        const key = `${selectedMarket.market.id}:${side}`;
+        if (strikeInitializedRef.current !== key && selectedMarket.forwardPrice > 0) {
+          strikeInitializedRef.current = key;
+          const step = Math.max(1, selectedMarket.market.admissionTickSize || 1);
+          if (side === 'range') {
+            setLowerStrikeInput(
+              String(snapStrike(selectedMarket.forwardPrice * 0.997, step, 'down'))
+            );
+            setUpperStrikeInput(
+              String(snapStrike(selectedMarket.forwardPrice * 1.003, step, 'up'))
+            );
+          } else {
+            const best = pickDefaultValidStrike(
+              rows,
+              side,
+              selectedMarket.market,
+              selectedMarket.forwardPrice
+            );
+            setStrikeInput(String(best));
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingLadder(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMarket, side]);
+
+  const parsedAmount = Number(amountInput) || 0;
+  const parsedStrike = Number(strikeInput) || 0;
+  const parsedLower = Number(lowerStrikeInput) || 0;
+  const parsedUpper = Number(upperStrikeInput) || 0;
+
+  useEffect(() => {
+    if (!selectedMarket) {
+      setQuotePlan(null);
+      setQuoteError(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsQuoting(true);
+      const res = await quotePredictTrade({
+        owner: account?.address || VOLT_TREASURY_ADDRESS,
+        market: selectedMarket.market,
+        side,
+        strike: parsedStrike,
+        lowerStrike: parsedLower,
+        upperStrike: parsedUpper,
+        amountUsdc: parsedAmount,
+        slippageCents,
+      });
+      setQuotePlan(res.plan);
+      setQuoteError(res.error);
+      setIsQuoting(false);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [
+    selectedMarket,
+    account?.address,
+    side,
+    parsedStrike,
+    parsedLower,
+    parsedUpper,
+    parsedAmount,
+    slippageCents,
+  ]);
+
+  const handleBestOtmStrike = () => {
+    if (!selectedMarket || side === 'range') return;
+    const best = pickDefaultValidStrike(
+      ladder,
+      side,
+      selectedMarket.market,
+      selectedMarket.forwardPrice
+    );
+    setStrikeInput(String(best));
+  };
+
+  const handleStepStrike = (dir: -1 | 1) => {
+    if (!selectedMarket) return;
+    const step = Math.max(1, selectedMarket.market.admissionTickSize || 1);
+    const cur = parsedStrike > 0 ? parsedStrike : selectedMarket.forwardPrice;
+    const next = snapStrike(cur + dir * step, step, 'nearest');
+    setStrikeInput(String(Math.max(step, next)));
+  };
+
+  const handlePlaceBet = async () => {
+    if (!account?.address) {
+      onNotify('warning', 'Wallet Not Connected', 'Connect your Sui wallet to place Predict trades.');
+      return;
+    }
+    if (!selectedMarket || !board) return;
+    if (!quotePlan || (!quotePlan.accepting && quotePlan.refusal !== 'fee')) {
+      onNotify(
+        'error',
+        'Invalid Predict Order',
+        quoteError || quotePlan?.refusal || 'Order parameters outside DeepBook Predict entry limits.'
+      );
+      return;
+    }
+
+    const availableRaw = usdcToRaw(board.account?.availableUsdc ?? 0);
+    const totalDebitRaw = quotePlan.raw.totalDebit;
+    const shortfallUsdc =
+      availableRaw >= totalDebitRaw ? 0 : rawToUsdc(totalDebitRaw - availableRaw);
+
+    if (shortfallUsdc > walletUsdc + 0.0001) {
+      onNotify(
+        'error',
+        'Insufficient USDC',
+        `Need ${shortfallUsdc.toFixed(2)} more USDC in your wallet (wallet holds ${walletUsdc.toFixed(2)} USDC).`
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const tx = buildPredictPlaceBetTx({
+        sender: account.address,
+        market: selectedMarket.market,
+        side,
+        strike: parsedStrike,
+        lowerStrike: parsedLower,
+        upperStrike: parsedUpper,
+        maxCostRaw: quotePlan.raw.maxCost ?? quotePlan.raw.budget,
+        minQuantityRaw: quotePlan.raw.minQuantity,
+        totalDebitRaw,
+        hasAccount: Boolean(board.account?.hasAccount),
+        availableRaw,
+        protocol: board.protocol,
+      });
+
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        onNotify(
+          'error',
+          'Predict Preflight Failed',
+          sim.errorMessage || 'Transaction would abort on-chain.'
+        );
+        return;
+      }
+
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
+      const sideText =
+        side === 'up'
+          ? `BTC > $${parsedStrike.toLocaleString()}`
+          : side === 'down'
+            ? `BTC <= $${parsedStrike.toLocaleString()}`
+            : `BTC $${parsedLower.toLocaleString()}-$${parsedUpper.toLocaleString()}`;
+
+      onNotify(
+        'success',
+        `Predict ${side.toUpperCase()} Enqueued`,
+        `${sideText} · Est. Payout $${quotePlan.potentialPayout.toFixed(2)} (${quotePlan.payoutMultiple.toFixed(2)}x)`,
+        'Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`
+      );
+
+      if (digest) {
+        const nextVol = addWalletVolumeUsd(account.address, quotePlan.totalDebit);
+        onVolumeUpdated?.(nextVol);
+        const tier = resolveTraderTier(nextVol);
+        const ref = getValidReferrerForSender(account.address);
+        fetch('/api/record-swap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            digest,
+            address: account.address,
+            fromToken: 'USDC',
+            toToken: `BTC-${side.toUpperCase()}`,
+            fromAmount: quotePlan.totalDebit.toFixed(2),
+            toAmount: quotePlan.potentialPayout.toFixed(2),
+            volumeUsd: quotePlan.totalDebit,
+            feeRate: board.protocol.builderFeeCutoverActive ? PREDICT_BUILDER_FEE_PCT / 100 : 0,
+            tierName: tier.name,
+            swapMode: 'DEEPBOOK_PREDICT',
+            referrer: ref,
+          }),
+        }).catch(() => {});
+
+        onTradeRecorded({
+          fromToken: 'USDC',
+          toToken: `BTC Predict (${side.toUpperCase()})`,
+          fromAmount: quotePlan.totalDebit.toFixed(2),
+          toAmount: `$${quotePlan.potentialPayout.toFixed(2)} max payout`,
+          volumeUsd: quotePlan.totalDebit,
+          digest,
+          orderType: 'PERPS',
+        });
+      }
+
+      await loadBoard();
+    } catch (err: any) {
+      onNotify('error', 'Predict Trade Failed', err?.message || 'Transaction rejected by wallet.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleWithdrawAvailable = async () => {
+    if (!account?.address || !board?.account || board.account.availableUsdc <= 0.001) return;
+    setIsWithdrawing(true);
+    try {
+      const tx = buildPredictWithdrawTx(account.address, board.account.availableUsdc);
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        onNotify('error', 'Withdraw Simulation Failed', sim.errorMessage || 'Cannot withdraw right now.');
+        return;
+      }
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
+      onNotify(
+        'success',
+        'Predict USDC Withdrawn',
+        `${board.account.availableUsdc.toFixed(2)} USDC returned to your Sui wallet.`,
+        'Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`
+      );
+      await loadBoard();
+    } catch (err: any) {
+      onNotify('error', 'Withdraw Failed', err?.message || 'Wallet rejected withdrawal.');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  const handleRecordAction = async (
+    rec: PredictUserOrderRecord,
+    action: 'sell' | 'parked' | 'refund'
+  ) => {
+    if (!account?.address || !board) return;
+    const recKey = `${rec.marketId}:${rec.recordId.toString()}:${action}`;
+    setBusyRecordKey(recKey);
+    try {
+      let tx;
+      let label = '';
+      if (action === 'sell' && (rec.view.state === 'filled' || rec.view.state === 'refunded') && rec.view.position) {
+        const qty = rawToUsdc(rec.view.position.quantityRaw);
+        const built = await buildPredictEarlySellTx({
+          sender: account.address,
+          marketId: rec.marketId,
+          expiryMs: rec.expiryMs,
+          recordId: rec.recordId,
+          quantity: qty,
+          protocol: board.protocol,
+        });
+        tx = built.tx;
+        label = `Early Sell Submitted (~$${built.sellPlan.net.toFixed(2)} USDC)`;
+      } else {
+        tx = await buildPredictClaimRecordTx(
+          account.address,
+          rec.marketId,
+          rec.expiryMs,
+          rec.recordId,
+          action === 'parked' ? 'parked' : 'refund'
+        );
+        label = action === 'parked' ? 'Parked USDC Claimed' : 'Order Refund Requested';
+      }
+
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        onNotify('error', 'Predict Action Failed', sim.errorMessage || 'Preflight simulation failed.');
+        return;
+      }
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
+      onNotify(
+        'success',
+        'DeepBook Predict Updated',
+        label,
+        'Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`
+      );
+      await loadBoard();
+    } catch (err: any) {
+      onNotify('error', 'Action Failed', err?.message || 'Transaction rejected.');
+    } finally {
+      setBusyRecordKey(null);
+    }
+  };
+
+  const forward = selectedMarket?.forwardPrice || board?.spotForward || 0;
+  const availableUsdc = board?.account?.availableUsdc ?? 0;
+  const pendingUsdc = board?.account?.pendingUsdc ?? 0;
+  const totalNeeded = quotePlan?.totalDebit ?? parsedAmount;
+  const shortfallUsd = Math.max(0, totalNeeded - availableUsdc);
+  // SDK refusal === 'fee' means internal Predict vault doesn't pre-hold USDC yet; our 1-tx PTB auto-deposits wallet shortfall
+  const isVaultFundingOnly =
+    quotePlan?.refusal === 'fee' && parsedAmount >= PREDICT_ORDER_USD_MIN;
+  const canSubmitPredict = Boolean(
+    selectedMarket && quotePlan && (quotePlan.accepting || isVaultFundingOnly)
+  );
+
+  return (
+    <div className="max-w-[1440px] mx-auto px-3 sm:px-6 pt-3 pb-10 space-y-4">
+      {/* Top Market & Expiry Strip */}
+      <div className="panel-carbon rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 border border-white/[0.1]">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/40 flex items-center justify-center">
+              <Target className="w-4 h-4 text-[#18C8FF]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white">BTC / USD Predict</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#00E599]/15 text-[#00E599] border border-[#00E599]/30">
+                  DeepBook v3 Native
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Pyth Lazer + Block-Scholes · Mainnet Entry Band 15%–50%
+              </div>
+            </div>
+          </div>
+
+          <div className="h-7 w-px bg-white/10 hidden sm:block" />
+
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase tracking-wider text-slate-400">BTC Forward</span>
+            <span className="text-base font-mono font-bold text-white tabular-nums">
+              {forward > 0 ? `$${forward.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--'}
+            </span>
+          </div>
+
+          {/* Expiry Windows */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(board?.markets || []).slice(0, 6).map((item) => {
+              const isSelected = selectedMarket?.market.id === item.market.id;
+              const remMs = Number(item.market.expiryMs) - nowMs;
+              return (
+                <button
+                  key={item.market.id}
+                  type="button"
+                  onClick={() => {
+                    strikeInitializedRef.current = '';
+                    setSelectedMarketId(item.market.id);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-mono border transition-all flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-[#18C8FF]/15 border-[#18C8FF] text-white'
+                      : 'bg-[#0A1019] border-white/[0.08] text-slate-300 hover:border-white/25'
+                  }`}
+                >
+                  <Clock className="w-3 h-3 text-[#18C8FF]" />
+                  <span className="font-semibold">{formatWindowLabel(item, nowMs)}</span>
+                  <span className="text-[10px] text-slate-400 tabular-nums">
+                    {formatCountdown(remMs)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Account Balance & Refresh */}
+        <div className="flex items-center gap-2.5">
+          {account && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0A1019] border border-white/[0.1] text-xs font-mono">
+              <span className="text-slate-400">Predict Vault:</span>
+              <span className="text-white font-semibold tabular-nums">
+                ${availableUsdc.toFixed(2)}
+              </span>
+              {pendingUsdc > 0 && (
+                <span className="text-amber-300 text-[11px]">(+${pendingUsdc.toFixed(2)} pend)</span>
+              )}
+              {availableUsdc > 0.01 && (
+                <button
+                  type="button"
+                  disabled={isWithdrawing}
+                  onClick={handleWithdrawAvailable}
+                  className="ml-1 px-2 py-0.5 rounded-lg bg-[#00E599]/15 border border-[#00E599]/35 text-[#00E599] hover:bg-[#00E599]/25 text-[11px] font-sans font-semibold inline-flex items-center gap-1"
+                >
+                  {isWithdrawing ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <ArrowDownToLine className="w-3 h-3" />
+                  )}
+                  Withdraw
+                </button>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={loadBoard}
+            className="p-2 rounded-xl bg-[#0A1019] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#18C8FF]/50"
+            title="Refresh Predict markets"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingBoard ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Left: Chart + Strike Probability Ladder + Open/Orders */}
+        <div className="lg:col-span-8 space-y-4">
+          <div className="panel-carbon rounded-2xl overflow-hidden border border-white/[0.1]">
+            <ProCandleChart
+              symbolLabel="BTC/USD"
+              sourceLabel="Pyth Forward + Binance Feed"
+              candles={btcCandles}
+              timeframe={timeframe}
+              onTimeframeChange={setTimeframe}
+              isLoading={candlesLoading}
+              heightClass="h-[290px]"
+              livePrice={forward}
+              tvSymbol="BINANCE:BTCUSDT"
+            />
+          </div>
+
+          {/* Interactive Strike Odds Ladder */}
+          <div className="panel-carbon rounded-2xl p-4 border border-white/[0.1] space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#18C8FF]" />
+                <span className="text-sm font-bold text-white">
+                  Live Option Strike Ladder
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Click any shaded [15%–50%] strike to load it into your ticket
+                </span>
+              </div>
+              {selectedMarket && (
+                <div className="text-[11px] font-mono text-slate-300 flex items-center gap-3">
+                  <span>Pool Cash: ${selectedMarket.spareCashUsdc.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                  {selectedMarket.referencePrice && (
+                    <span className="text-[#18C8FF]">
+                      Anchor: ${selectedMarket.referencePrice.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {isLoadingLadder && ladder.length === 0 ? (
+              <div className="py-6 flex items-center justify-center text-xs text-slate-400 gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-[#18C8FF]" />
+                Loading live Black-Scholes strike probabilities...
+              </div>
+            ) : ladder.length === 0 ? (
+              <div className="py-5 text-center text-xs text-slate-400">
+                No active Predict expiry markets returned right now. Wait a few seconds for the next window roll.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {ladder.map((row) => {
+                  const isStrikeSelected = Number(strikeInput) === row.strike && side !== 'range';
+                  return (
+                    <div
+                      key={row.strike}
+                      className={`rounded-xl p-2.5 border bg-[#0A1019] transition-all ${
+                        isStrikeSelected
+                          ? 'border-[#18C8FF] shadow-[0_0_14px_rgba(24,200,255,0.12)]'
+                          : 'border-white/[0.08]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-mono font-bold text-white">
+                          ${row.strike.toLocaleString()}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {forward > 0
+                            ? `${row.strike >= forward ? '+' : ''}${(((row.strike - forward) / forward) * 100).toFixed(2)}%`
+                            : ''}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSide('up');
+                            setStrikeInput(String(row.strike));
+                          }}
+                          className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-mono border transition-colors ${
+                            row.upInBand
+                              ? 'bg-[#00E599]/10 border-[#00E599]/35 text-[#00E599] hover:bg-[#00E599]/20'
+                              : 'bg-white/[0.02] border-white/[0.06] text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>UP</span>
+                            <span className="font-bold">{row.upMultiple.toFixed(2)}x</span>
+                          </div>
+                          <div className="text-[10px] opacity-80">{(row.upProb * 100).toFixed(1)}%</div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSide('down');
+                            setStrikeInput(String(row.strike));
+                          }}
+                          className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-mono border transition-colors ${
+                            row.downInBand
+                              ? 'bg-rose-500/10 border-rose-500/35 text-rose-300 hover:bg-rose-500/20'
+                              : 'bg-white/[0.02] border-white/[0.06] text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>DOWN</span>
+                            <span className="font-bold">{row.downMultiple.toFixed(2)}x</span>
+                          </div>
+                          <div className="text-[10px] opacity-80">{(row.downProb * 100).toFixed(1)}%</div>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Orders & Positions */}
+          <div className="panel-carbon rounded-2xl p-4 border border-white/[0.1] space-y-3">
+            <div className="flex items-center gap-2 border-b border-white/[0.08] pb-2.5">
+              <button
+                type="button"
+                onClick={() => setBottomTab('orders')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  bottomTab === 'orders'
+                    ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Queued & Settled Orders ({board?.orderRecords.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setBottomTab('positions')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  bottomTab === 'positions'
+                    ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Open Positions ({board?.positions.length || 0})
+              </button>
+            </div>
+
+            {!account ? (
+              <div className="py-5 text-center text-xs text-slate-400">
+                Connect your Sui wallet to view Predict orders, early-sell controls, and claimable USDC.
+              </div>
+            ) : bottomTab === 'orders' ? (
+              (board?.orderRecords.length || 0) === 0 ? (
+                <div className="py-5 text-center text-xs text-slate-400">
+                  No recent DeepBook Predict orders found for this wallet.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+                  {board!.orderRecords.map((rec) => {
+                    const v = rec.view;
+                    const qtyUsdc =
+                      v.state === 'filled' && v.position
+                        ? rawToUsdc(v.position.quantityRaw)
+                        : v.state === 'filled' || v.state === 'closed'
+                          ? rawToUsdc(v.quantityRaw)
+                          : 0;
+                    const sellable =
+                      (v.state === 'filled' || v.state === 'refunded') && v.sellable && Boolean(v.position);
+                    const hasParked =
+                      (v.state === 'filled' || v.state === 'refunded' || v.state === 'closed') &&
+                      v.parkedRaw > 0n;
+                    const canRefund =
+                      (v.state === 'placed' || v.state === 'priced' || v.state === 'refunding') &&
+                      v.canRequestRefund;
+
+                    const sellKey = `${rec.marketId}:${rec.recordId.toString()}:sell`;
+                    const parkedKey = `${rec.marketId}:${rec.recordId.toString()}:parked`;
+                    const refundKey = `${rec.marketId}:${rec.recordId.toString()}:refund`;
+
+                    return (
+                      <div
+                        key={`${rec.marketId}:${rec.recordId.toString()}`}
+                        className="rounded-xl bg-[#0A1019] border border-white/[0.08] px-3 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                              rec.sideLabel === 'UP'
+                                ? 'bg-[#00E599]/15 text-[#00E599]'
+                                : rec.sideLabel === 'DOWN'
+                                  ? 'bg-rose-500/15 text-rose-300'
+                                  : 'bg-[#18C8FF]/15 text-[#18C8FF]'
+                            }`}
+                          >
+                            {rec.sideLabel}
+                          </span>
+                          <div>
+                            <div className="font-mono font-semibold text-white">
+                              {rec.strikeLabel}
+                              {qtyUsdc > 0 ? ` · $${qtyUsdc.toFixed(2)} max payout` : ''}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">
+                              Record #{rec.recordId.toString()} · State: <span className="text-slate-200 uppercase">{v.state}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {sellable && (
+                            <button
+                              type="button"
+                              disabled={busyRecordKey === sellKey}
+                              onClick={() => handleRecordAction(rec, 'sell')}
+                              className="px-2.5 py-1 rounded-lg bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#18C8FF] hover:bg-[#18C8FF]/25 font-semibold inline-flex items-center gap-1"
+                            >
+                              {busyRecordKey === sellKey && <Loader2 className="w-3 h-3 animate-spin" />}
+                              Early Sell
+                            </button>
+                          )}
+                          {hasParked && (
+                            <button
+                              type="button"
+                              disabled={busyRecordKey === parkedKey}
+                              onClick={() => handleRecordAction(rec, 'parked')}
+                              className="px-2.5 py-1 rounded-lg bg-[#00E599]/15 border border-[#00E599]/40 text-[#00E599] hover:bg-[#00E599]/25 font-semibold inline-flex items-center gap-1"
+                            >
+                              {busyRecordKey === parkedKey && <Loader2 className="w-3 h-3 animate-spin" />}
+                              Claim Parked
+                            </button>
+                          )}
+                          {canRefund && (
+                            <button
+                              type="button"
+                              disabled={busyRecordKey === refundKey}
+                              onClick={() => handleRecordAction(rec, 'refund')}
+                              className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-200 hover:bg-amber-500/25 font-semibold inline-flex items-center gap-1"
+                            >
+                              {busyRecordKey === refundKey && <Loader2 className="w-3 h-3 animate-spin" />}
+                              Refund
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : (board?.positions.length || 0) === 0 ? (
+              <div className="py-5 text-center text-xs text-slate-400">
+                No active open options held in your Predict account.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {board!.positions.map((pos) => (
+                  <div
+                    key={`${pos.marketId}:${pos.orderId.toString()}`}
+                    className="rounded-xl bg-[#0A1019] border border-white/[0.08] px-3 py-2 flex items-center justify-between text-xs font-mono"
+                  >
+                    <span className="text-slate-300">
+                      Market {pos.marketId.slice(0, 8)}...{pos.marketId.slice(-6)}
+                    </span>
+                    <span className="text-[#00E599]">Order #{pos.orderId.toString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Order Ticket */}
+        <div className="lg:col-span-4 panel-carbon rounded-2xl p-4 border border-white/[0.1] space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-white">Place Binary Option</span>
+            <span className="text-[11px] font-mono text-slate-400">
+              Wallet: {walletUsdc.toFixed(2)} USDC
+            </span>
+          </div>
+
+          {/* Direction Selector */}
+          <div className="grid grid-cols-3 gap-1.5 bg-[#0A1019] p-1 rounded-xl border border-white/[0.08]">
+            <button
+              type="button"
+              onClick={() => setSide('up')}
+              className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
+                side === 'up'
+                  ? 'bg-[#00E599] text-[#05120D]'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              UP
+            </button>
+            <button
+              type="button"
+              onClick={() => setSide('down')}
+              className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
+                side === 'down'
+                  ? 'bg-rose-500 text-white'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <TrendingDown className="w-3.5 h-3.5" />
+              DOWN
+            </button>
+            <button
+              type="button"
+              onClick={() => setSide('range')}
+              className={`py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
+                side === 'range'
+                  ? 'bg-[#18C8FF] text-[#04111A]'
+                  : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              RANGE
+            </button>
+          </div>
+
+          {/* Strike Input(s) */}
+          {side !== 'range' ? (
+            <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">
+                  Target Strike ({side === 'up' ? 'BTC finishes >' : 'BTC finishes <='})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleBestOtmStrike}
+                  className="text-[#18C8FF] hover:underline font-semibold"
+                >
+                  Best OTM (~2.4x)
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleStepStrike(-1)}
+                  className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:text-white text-xs font-mono"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  value={strikeInput}
+                  onChange={(e) => setStrikeInput(e.target.value)}
+                  className="w-full bg-transparent text-white font-mono font-bold text-base focus:outline-none text-center tabular-nums"
+                  placeholder="68700"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleStepStrike(1)}
+                  className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:text-white text-xs font-mono"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-2.5 space-y-1">
+                <span className="text-[11px] text-slate-400">Lower Strike ($)</span>
+                <input
+                  type="number"
+                  value={lowerStrikeInput}
+                  onChange={(e) => setLowerStrikeInput(e.target.value)}
+                  className="w-full bg-transparent text-white font-mono font-bold text-sm focus:outline-none"
+                />
+              </div>
+              <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-2.5 space-y-1">
+                <span className="text-[11px] text-slate-400">Upper Strike ($)</span>
+                <input
+                  type="number"
+                  value={upperStrikeInput}
+                  onChange={(e) => setUpperStrikeInput(e.target.value)}
+                  className="w-full bg-transparent text-white font-mono font-bold text-sm focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Budget Amount */}
+          <div className="rounded-xl bg-[#0A1019] border border-white/[0.1] p-3 space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">Budget (USDC)</span>
+              <span className="text-slate-300 font-mono">
+                Min ${PREDICT_ORDER_USD_MIN.toFixed(2)}
+              </span>
+            </div>
+            <input
+              type="number"
+              min="1"
+              step="0.5"
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value)}
+              className="w-full bg-transparent text-white font-mono font-bold text-xl focus:outline-none tabular-nums"
+              placeholder="2.00"
+            />
+            <div className="grid grid-cols-5 gap-1.5">
+              {['1.5', '2', '5', '10', '25'].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setAmountInput(v)}
+                  className={`py-1 rounded-lg text-[11px] font-mono border transition-colors ${
+                    amountInput === v
+                      ? 'bg-[#18C8FF]/15 border-[#18C8FF]/50 text-[#18C8FF]'
+                      : 'bg-white/[0.03] border-white/[0.08] text-slate-300 hover:border-white/25'
+                  }`}
+                >
+                  ${v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Slippage Toggle */}
+          <div className="flex items-center justify-between text-xs px-1">
+            <span className="text-slate-400">Fill Slippage Guard</span>
+            <div className="flex items-center gap-1">
+              {(['auto', 2, 5] as const).map((s) => (
+                <button
+                  key={String(s)}
+                  type="button"
+                  onClick={() => setSlippageCents(s)}
+                  className={`px-2 py-0.5 rounded-md font-mono text-[11px] border ${
+                    slippageCents === s
+                      ? 'bg-[#18C8FF]/15 border-[#18C8FF]/50 text-[#18C8FF]'
+                      : 'border-white/[0.08] text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {s === 'auto' ? 'Auto' : `${s}c`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Live Quote Details */}
+          <div className="rounded-xl bg-[#0A1019] border border-white/[0.08] p-3 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Implied Odds / Contract</span>
+              <span className="font-mono font-semibold text-white">
+                {isQuoting
+                  ? '...'
+                  : quotePlan
+                    ? `${(quotePlan.pricePerContract * 100).toFixed(1)}c (${(quotePlan.pricePerContract * 100).toFixed(1)}%)`
+                    : '--'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Potential Win Payout</span>
+              <span className="font-mono font-bold text-[#00E599]">
+                {quotePlan
+                  ? `$${quotePlan.potentialPayout.toFixed(2)} (${quotePlan.payoutMultiple.toFixed(2)}x)`
+                  : '--'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Min Guaranteed Payout</span>
+              <span className="font-mono text-slate-200">
+                {quotePlan ? `$${quotePlan.minPayout.toFixed(2)}` : '--'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Queue Keeper Fee</span>
+              <span className="font-mono text-slate-200">
+                ${(quotePlan?.orderFee ?? 0.02).toFixed(2)} USDC
+              </span>
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-white/[0.06]">
+              <span className="text-slate-400">Wallet Shortfall (1-Tx Deposit)</span>
+              <span className="font-mono text-[#18C8FF]">
+                {shortfallUsd > 0 ? `$${shortfallUsd.toFixed(2)} USDC` : '$0.00 (Covered by Vault)'}
+              </span>
+            </div>
+          </div>
+
+          {quoteError && (
+            <div className="rounded-xl bg-rose-500/10 border border-rose-500/30 px-3 py-2 text-[11px] text-rose-200 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+              <span>{quoteError}</span>
+            </div>
+          )}
+
+          {!quoteError && quotePlan && !quotePlan.accepting && !isVaultFundingOnly && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+              <span>
+                Refused ({quotePlan.refusal || 'limits'}): Mainnet Predict admits strikes inside the 15%–50% probability band with min $1.00 premium.
+              </span>
+            </div>
+          )}
+
+          {!quoteError && account && canSubmitPredict && shortfallUsd > walletUsdc + 0.0001 && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+              <span>
+                Insufficient wallet USDC: need ${shortfallUsd.toFixed(2)} USDC for this 1-tx deposit (wallet holds ${walletUsdc.toFixed(2)} USDC).
+              </span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={
+              isSubmitting ||
+              !selectedMarket ||
+              (Boolean(account) && (!canSubmitPredict || shortfallUsd > walletUsdc + 0.0001))
+            }
+            onClick={handlePlaceBet}
+            className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              side === 'up'
+                ? 'bg-[#00E599] text-[#05120D] hover:brightness-110'
+                : side === 'down'
+                  ? 'bg-rose-500 text-white hover:brightness-110'
+                  : 'bg-[#18C8FF] text-[#04111A] hover:brightness-110'
+            } disabled:opacity-45 disabled:cursor-not-allowed`}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Simulating & Signing 1-Tx Bet...</span>
+              </>
+            ) : !account ? (
+              <span>Connect Sui Wallet to Trade</span>
+            ) : (
+              <>
+                <Zap className="w-4 h-4" />
+                <span>
+                  {board?.account?.hasAccount ? 'Place' : 'Create Vault & Place'}{' '}
+                  {side.toUpperCase()} (${parsedAmount.toFixed(2)})
+                </span>
+              </>
+            )}
+          </button>
+
+          {/* Native Monetization Status */}
+          <div className="rounded-xl bg-[#0A1019]/80 border border-white/[0.06] px-3 py-2 text-[11px] text-slate-400 flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#00E599]" />
+              {board?.protocol.builderFeeCutoverActive && board?.protocol.builderCodeExists
+                ? `Volt BuilderCode Active (${PREDICT_BUILDER_FEE_PCT}%)`
+                : board?.protocol.referrerWrapperExists
+                  ? `DeepBook Native Referrer (${board.protocol.referralFeeRatePct.toFixed(0)}% Split)`
+                  : `Native BuilderCode v${board?.protocol.versionWatermark || 4} Ready`}
+            </span>
+            <span className="font-mono text-[10px] text-slate-500">1-Tx Auto</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

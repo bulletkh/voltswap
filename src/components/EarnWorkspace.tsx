@@ -17,12 +17,14 @@ import {
   fetchDeepBookMarginVaults,
   fetchLstVaultStats,
   fetchUserDeepBookMarginPositions,
+  fetchVoltMarginSupplyReferrals,
   LST_VAULT_OPTIONS,
   USDC_COIN_TYPE,
   type DeepBookMarginVault,
   type EarnFilterTab,
   type LstVaultLiveStat,
   type UserMarginPosition,
+  type VoltMarginSupplyReferral,
 } from '../earnPools';
 import { extractTxDigest, fetchWalletBalances, readBalanceFromMap, SUI_COIN_TYPE } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
@@ -71,6 +73,9 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
   const [balances, setBalances] = useState<Record<string, bigint>>({});
   const [supplierCapIds, setSupplierCapIds] = useState<string[]>([]);
   const [marginPositions, setMarginPositions] = useState<Record<string, UserMarginPosition>>({});
+  const [marginReferrals, setMarginReferrals] = useState<
+    Record<string, VoltMarginSupplyReferral | undefined>
+  >({});
 
   // Interactive Ticket State
   const [selected, setSelected] = useState<SelectedAction>({
@@ -96,12 +101,14 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
   const loadAllYieldData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [margins, lsts] = await Promise.all([
+      const [margins, lsts, refs] = await Promise.all([
         fetchDeepBookMarginVaults().catch(() => []),
         fetchLstVaultStats().catch(() => []),
+        fetchVoltMarginSupplyReferrals().catch(() => ({})),
       ]);
       setMarginVaults(margins);
       setLstStats(lsts);
+      setMarginReferrals(refs);
     } finally {
       setIsLoading(false);
     }
@@ -297,8 +304,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
               marginPositions[activeMarginVault.coinKey]?.supplierCapId ||
               supplierCapIds[0] ||
               null,
-            feeRate: traderTier.feeRate,
-            refSharePct: refTier.revSharePct,
+            referralId: marginReferrals[activeMarginVault.coinKey]?.referralId || null,
           });
 
           const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
@@ -1048,10 +1054,16 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
               </div>
             )}
             <div className="flex items-center justify-between">
-              <span className="text-slate-300">Volt Tier Fee ({traderTier.name})</span>
+              <span className="text-slate-300">
+                {selected.kind === 'margin'
+                  ? 'Vault Deposit Fee'
+                  : `Volt Tier Fee (${traderTier.name})`}
+              </span>
               <span className="text-[#18C8FF] font-semibold">
-                {(selected.kind === 'margin' && selected.op === 'withdraw')
-                  ? '0.00% (Free Withdraw)'
+                {selected.kind === 'margin'
+                  ? selected.op === 'withdraw'
+                    ? '0.00% (Free Withdraw)'
+                    : '0.00% (100% Principal · DeepBook Ref)'
                   : `${(traderTier.feeRate * 100).toFixed(2)}%`}
               </span>
             </div>

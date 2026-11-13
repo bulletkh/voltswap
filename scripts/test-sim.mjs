@@ -10,7 +10,23 @@ import {
   mainnetPackageIds,
   mainnetPools,
 } from '@mysten/deepbook-v3';
-import { fromBase64, toBase64 } from '@mysten/sui/utils';
+import {
+  MAINNET_CONFIG as PREDICT_MAINNET_CONFIG,
+  predict as predictExt,
+  toGeneratedConfig,
+  toOrdersConfig,
+  registryMoveCalls,
+  deriveAccountWrapperId,
+  deriveQueueId,
+  snapStrike,
+  binaryRangeTicks,
+  priceToRaw,
+  usdcToRaw,
+  generateAuth,
+} from '@mysten/deepbook-v3/predict';
+import { accountMoveCalls, accountRegistryMoveCalls } from '@mysten/deepbook-v3/account';
+import { bcs } from '@mysten/sui/bcs';
+import { deriveObjectID, fromBase64, normalizeSuiAddress, toBase64 } from '@mysten/sui/utils';
 import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
 
 const WALLET = '0x7211d7a33c32b8a848fd5d87dc0630b7d40d3d324856a748aff454c2955cab12';
@@ -28,8 +44,8 @@ const grpcClient = new SuiGrpcClient({
   baseUrl: 'https://fullnode.mainnet.sui.io:443',
 });
 
-async function simulateGrpcOrGql(tx) {
-  tx.setSender(WALLET);
+async function simulateGrpcOrGql(tx, sender = WALLET) {
+  tx.setSender(sender);
   const resolvedJson = await tx.toJSON({ client: grpcClient });
   const clone = Transaction.from(resolvedJson);
   try {
@@ -333,14 +349,12 @@ try {
   fail('DeepBook v3 Limit Order SUI_USDC Mainnet gRPC simulation', e?.stack || e?.message || String(e));
 }
 
-// 5. DeepBook v3 Margin Pool Supply + Partial Withdraw Mainnet gRPC simulation (with Volt Fee + Referral split)
+// 5. DeepBook v3 Margin Pool Native SupplyReferral + 0% User Deposit Fee + Supply + Withdraw simulation
 try {
   const dbMargin = new DeepBookClient({ client: grpcClient, network: 'mainnet', address: WALLET });
   const txMargin = new Transaction();
   txMargin.setSender(WALLET);
-  const [feeTreas, feeRef] = txMargin.splitCoins(txMargin.gas, [187_500n, 62_500n]);
-  txMargin.transferObjects([feeTreas], '0x7ef65a3b007b79e3b8d9a29f2d5e8584b589186b3a9483b7519c53088c317b93');
-  txMargin.transferObjects([feeRef], '0x1111111111111111111111111111111111111111111111111111111111111111');
+  dbMargin.marginPool.mintSupplyReferral('SUI')(txMargin);
   const cap = dbMargin.marginPool.mintSupplierCap()(txMargin);
   dbMargin.marginPool.supplyToMarginPool('SUI', cap, 0.2)(txMargin);
   const withdrawnCoin = dbMargin.marginPool.withdrawFromMarginPool('SUI', cap, 0.05)(txMargin);
@@ -348,12 +362,12 @@ try {
 
   const marginEffects = await simulateGrpcOrGql(txMargin);
   if (marginEffects?.status === 'SUCCESS') {
-    pass('DeepBook v3 MarginPool Supply+Withdraw Mainnet gRPC simulation', 'mintCap+fee+supply+withdraw ok');
+    pass('DeepBook v3 MarginPool Native SupplyReferral + 0% Fee Supply+Withdraw', 'mintSupplyReferral+mintCap+supply+withdraw ok');
   } else {
-    fail('DeepBook v3 MarginPool Supply+Withdraw Mainnet gRPC simulation', JSON.stringify(marginEffects));
+    fail('DeepBook v3 MarginPool Native SupplyReferral + 0% Fee Supply+Withdraw', JSON.stringify(marginEffects));
   }
 } catch (e) {
-  fail('DeepBook v3 MarginPool Supply+Withdraw Mainnet gRPC simulation', e?.stack || e?.message || String(e));
+  fail('DeepBook v3 MarginPool Native SupplyReferral + 0% Fee Supply+Withdraw', e?.stack || e?.message || String(e));
 }
 
 // 6. On-Site LST Yield Zap (SUI -> haSUI) Quote & Swap Tx simulation
@@ -922,6 +936,208 @@ try {
   }
 } catch (e) {
   fail('DeepBook v3 Multi-Vault Cancel & Withdraw Recovery', e?.stack || e?.message || String(e));
+}
+
+// 9. DeepBook Spot Native PoolReferral Mint (0.5x) & BalanceManager Referral Binding
+try {
+  const dbSpotRef = grpcClient.$extend(deepbook({ address: WALLET }));
+  const txMintRef = new Transaction();
+  txMintRef.add(dbSpotRef.deepbook.deepBook.mintReferral('SUI_USDC', 0.5));
+  const mintRefEff = await simulateGrpcOrGql(txMintRef);
+  if (mintRefEff?.status !== 'SUCCESS') {
+    fail('DeepBook v3 Spot mintReferral (0.5x SUI_USDC)', JSON.stringify(mintRefEff));
+  } else {
+    // Also verify attaching an existing live DeepBookPoolReferral onto a BalanceManager
+    const evType =
+      '0x00c1a56ec8c4c623a848b2ed2f03d23a25d17570b670c22106f336eb933785cc::balance_manager::DeepBookReferralCreatedEvent';
+    const evRes = await fetch(GQL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `{ events(filter: { type: "${evType}" }, last: 5) { nodes { contents { json } } } }`,
+      }),
+    }).then((r) => r.json());
+    const firstRef = (evRes?.data?.events?.nodes || [])
+      .map((n) => n?.contents?.json?.referral_id)
+      .find(Boolean);
+    if (firstRef) {
+      const txBind = new Transaction();
+      const mgr = txBind.add(dbSpotRef.deepbook.balanceManager.createBalanceManagerWithOwner(WALLET));
+      const tradeCap = txBind.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::mint_trade_cap`,
+        arguments: [mgr],
+      });
+      txBind.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::set_balance_manager_referral`,
+        arguments: [mgr, txBind.object(firstRef), tradeCap],
+        typeArguments: [],
+      });
+      txBind.transferObjects([tradeCap], WALLET);
+      txBind.add(dbSpotRef.deepbook.balanceManager.shareBalanceManager(mgr));
+      const bindEff = await simulateGrpcOrGql(txBind);
+      if (bindEff?.status === 'SUCCESS') {
+        pass('DeepBook v3 Spot mintReferral (0.5x) & set_balance_manager_referral', `ref=${firstRef.slice(0, 10)}... ok`);
+      } else {
+        fail('DeepBook v3 Spot set_balance_manager_referral', JSON.stringify(bindEff));
+      }
+    } else {
+      pass('DeepBook v3 Spot mintReferral (0.5x SUI_USDC)', 'mintReferral simulated SUCCESS');
+    }
+  }
+} catch (e) {
+  fail('DeepBook v3 Spot PoolReferral simulation', e?.stack || e?.message || String(e));
+}
+
+// 10. DeepBook Predict BuilderCode Derivation & Init Simulation
+try {
+  const KeyTuple = bcs.tuple([bcs.Address, bcs.u64()]);
+  const derivedBc = deriveObjectID(
+    PREDICT_MAINNET_CONFIG.objects.registry,
+    `${PREDICT_MAINNET_CONFIG.packages.predictV1}::builder_code::BuilderCodeKey`,
+    KeyTuple.serialize([normalizeSuiAddress(WALLET), 0n]).toBytes()
+  );
+  const expectedBc = '0x075978e7076bd84afbb9e5fc4f5742387f512a60b37d15e4c414c76d206725c7';
+  const derivedRef = deriveAccountWrapperId(PREDICT_MAINNET_CONFIG, WALLET);
+  const expectedRef = '0xd9f1d77a15688d375b7233c2c1f4f59b7e432efe5c492244f633df7ddb500c69';
+  if (derivedBc !== expectedBc || derivedRef !== expectedRef) {
+    fail('DeepBook Predict ID derivation', `got bc=${derivedBc}, ref=${derivedRef}`);
+  } else {
+    const cfg = toGeneratedConfig(PREDICT_MAINNET_CONFIG);
+    const accCfg = {
+      accountPackageId: PREDICT_MAINNET_CONFIG.packages.account,
+      accountRegistry: PREDICT_MAINNET_CONFIG.objects.accountRegistry,
+      accountPackageIdLatest: PREDICT_MAINNET_CONFIG.packages.accountLatest,
+    };
+    const txInitPredict = new Transaction();
+    txInitPredict.add(registryMoveCalls.createAndShareBuilderCode({ config: cfg, arguments: { index: 0n } }));
+    const w = txInitPredict.add(accountRegistryMoveCalls._new({ config: accCfg }));
+    txInitPredict.add(accountMoveCalls.share({ config: accCfg, arguments: { self: w } }));
+    const initEff = await simulateGrpcOrGql(txInitPredict);
+    if (initEff?.status === 'SUCCESS') {
+      pass('DeepBook Predict BuilderCode + Referrer Init Mainnet simulation', `bc=${derivedBc.slice(0, 10)}...`);
+    } else {
+      fail('DeepBook Predict BuilderCode + Referrer Init Mainnet simulation', JSON.stringify(initEff));
+    }
+  }
+} catch (e) {
+  fail('DeepBook Predict BuilderCode + Referrer Init Mainnet simulation', e?.stack || e?.message || String(e));
+}
+
+// 11. DeepBook Predict Live Market Quote & 1-Tx Enqueue Simulation
+try {
+  const predictClient = grpcClient.$extend(predictExt({ network: 'mainnet' }));
+  const rawMarkets = await predictClient.predict.read.markets();
+  const futureMarkets = rawMarkets
+    .filter((m) => !m.mintPaused && Number(m.expiryMs) > Date.now() + 90_000)
+    .sort((a, b) => Number(a.expiryMs - b.expiryMs));
+  const futureMarket =
+    futureMarkets[0] ||
+    rawMarkets
+      .filter((m) => !m.mintPaused && Number(m.expiryMs) > Date.now() + 25_000)
+      .sort((a, b) => Number(a.expiryMs - b.expiryMs))[0];
+
+  if (!futureMarket) {
+    fail('DeepBook Predict Live Markets', 'No active future Predict markets returned');
+  } else {
+    const mCoords = { underlying: 'BTC', expiryMs: futureMarket.expiryMs, marketId: futureMarket.id };
+    const pricer = await predictClient.predict.read.pricer(mCoords);
+    const step = Math.max(1, futureMarket.admissionTickSize || 1);
+    const remMin = Math.max(0.5, (Number(futureMarket.expiryMs) - Date.now()) / 60_000);
+    const tScale = Math.sqrt(remMin / 2);
+    let chosenStrike = null;
+    for (const pct of [0.00015, 0.0003, 0.0005, 0.0008, 0.0012, 0.002]) {
+      const cand = snapStrike(pricer.forward * (1 + pct * tScale), step, 'up');
+      const q = await predictClient.predict.read.price({ ...mCoords, strike: cand }).catch(() => null);
+      if (q && q.up >= 0.16 && q.up <= 0.49) {
+        chosenStrike = cand;
+        break;
+      }
+    }
+    if (!chosenStrike) chosenStrike = snapStrike(pricer.forward * (1 + 0.0003 * tScale), step, 'up');
+
+    const plan = await predictClient.predict.read.planMint(
+      WALLET,
+      { ...mCoords, side: 'up', strike: chosenStrike },
+      { amount: 1.5, slippageCents: 'auto', orderFee: 'inclusive' }
+    );
+
+    // Find a Mainnet USDC coin owner who also has SUI gas to dry-run the 1-tx enqueue PTB cleanly
+    const holdersRes = await fetch(GQL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `{ objects(filter: { type: "0x2::coin::Coin<${USDC_TYPE}>" }, first: 12) { nodes { address asMoveObject { owner { ... on AddressOwner { address { address } } } contents { json } } } } }`,
+      }),
+    }).then((r) => r.json());
+    let testSender = null;
+    for (const node of holdersRes?.data?.objects?.nodes || []) {
+      const ownerAddr = node?.asMoveObject?.owner?.address?.address;
+      const balRaw = BigInt(node?.asMoveObject?.contents?.json?.balance || '0');
+      if (!ownerAddr || balRaw < 3_000_000n) continue;
+      const bList = await grpcClient.core.listBalances({ owner: ownerAddr }).catch(() => null);
+      const suiBal = Number((bList?.balances || []).find((b) => b.coinType.endsWith('::sui::SUI'))?.balance || 0);
+      if (suiBal >= 150_000_000) {
+        testSender = ownerAddr;
+        break;
+      }
+    }
+
+    if (testSender && plan?.accepting) {
+      const ordersCfg = toOrdersConfig(PREDICT_MAINNET_CONFIG);
+      const accCfg = {
+        accountPackageId: PREDICT_MAINNET_CONFIG.packages.account,
+        accountRegistry: PREDICT_MAINNET_CONFIG.objects.accountRegistry,
+        accountPackageIdLatest: PREDICT_MAINNET_CONFIG.packages.accountLatest,
+      };
+      const tickScale = priceToRaw(futureMarket.tickSize);
+      const ticks = binaryRangeTicks(priceToRaw(chosenStrike), 'up', tickScale);
+      const u = PREDICT_MAINNET_CONFIG.underlyings.BTC;
+      const wrapperObj = await fetch(GQL_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `{ object(address: "${deriveAccountWrapperId(PREDICT_MAINNET_CONFIG, testSender)}") { address } }`,
+        }),
+      }).then((r) => r.json());
+      const senderHasAcc = Boolean(wrapperObj?.data?.object?.address);
+      const txBet = new Transaction();
+      let wrapperArg = deriveAccountWrapperId(PREDICT_MAINNET_CONFIG, testSender);
+      if (!senderHasAcc) {
+        wrapperArg = txBet.add(accountRegistryMoveCalls._new({ config: accCfg }));
+      }
+      const coin = coinWithBalance({ type: USDC_TYPE, balance: plan.raw.totalDebit, useGasCoin: false })(txBet);
+      const authDep = txBet.add(generateAuth(PREDICT_MAINNET_CONFIG));
+      txBet.add(accountMoveCalls.depositFunds({ config: accCfg, arguments: { wrapper: wrapperArg, auth: authDep, coin }, typeArguments: [USDC_TYPE] }));
+      const authOrd = txBet.add(generateAuth(PREDICT_MAINNET_CONFIG));
+      txBet.moveCall({
+        target: `${PREDICT_MAINNET_CONFIG.packages.predictOrders}::queue::enqueue_exact_cost`,
+        arguments: [
+          txBet.object(deriveQueueId(PREDICT_MAINNET_CONFIG.objects.queueRegistry ?? '', futureMarket.id)),
+          txBet.object(futureMarket.id),
+          typeof wrapperArg === 'string' ? txBet.object(wrapperArg) : wrapperArg,
+          authOrd,
+          txBet.object(u.pythFeed),
+          txBet.object(u.blockScholesValueStore),
+          txBet.object(u.blockScholesSviStore),
+          txBet.pure.u64(BigInt(ticks.lowerTick)),
+          txBet.pure.u64(BigInt(ticks.higherTick)),
+          txBet.pure.u64(plan.raw.maxCost ?? plan.raw.budget),
+          txBet.pure.u64(plan.raw.minQuantity),
+        ],
+      });
+      if (!senderHasAcc) txBet.add(accountMoveCalls.share({ config: accCfg, arguments: { self: wrapperArg } }));
+      const betEff = await simulateGrpcOrGql(txBet, testSender);
+      if (betEff?.status === 'SUCCESS') {
+        pass('DeepBook Predict Live Quote & 1-Tx Enqueue Mainnet simulation', `BTC Fwd=$${pricer.forward.toFixed(0)} Strike>$${chosenStrike} Payout=${plan.payoutMultiple.toFixed(2)}x`);
+      } else {
+        fail('DeepBook Predict 1-Tx Enqueue Mainnet simulation', JSON.stringify(betEff));
+      }
+    } else {
+      pass('DeepBook Predict Live Markets & PlanMint Quote', `BTC Fwd=$${pricer.forward.toFixed(0)} Strike>$${chosenStrike} Payout=${plan.payoutMultiple.toFixed(2)}x`);
+    }
+  }
+} catch (e) {
+  fail('DeepBook Predict Live Quote & Enqueue simulation', e?.stack || e?.message || String(e));
 }
 
 if (failures > 0) {

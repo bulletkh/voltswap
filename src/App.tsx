@@ -7,6 +7,7 @@ import {
   Layers,
   Shield,
   Sparkles,
+  Target,
   Wallet,
   X,
   Zap,
@@ -18,6 +19,7 @@ import { VOLT_TREASURY_ADDRESS } from './constants';
 import { captureReferralFromUrl, getWalletVolumeUsd } from './voltFee';
 import { SwapWorkspace } from './components/SwapWorkspace';
 import { PerpsWorkspace } from './components/PerpsWorkspace';
+import { PredictWorkspace } from './components/PredictWorkspace';
 import { EarnWorkspace } from './components/EarnWorkspace';
 import { TiersReferralsWorkspace } from './components/TiersReferralsWorkspace';
 import { PortfolioDrawer } from './components/PortfolioDrawer';
@@ -26,7 +28,7 @@ import { PnlShareModal, type PnlTradeData } from './PnlShareModal';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { VoltLogo } from './components/VoltLogo';
 
-type ActiveTab = 'swap' | 'perps' | 'earn' | 'tiers' | 'treasury';
+type ActiveTab = 'swap' | 'perps' | 'predict' | 'earn' | 'tiers' | 'treasury';
 
 interface ToastState {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -93,6 +95,7 @@ export function App() {
   }> = [
     { id: 'swap', label: 'Swap', icon: <Zap className="w-4 h-4" /> },
     { id: 'perps', label: 'Perps', icon: <Activity className="w-4 h-4" /> },
+    { id: 'predict', label: 'Predict', icon: <Target className="w-4 h-4" /> },
     { id: 'earn', label: 'Earn', icon: <Layers className="w-4 h-4" /> },
     { id: 'tiers', label: 'Tiers & Referrals', icon: <Award className="w-4 h-4" /> },
   ];
@@ -194,6 +197,14 @@ export function App() {
 
         {activeTab === 'perps' && (
           <PerpsWorkspace
+            onNotify={notify}
+            onTradeRecorded={(t) => setPnlTrade(t)}
+            onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+          />
+        )}
+
+        {activeTab === 'predict' && (
+          <PredictWorkspace
             onNotify={notify}
             onTradeRecorded={(t) => setPnlTrade(t)}
             onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
