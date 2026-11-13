@@ -783,11 +783,9 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
   const cetusClient = useMemo(
     () =>
       new AggregatorClient({
-        endpoint: 'https://api-sui.cetus.zone/router_v2/find_routes',
-        signer: currentAccount?.address || undefined,
         client: suiClient,
       }),
-    [currentAccount?.address, suiClient]
+    [suiClient]
   );
 
   // Fetch Aftermath Perpetuals markets on mount
@@ -1167,11 +1165,14 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
         }
         const swapTx = new Transaction();
         swapTx.setSender(walletAddr);
-        await cetusClient.fastRouterSwap({
+        const [suiInputCoin] = swapTx.splitCoins(swapTx.gas, [swapTx.pure.u64(rawSuiIn.toString())]);
+        const targetUsdcCoin = await cetusClient.routerSwap({
           router,
-          txb: swapTx,
+          inputCoin: suiInputCoin,
           slippage: 0.015,
+          txb: swapTx,
         });
+        swapTx.transferObjects([targetUsdcCoin], swapTx.pure.address(walletAddr));
         const swapRes = await signAndExecute({ transaction: swapTx });
         if (!(swapRes as any)?.digest) {
           throw new Error('SUI -> USDC collateral swap failed.');
