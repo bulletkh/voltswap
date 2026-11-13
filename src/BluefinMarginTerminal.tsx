@@ -1243,7 +1243,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
         leverage: effectiveLeverage,
         reduceOnly: false,
         collateralChange: collateralValueUsd,
-        hasPosition: Boolean(existingOnChainPos),
+        hasPosition: activeAccount.positionMarketIds?.includes(afMarket.marketId) ?? Boolean(existingOnChainPos),
         cancelSlTp: false,
         slippage: 0.02,
         feeMist,
@@ -1813,10 +1813,10 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
             </div>
           </div>
 
-          {/* Bluefin Protocol Badge */}
+          {/* Aftermath Protocol Badge */}
           <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono font-bold">
             <Zap className="w-3.5 h-3.5 fill-blue-400" />
-            Bluefin Pro CLOB
+            Aftermath Perpetuals
           </div>
         </div>
       </div>

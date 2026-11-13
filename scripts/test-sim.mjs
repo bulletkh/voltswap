@@ -67,6 +67,14 @@ if (!suiMkt) {
 
 // 2. Aftermath Perps Open Market Order (SUI 14x Long, 13 SUI on account 2050n)
 if (suiMkt) {
+  const posRes = await fetch('https://aftermath.finance/api/perpetuals/accounts/positions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accountIds: [ACCOUNT_ID] }),
+  }).then((r) => r.json());
+  const rawPos = posRes?.accounts?.[0]?.positions || [];
+  const hasPosition = rawPos.some((p) => p.marketId === suiMkt.market.objectId);
+
   const orderRes = await fetch('https://aftermath.finance/api/perpetuals/account/transactions/place-market-order', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -78,8 +86,8 @@ if (suiMkt) {
       size: '13000000000n',
       leverage: 14,
       reduceOnly: false,
-      collateralChange: 0.80,
-      hasPosition: false,
+      collateralChange: 0.75,
+      hasPosition,
       cancelSlTp: false,
       slippage: 0.02,
     }),

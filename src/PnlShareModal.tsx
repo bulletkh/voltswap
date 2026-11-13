@@ -46,7 +46,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
   const engineName = trade.orderType === 'LIMIT'
     ? 'DeepBook v3 CLOB'
     : trade.orderType === 'PERPS'
-    ? 'Bluefin Pro CLOB'
+    ? 'Aftermath Perpetuals'
     : 'Cetus CLMM + DeepBook v3';
 
   const orderTypeLabel = trade.orderType === 'LIMIT'

@@ -43,6 +43,8 @@ export interface AfAccountState {
   availableCollateralUsd: number;
   totalUnrealizedPnlUsd: number;
   positions: AfPositionInfo[];
+  /** All marketIds that already have an on-chain Position struct (including closed 0-size slots) */
+  positionMarketIds: string[];
 }
 
 function parseBigIntN(val: unknown, fallback = 1n): bigint {
@@ -217,6 +219,7 @@ export async function fetchAftermathAccountState(walletAddress: string): Promise
       availableCollateralUsd: 0,
       totalUnrealizedPnlUsd: 0,
       positions: [],
+      positionMarketIds: [],
     };
   }
 
@@ -240,6 +243,7 @@ export async function fetchAftermathAccountState(walletAddress: string): Promise
       availableCollateralUsd: Number(parseBigIntN(primaryCap.collateral, 0n)) / 1e6,
       totalUnrealizedPnlUsd: 0,
       positions: [],
+      positionMarketIds: [],
     };
   }
   const posData = await posRes.json();
@@ -253,6 +257,7 @@ export async function fetchAftermathAccountState(walletAddress: string): Promise
     availableCollateral: Number(acc?.availableCollateral || 0),
     availableCollateralUsd: Number(acc?.availableCollateralUsd || 0),
     totalUnrealizedPnlUsd: Number(acc?.totalUnrealizedPnlUsd || 0),
+    positionMarketIds: rawPositions.map((p) => String(p.marketId)).filter(Boolean),
     positions: rawPositions
       .filter((p) => Math.abs(Number(p.baseAssetAmount || 0)) > 0)
       .map((p) => ({
