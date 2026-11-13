@@ -16,7 +16,8 @@ import {
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { ConnectButton } from '@mysten/dapp-kit-react/ui';
 import { VOLT_TREASURY_ADDRESS } from './constants';
-import { captureReferralFromUrl, getWalletVolumeUsd } from './voltFee';
+import { captureReferralFromUrl } from './voltFee';
+import { useSyncedWalletVolume } from './onChainVolume';
 import { SwapWorkspace } from './components/SwapWorkspace';
 import { PerpsWorkspace } from './components/PerpsWorkspace';
 import { PredictWorkspace } from './components/PredictWorkspace';
@@ -48,6 +49,7 @@ export function App() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [pnlTrade, setPnlTrade] = useState<PnlTradeData | null>(null);
+  const { volumeUsd: syncedVolumeUsd } = useSyncedWalletVolume(account?.address);
   const [trackedVolumeUsd, setTrackedVolumeUsd] = useState<number>(0);
 
   useEffect(() => {
@@ -55,8 +57,8 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    setTrackedVolumeUsd(getWalletVolumeUsd(account?.address));
-  }, [account?.address]);
+    setTrackedVolumeUsd(syncedVolumeUsd);
+  }, [syncedVolumeUsd]);
 
   const isCreatorWallet = useMemo(() => {
     if (!account?.address) return false;

@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Activity,
   Award,
   Check,
   Copy,
   ExternalLink,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   TrendingDown,
@@ -12,9 +14,9 @@ import {
 } from 'lucide-react';
 import { useCurrentAccount } from '@mysten/dapp-kit-react';
 import { TRADER_TIERS } from '../constants';
+import { useSyncedWalletVolume } from '../onChainVolume';
 import {
   getValidReferrerForSender,
-  getWalletVolumeUsd,
   REFERRAL_TIERS,
   resolveReferralTier,
   resolveTraderTier,
@@ -33,9 +35,16 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
   const [subTab, setSubTab] = useState<TiersSubTab>('traders');
   const [copied, setCopied] = useState(false);
 
+  const {
+    volumeUsd: syncedVolumeUsd,
+    summary,
+    isSyncing,
+    refresh: refreshOnChainVolume,
+  } = useSyncedWalletVolume(account?.address);
+
   const volumeUsd = useMemo(
-    () => externalVolumeUsd ?? getWalletVolumeUsd(account?.address),
-    [externalVolumeUsd, account?.address]
+    () => Math.max(syncedVolumeUsd, externalVolumeUsd ?? 0),
+    [syncedVolumeUsd, externalVolumeUsd]
   );
   const activeReferrer = useMemo(
     () => getValidReferrerForSender(account?.address),
@@ -80,31 +89,45 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           </p>
         </div>
 
-        <div className="inline-flex items-center p-1 rounded-xl bg-[#06070A] border border-[#1E232D] self-start sm:self-auto gap-1">
-          <button
-            type="button"
-            onClick={() => setSubTab('traders')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-all ${
-              subTab === 'traders'
-                ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.28)]'
-                : 'text-[#8E98A8] hover:text-white'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            <span>For Traders</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubTab('referrers')}
-            className={`px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-all ${
-              subTab === 'referrers'
-                ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.28)]'
-                : 'text-[#8E98A8] hover:text-white'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>For Affiliates</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {account?.address && (
+            <button
+              type="button"
+              disabled={isSyncing}
+              onClick={() => refreshOnChainVolume(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-[#06070A] border border-[#1E232D] hover:border-[#2B7FFF]/50 text-xs font-mono text-slate-200 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              title="Re-scan Sui Mainnet GraphQL & Aftermath trade history"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#60A5FA] ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'Syncing Chain...' : 'Sync On-Chain'}</span>
+            </button>
+          )}
+          <div className="inline-flex items-center p-1 rounded-xl bg-[#06070A] border border-[#1E232D] gap-1">
+            <button
+              type="button"
+              onClick={() => setSubTab('traders')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-all ${
+                subTab === 'traders'
+                  ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.28)]'
+                  : 'text-[#8E98A8] hover:text-white'
+              }`}
+            >
+              <Award className="w-4 h-4" />
+              <span>For Traders</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubTab('referrers')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-all ${
+                subTab === 'referrers'
+                  ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.28)]'
+                  : 'text-[#8E98A8] hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>For Affiliates</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -112,60 +135,104 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
       {subTab === 'traders' && (
         <div className="space-y-5">
           {/* Active Tier Hero Progress Card */}
-          <div className="panel-carbon rounded-2xl p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
-            <div className="lg:col-span-5 flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#000000] border border-[#2B7FFF]/40 flex items-center justify-center text-3xl shadow-[0_0_24px_rgba(43,127,255,0.16)]">
-                {traderTier.badgeEmoji}
-              </div>
-              <div>
-                <div className="text-xs font-mono uppercase tracking-wider text-[#60A5FA]">
-                  Active Trader Tier
+          <div className="panel-carbon rounded-2xl p-5 sm:p-6 space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+              <div className="lg:col-span-5 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#000000] border border-[#2B7FFF]/40 flex items-center justify-center text-3xl shadow-[0_0_24px_rgba(43,127,255,0.16)]">
+                  {traderTier.badgeEmoji}
                 </div>
-                <div className="text-xl font-bold text-white mt-0.5">{traderTier.name}</div>
-                <div className="text-sm text-slate-300 font-mono tabular-nums mt-0.5">
-                  Tracked Volume:{' '}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono uppercase tracking-wider text-[#60A5FA]">
+                      Active Trader Tier
+                    </span>
+                    {account?.address && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#08D189]/15 border border-[#08D189]/35 text-[#08D189]">
+                        {isSyncing ? 'Syncing…' : 'On-Chain Synced'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-white mt-0.5">{traderTier.name}</div>
+                  <div className="text-sm text-slate-300 font-mono tabular-nums mt-0.5">
+                    Verified Volume:{' '}
+                    <span className="text-white font-semibold">
+                      ${volumeUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 space-y-2">
+                <div className="flex justify-between text-sm font-mono text-slate-300">
+                  <span>Progress to Next Tier</span>
                   <span className="text-white font-semibold">
-                    ${volumeUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                    {traderTier.nextTierVolumeUsd
+                      ? `$${volumeUsd.toFixed(0)} / $${traderTier.nextTierVolumeUsd.toLocaleString()}`
+                      : 'Maximum Tier Reached'}
                   </span>
+                </div>
+                <div className="w-full h-2.5 rounded-full bg-[#121620] overflow-hidden border border-[#1E232D]">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#2B7FFF] to-[#08D189] transition-all"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                {activeReferrer && (
+                  <div className="text-xs font-mono text-[#08D189] inline-flex items-center gap-1.5 pt-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>
+                      Invited by {activeReferrer.slice(0, 8)}...{activeReferrer.slice(-6)} · -20%
+                      Plankton fee rebate active automatically
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="lg:col-span-2 panel-carbon-sub rounded-xl p-3.5 text-center border border-[#2B7FFF]/35">
+                <div className="text-xs text-[#8E98A8]">Your Protocol Fee</div>
+                <div className="text-2xl font-mono font-bold text-[#60A5FA] mt-0.5">
+                  {(traderTier.feeRate * 100).toFixed(2)}%
+                </div>
+                <div className="text-xs text-[#08D189] font-mono">
+                  {traderTier.discountPct > 0 ? `-${traderTier.discountPct}% Rebate` : 'Base Rate'}
                 </div>
               </div>
             </div>
 
-            <div className="lg:col-span-5 space-y-2">
-              <div className="flex justify-between text-sm font-mono text-slate-300">
-                <span>Progress to Next Tier</span>
-                <span className="text-white font-semibold">
-                  {traderTier.nextTierVolumeUsd
-                    ? `$${volumeUsd.toFixed(0)} / $${traderTier.nextTierVolumeUsd.toLocaleString()}`
-                    : 'Maximum Tier Reached'}
-                </span>
-              </div>
-              <div className="w-full h-2.5 rounded-full bg-[#121620] overflow-hidden border border-[#1E232D]">
-                <div
-                  className="h-full bg-gradient-to-r from-[#2B7FFF] to-[#08D189] transition-all"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-              {activeReferrer && (
-                <div className="text-xs font-mono text-[#08D189] inline-flex items-center gap-1.5 pt-1">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>
-                    Invited by {activeReferrer.slice(0, 8)}...{activeReferrer.slice(-6)} · -20%
-                    Plankton fee rebate active automatically
-                  </span>
+            {account?.address && (
+              <div className="pt-4 border-t border-[#1A1E26] grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-mono">
+                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                  <div className="text-[10px] text-slate-400 font-sans">Market Swaps</div>
+                  <div className="text-white font-semibold tabular-nums mt-0.5">
+                    ${(summary?.spotSwapVolumeUsd ?? 0).toFixed(2)}
+                  </div>
                 </div>
-              )}
-            </div>
-
-            <div className="lg:col-span-2 panel-carbon-sub rounded-xl p-3.5 text-center border border-[#2B7FFF]/35">
-              <div className="text-xs text-[#8E98A8]">Your Protocol Fee</div>
-              <div className="text-2xl font-mono font-bold text-[#60A5FA] mt-0.5">
-                {(traderTier.feeRate * 100).toFixed(2)}%
+                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                  <div className="text-[10px] text-slate-400 font-sans">Spot CLOB</div>
+                  <div className="text-[#60A5FA] font-semibold tabular-nums mt-0.5">
+                    ${(summary?.clobVolumeUsd ?? 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                  <div className="text-[10px] text-slate-400 font-sans">Margin 4.5x</div>
+                  <div className="text-[#60A5FA] font-semibold tabular-nums mt-0.5">
+                    ${(summary?.marginVolumeUsd ?? 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                  <div className="text-[10px] text-slate-400 font-sans">Aftermath Perps</div>
+                  <div className="text-white font-semibold tabular-nums mt-0.5">
+                    ${(summary?.perpsVolumeUsd ?? 0).toFixed(2)}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2 col-span-2 sm:col-span-1">
+                  <div className="text-[10px] text-slate-400 font-sans">Predict &amp; Earn</div>
+                  <div className="text-[#08D189] font-semibold tabular-nums mt-0.5">
+                    ${((summary?.predictVolumeUsd ?? 0) + (summary?.earnVolumeUsd ?? 0)).toFixed(2)}
+                  </div>
+                </div>
               </div>
-              <div className="text-xs text-[#08D189] font-mono">
-                {traderTier.discountPct > 0 ? `-${traderTier.discountPct}% Rebate` : 'Base Rate'}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* 6 Dynamic Trader Fee Tiers */}
@@ -232,6 +299,67 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
               })}
             </div>
           </div>
+
+          {/* Verified On-Chain Trade Log (Sui Mainnet GraphQL + Aftermath History) */}
+          {account?.address && (
+            <div className="panel-carbon rounded-2xl overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
+                <span className="text-sm font-bold text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#08D189]" />
+                  Verified On-Chain Activity ({summary?.trades.length ?? 0} fills / {summary?.txScannedCount ?? 0} txs scanned)
+                </span>
+                <span className="text-xs font-mono text-[#8E98A8]">
+                  Persists across browsers &amp; devices
+                </span>
+              </div>
+
+              {!summary || summary.trades.length === 0 ? (
+                <div className="p-5 text-xs font-mono text-slate-400 bg-[#000000]">
+                  {isSyncing
+                    ? 'Scanning Sui Mainnet GraphQL & Aftermath Perpetuals history...'
+                    : 'No swaps, CLOB/Margin fills, Perps, or Predict orders found in the latest 100 transactions for this address.'}
+                </div>
+              ) : (
+                <div className="divide-y divide-[#1A1E26] bg-[#000000] max-h-72 overflow-y-auto">
+                  {summary.trades.slice(0, 12).map((t) => (
+                    <div
+                      key={t.digest}
+                      className="px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-mono hover:bg-white/[0.02]"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] font-semibold text-[11px] shrink-0">
+                          {t.channel}
+                        </span>
+                        <span className="text-white font-sans font-medium truncate">{t.label}</span>
+                      </div>
+                      <div className="flex items-center gap-4 tabular-nums shrink-0">
+                        <span className="text-white font-semibold">${t.volumeUsd.toFixed(2)}</span>
+                        <span className="text-slate-500 hidden sm:inline">
+                          {t.timestampMs > 0
+                            ? new Date(t.timestampMs).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                            : 'Mainnet'}
+                        </span>
+                        {!t.digest.startsWith('af-') && (
+                          <a
+                            href={`https://suiscan.xyz/mainnet/tx/${t.digest}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[#60A5FA] hover:underline"
+                          >
+                            <span>{t.digest.slice(0, 6)}...</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -311,6 +439,52 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
               </div>
             </div>
           </div>
+
+          {account?.address && (
+            <div className="panel-carbon rounded-2xl overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
+                <span className="text-sm font-bold text-white">
+                  On-Chain Affiliate Rev-Share Received ({summary?.referralPayouts.length ?? 0} payouts)
+                </span>
+                <span className="text-sm font-mono font-bold text-[#08D189] tabular-nums">
+                  ${(summary?.referralEarnedUsd ?? 0).toFixed(4)} Earned
+                </span>
+              </div>
+
+              {!summary || summary.referralPayouts.length === 0 ? (
+                <div className="p-4 text-xs font-mono text-slate-400 bg-[#000000]">
+                  No incoming fee-split payouts detected in the latest 30 transactions yet.
+                </div>
+              ) : (
+                <div className="divide-y divide-[#1A1E26] bg-[#000000] max-h-56 overflow-y-auto">
+                  {summary.referralPayouts.map((p) => (
+                    <div
+                      key={`${p.digest}-${p.coinSymbol}`}
+                      className="px-5 py-2.5 flex items-center justify-between text-xs font-mono"
+                    >
+                      <span className="text-slate-300">
+                        From {p.traderAddress.slice(0, 6)}...{p.traderAddress.slice(-4)}
+                      </span>
+                      <div className="flex items-center gap-3 tabular-nums">
+                        <span className="text-[#08D189] font-semibold">
+                          +{p.amount.toFixed(4)} {p.coinSymbol} (${p.usdValue.toFixed(4)})
+                        </span>
+                        <a
+                          href={`https://suiscan.xyz/mainnet/tx/${p.digest}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[#60A5FA] hover:underline"
+                        >
+                          <span>{p.digest.slice(0, 6)}...</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 3 Affiliate Syndicate Tiers */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

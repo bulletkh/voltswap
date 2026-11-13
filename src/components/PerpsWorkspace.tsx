@@ -64,10 +64,10 @@ import {
   addWalletVolumeUsd,
   calcFeeUnits,
   getValidReferrerForSender,
-  getWalletVolumeUsd,
   resolveReferralTier,
   resolveTraderTier,
 } from '../voltFee';
+import { useSyncedWalletVolume } from '../onChainVolume';
 import { fetchDeepBookCandles, type DeepBookCandle } from '../deepbookV3';
 import { ProCandleChart, resolveTradingViewSymbol, type ChartTimeframe } from './ProCandleChart';
 import type { PnlTradeData } from '../PnlShareModal';
@@ -240,7 +240,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
 
   const lastSyncedMarketIdRef = useRef<string | null>(null);
 
-  const walletVol = useMemo(() => getWalletVolumeUsd(account?.address), [account?.address]);
+  const { volumeUsd: walletVol } = useSyncedWalletVolume(account?.address);
   const activeRef = useMemo(() => getValidReferrerForSender(account?.address), [account?.address]);
   const traderTier = useMemo(() => resolveTraderTier(walletVol, Boolean(activeRef)), [walletVol, activeRef]);
   const refTier = useMemo(() => resolveReferralTier(walletVol), [walletVol]);

@@ -6,6 +6,21 @@ import { safeNormalizeAddress, safeNormalizeCoinType, SUI_COIN_TYPE } from './su
 
 export const REFERRAL_STORAGE_KEY = 'volt_ref_address';
 export const VOLUME_STORAGE_PREFIX = 'volt_vol_usd_';
+export const VOLT_VOLUME_EVENT = 'volt:volume-updated';
+export const VOLT_VOLUME_RECORDED_EVENT = 'volt:trade-volume-recorded';
+
+const memoryVolumeByAddr = new Map<string, number>();
+const pendingOptimisticDeltaByAddr = new Map<string, { delta: number; at: number }>();
+const OPTIMISTIC_WINDOW_MS = 30_000;
+
+function emitVolumeEvent(eventName: string, address: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(eventName, { detail: { address } }));
+  } catch {
+    // ignore event errors
+  }
+}
 
 export interface ReferralTierInfo {
   name: string;
@@ -73,9 +88,15 @@ export function getValidReferrerForSender(sender?: string | null): string | null
 }
 
 export function getWalletVolumeUsd(address?: string | null): number {
-  if (typeof window === 'undefined' || !address) return 0;
+  if (!address) return 0;
+  const key = address.toLowerCase();
+  const mem = memoryVolumeByAddr.get(key);
+  if (typeof mem === 'number' && Number.isFinite(mem) && mem >= 0) {
+    return mem;
+  }
+  if (typeof window === 'undefined') return 0;
   try {
-    const raw = localStorage.getItem(`${VOLUME_STORAGE_PREFIX}${address.toLowerCase()}`);
+    const raw = localStorage.getItem(`${VOLUME_STORAGE_PREFIX}${key}`);
     const val = raw ? Number(raw) : 0;
     return Number.isFinite(val) && val > 0 ? val : 0;
   } catch {
@@ -83,16 +104,56 @@ export function getWalletVolumeUsd(address?: string | null): number {
   }
 }
 
-export function addWalletVolumeUsd(address: string, deltaUsd: number): number {
-  if (typeof window === 'undefined' || !address || !Number.isFinite(deltaUsd) || deltaUsd <= 0) {
+export function setSyncedWalletVolume(address: string, onChainUsd: number): number {
+  if (!address || !Number.isFinite(onChainUsd) || onChainUsd < 0) {
     return getWalletVolumeUsd(address);
   }
-  const next = getWalletVolumeUsd(address) + deltaUsd;
-  try {
-    localStorage.setItem(`${VOLUME_STORAGE_PREFIX}${address.toLowerCase()}`, String(next));
-  } catch {
-    // ignore storage errors
+  const key = address.toLowerCase();
+  const pending = pendingOptimisticDeltaByAddr.get(key);
+  const effectivePending =
+    pending && Date.now() - pending.at < OPTIMISTIC_WINDOW_MS ? pending.delta : 0;
+  if (effectivePending === 0 && pending) {
+    pendingOptimisticDeltaByAddr.delete(key);
   }
+
+  // Authoritative chain total + any un-indexed live session delta within 30s
+  const prev = getWalletVolumeUsd(address);
+  const next = Math.max(onChainUsd, effectivePending > 0 ? Math.max(prev, onChainUsd) : onChainUsd);
+  memoryVolumeByAddr.set(key, next);
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`${VOLUME_STORAGE_PREFIX}${key}`, String(next));
+    } catch {
+      // ignore storage errors
+    }
+  }
+  emitVolumeEvent(VOLT_VOLUME_EVENT, key);
+  return next;
+}
+
+export function addWalletVolumeUsd(address: string, deltaUsd: number): number {
+  if (!address || !Number.isFinite(deltaUsd) || deltaUsd <= 0) {
+    return getWalletVolumeUsd(address);
+  }
+  const key = address.toLowerCase();
+  const next = getWalletVolumeUsd(address) + deltaUsd;
+  memoryVolumeByAddr.set(key, next);
+  const prevPending = pendingOptimisticDeltaByAddr.get(key);
+  const withinWindow = prevPending && Date.now() - prevPending.at < OPTIMISTIC_WINDOW_MS;
+  pendingOptimisticDeltaByAddr.set(key, {
+    delta: (withinWindow ? prevPending.delta : 0) + deltaUsd,
+    at: Date.now(),
+  });
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(`${VOLUME_STORAGE_PREFIX}${key}`, String(next));
+    } catch {
+      // ignore storage errors
+    }
+  }
+  emitVolumeEvent(VOLT_VOLUME_EVENT, key);
+  emitVolumeEvent(VOLT_VOLUME_RECORDED_EVENT, key);
   return next;
 }
 

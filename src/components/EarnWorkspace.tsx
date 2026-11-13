@@ -31,10 +31,10 @@ import { simulateTxBeforeWallet } from '../suiSimulate';
 import {
   addWalletVolumeUsd,
   getValidReferrerForSender,
-  getWalletVolumeUsd,
   resolveReferralTier,
   resolveTraderTier,
 } from '../voltFee';
+import { useSyncedWalletVolume } from '../onChainVolume';
 import type { PnlTradeData } from '../PnlShareModal';
 
 interface EarnWorkspaceProps {
@@ -87,7 +87,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
   const [amountInput, setAmountInput] = useState<string>('1');
   const [isExecuting, setIsExecuting] = useState(false);
 
-  const volUsd = useMemo(() => getWalletVolumeUsd(account?.address), [account?.address]);
+  const { volumeUsd: volUsd } = useSyncedWalletVolume(account?.address);
   const activeReferrer = useMemo(
     () => getValidReferrerForSender(account?.address),
     [account?.address]

@@ -1475,6 +1475,106 @@ try {
   fail('Portfolio Vaults 1-Click Withdrawals', e?.stack || e?.message || String(e));
 }
 
+// ---------------------------------------------------------------------------
+// 18) On-Chain Volume & Tier Sync (Sui GraphQL + Aftermath Perps History)
+// ---------------------------------------------------------------------------
+try {
+  const [gqlRes, afHistRes] = await Promise.all([
+    fetch(GQL_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        query: `query ($addr: SuiAddress!) {
+          sent: transactions(filter: { sentAddress: $addr }, last: 50) {
+            nodes {
+              digest
+              effects {
+                status
+                balanceChanges { nodes { coinType { repr } amount } }
+                events { nodes { contents { type { repr } json } } }
+              }
+            }
+          }
+          incoming: transactions(filter: { affectedAddress: $addr }, last: 25) {
+            nodes {
+              digest
+              sender { address }
+              effects {
+                status
+                balanceChanges { nodes { owner { address } coinType { repr } amount } }
+              }
+            }
+          }
+        }`,
+        variables: { addr: WALLET },
+      }),
+    }).then((r) => r.json()),
+    fetch('https://aftermath.finance/api/perpetuals/account/order-history', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: ACCOUNT_ID.replace('n', ''), limit: 50 }),
+    }).then((r) => r.json()),
+  ]);
+
+  const sentNodes = gqlRes?.data?.sent?.nodes || [];
+  const incomingNodes = gqlRes?.data?.incoming?.nodes || [];
+  const afOrders = Array.isArray(afHistRes) ? afHistRes : afHistRes?.orders || [];
+
+  const perpsDigests = new Set();
+  let perpsUsd = 0;
+  for (const ord of afOrders) {
+    const sz = Math.abs(Number(ord?.size || 0));
+    const px = Number(ord?.price || 0);
+    if (sz > 0 && px > 0 && !String(ord?.eventType || '').toLowerCase().includes('cancel')) {
+      perpsUsd += sz * px;
+      if (ord?.txDigest) perpsDigests.add(ord.txDigest);
+    }
+  }
+
+  let dbUsd = 0;
+  let swapUsd = 0;
+  for (const tx of sentNodes) {
+    if (tx?.effects?.status && tx.effects.status !== 'SUCCESS') continue;
+    if (perpsDigests.has(tx.digest)) continue;
+    const events = tx?.effects?.events?.nodes || [];
+    const evTypes = events.map((e) => String(e?.contents?.type?.repr || ''));
+    const dbFills = events.filter((e) => String(e?.contents?.type?.repr || '').includes('::order_info::OrderFilled'));
+    if (dbFills.length > 0) {
+      for (const df of dbFills) {
+        const qRaw = Number(df?.contents?.json?.quote_quantity || 0);
+        if (qRaw > 0) dbUsd += qRaw / 1e6;
+      }
+      continue;
+    }
+    if (evTypes.some((t) => t.includes('::SwapEvent') || t.includes('ConfirmSwapEvent') || t.includes('::AssetSwap'))) {
+      const bcs = tx?.effects?.balanceChanges?.nodes || [];
+      let stableUsd = 0;
+      for (const bc of bcs) {
+        const repr = String(bc?.coinType?.repr || '').toLowerCase();
+        if (repr.includes('usdc') || repr.includes('usdt') || repr.includes('sui_usde')) {
+          stableUsd = Math.max(stableUsd, Math.abs(Number(bc?.amount || 0)) / 1e6);
+        }
+      }
+      swapUsd += stableUsd;
+    }
+  }
+
+  const totalSyncedUsd = perpsUsd + dbUsd + swapUsd;
+  if (sentNodes.length > 0 && afOrders.length > 0 && totalSyncedUsd > 0) {
+    pass(
+      'On-Chain Volume & Tier GraphQL + Aftermath Sync',
+      `sent=${sentNodes.length} incoming=${incomingNodes.length} afOrders=${afOrders.length} perps=$${perpsUsd.toFixed(2)} db=$${dbUsd.toFixed(2)} swaps=$${swapUsd.toFixed(2)} total=$${totalSyncedUsd.toFixed(2)}`
+    );
+  } else {
+    fail(
+      'On-Chain Volume & Tier GraphQL + Aftermath Sync',
+      `sent=${sentNodes.length}, afOrders=${afOrders.length}, total=${totalSyncedUsd}`
+    );
+  }
+} catch (e) {
+  fail('On-Chain Volume & Tier GraphQL + Aftermath Sync', e?.stack || e?.message || String(e));
+}
+
 if (failures > 0) {
   console.error(`\n${failures} simulation check(s) failed.`);
   process.exit(1);

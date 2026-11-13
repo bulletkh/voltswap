@@ -27,10 +27,10 @@ import {
   addWalletVolumeUsd,
   calcFeeUnits,
   getValidReferrerForSender,
-  getWalletVolumeUsd,
   resolveReferralTier,
   resolveTraderTier,
 } from '../voltFee';
+import { useSyncedWalletVolume } from '../onChainVolume';
 import {
   buildCancelDeepBookOrderTx,
   buildDepositManagerTx,
@@ -270,8 +270,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     }
   }, [mode, marginPools, activePool.poolName]);
 
-  // Tier & Referral
-  const walletVolumeUsd = useMemo(() => getWalletVolumeUsd(account?.address), [account?.address]);
+  // Tier & Referral (synced with Sui Mainnet + Aftermath on-chain volume)
+  const { volumeUsd: walletVolumeUsd } = useSyncedWalletVolume(account?.address);
   const activeReferrer = useMemo(() => getValidReferrerForSender(account?.address), [account?.address]);
   const traderTier = useMemo(
     () => resolveTraderTier(walletVolumeUsd, Boolean(activeReferrer)),
