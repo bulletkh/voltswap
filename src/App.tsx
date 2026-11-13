@@ -3384,6 +3384,7 @@ export default function App() {
               signAndExecute={signAndExecute}
               currentAccountAddress={currentAccount?.address}
               userBalances={userBalances}
+              feeRate={effectiveFeeRate}
               showNotification={showNotification}
               onOpenPnlShareModal={handleOpenPnlModal}
               onSwitchToSpotLimit={(baseAsset) => {

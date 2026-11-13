@@ -349,6 +349,7 @@ interface BluefinMarginTerminalProps {
   signAndExecute?: (args: { transaction: Transaction }) => Promise<any>;
   currentAccountAddress?: string | null;
   userBalances?: Record<string, string>;
+  feeRate?: number;
   showNotification: (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string, actionLabel?: string, actionUrl?: string, tradeData?: any) => void;
   onOpenPnlShareModal?: (tradeData: any) => void;
   onSwitchToSpotLimit?: (baseAsset: string) => void;
@@ -360,6 +361,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
   signAndExecute,
   currentAccountAddress,
   userBalances = {},
+  feeRate = 0.0025,
   showNotification,
   onOpenPnlShareModal,
   onSwitchToSpotLimit
@@ -1073,8 +1075,8 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     }
   }, [selectedMarket, orderSide, leverage, orderType, limitPriceInput]);
 
-  // Fee calculation (0.05% taker fee, Volt Tier rebate)
-  const tradingFeeUsd = positionSizeUsd * 0.0005;
+  // Fee calculation (linked to user's Volt Trader Tier, e.g. 0.25% for Guest)
+  const tradingFeeUsd = positionSizeUsd * feeRate;
 
   // Execute Open Position (Real On-Chain Aftermath Perpetuals)
   const handleOpenPosition = async () => {
@@ -1192,9 +1194,9 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
         await new Promise((r) => setTimeout(r, 800));
       }
 
-      // 4. Place Real On-Chain Market Order (+ 0.05% Volt Treasury Fee)
+      // 4. Place Real On-Chain Market Order (+ Volt Treasury Tier Fee)
       const existingOnChainPos = activeAccount.positions.find((p) => p.marketId === afMarket.marketId);
-      const feeSui = suiPriceUsd > 0 ? (effectiveSizeUsd * 0.0005) / suiPriceUsd : 0.0001;
+      const feeSui = suiPriceUsd > 0 ? (effectiveSizeUsd * feeRate) / suiPriceUsd : 0.0001;
       const feeMist = BigInt(Math.max(10000, Math.floor(feeSui * 1e9)));
 
       const orderTx = await buildPlaceMarketOrderTx({
@@ -1263,7 +1265,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
             toToken: selectedMarket.symbol,
             fromAmount: collateralAmount.toString(),
             volumeUsd: effectiveSizeUsd,
-            feeRate: 0.0005,
+            feeRate: feeRate,
             swapMode: `Aftermath Perps ${effectiveLeverage}x ${orderSide.toUpperCase()}`,
             timestamp: Date.now(),
             voltAuth: 'volt_protocol_mainnet_proof_2026_sui'
@@ -1277,7 +1279,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       showNotification(
         'success',
         `${effectiveLeverage}x ${orderSide.toUpperCase()} ${selectedMarket.symbol} Opened On-Chain`,
-        `Executed on Aftermath Perpetuals (Sui Mainnet)!\n• Position Size: ~$${effectiveSizeUsd.toFixed(2)} (${effectiveContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Collateral: ~$${collateralValueUsd.toFixed(2)} USDC\n• Entry Price: $${entryPrice.toFixed(4)}\n• Protocol Fee (0.05%): $${(effectiveSizeUsd * 0.0005).toFixed(4)} routed to Volt Treasury\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        `Executed on Aftermath Perpetuals (Sui Mainnet)!\n• Position Size: ~$${effectiveSizeUsd.toFixed(2)} (${effectiveContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Collateral: ~$${collateralValueUsd.toFixed(2)} USDC\n• Entry Price: $${entryPrice.toFixed(4)}\n• Protocol Fee (${(feeRate * 100).toFixed(2)}%): $${(effectiveSizeUsd * feeRate).toFixed(4)} routed to Volt Treasury\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
         'View on Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`,
         {
@@ -1286,7 +1288,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
           fromAmount: collateralAmount.toString(),
           toAmount: effectiveContracts.toFixed(3),
           volumeUsd: effectiveSizeUsd,
-          feeSavedUsd: effectiveSizeUsd * 0.0005,
+          feeSavedUsd: effectiveSizeUsd * feeRate,
           digest: digest,
           timestamp: Date.now(),
           orderType: 'PERPS'
@@ -1311,7 +1313,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     setIsSubmitting(true);
     try {
       let digest = '';
-      const closeFeeSui = suiPriceUsd > 0 ? (pos.sizeUsd * 0.0005) / suiPriceUsd : 0.0001;
+      const closeFeeSui = suiPriceUsd > 0 ? (pos.sizeUsd * feeRate) / suiPriceUsd : 0.0001;
       const feeMist = BigInt(Math.max(10000, Math.floor(closeFeeSui * 1e9)));
 
       if (pos.isOnChain && pos.afMarketId && afAccount?.accountId) {
@@ -2237,7 +2239,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-400">Est. Taker Fee:</span>
+                <span className="text-gray-400">Volt Fee ({(feeRate * 100).toFixed(2)}%):</span>
                 <span className="text-gray-400">${tradingFeeUsd.toFixed(3)} USDC</span>
               </div>
             </div>
