@@ -69,7 +69,7 @@ import {
   resolveTraderTier,
 } from '../voltFee';
 import { fetchDeepBookCandles, type DeepBookCandle } from '../deepbookV3';
-import { ProCandleChart, type ChartTimeframe } from './ProCandleChart';
+import { ProCandleChart, resolveTradingViewSymbol, type ChartTimeframe } from './ProCandleChart';
 import type { PnlTradeData } from '../PnlShareModal';
 import type { Transaction } from '@mysten/sui/transactions';
 
@@ -87,8 +87,26 @@ interface PerpsWorkspaceProps {
 
 type OrderMode = 'market' | 'limit' | 'stop' | 'scale' | 'twap';
 type BottomTab = 'positions' | 'orders' | 'stops' | 'twap' | 'history';
+type PerpCategory = 'all' | 'crypto' | 'equities' | 'commodities' | 'fx_indices';
 
-const FEATURED_PERP_SYMBOLS = ['SUI', 'BTC', 'ETH', 'SOL', 'WAL', 'DEEP', 'XRP', 'DOGE'];
+const FEATURED_PERP_SYMBOLS = ['SUI', 'BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'XAUT', 'NVDA', 'TSLA', 'US100'];
+
+const COMMODITY_SYMS = new Set(['XAUT', 'XAG', 'WTI', 'BRENT', 'GOLD', 'SILVER']);
+const FX_INDEX_SYMS = new Set(['US500', 'US100', 'KR200', 'JP225', 'INDIA50', 'USDJPY', 'USDKRW', 'USDBRL', 'SPX']);
+const EQUITY_RWA_SYMS = new Set([
+  'TSLA', 'NVDA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'COIN', 'MSTR', 'HOOD', 'PLTR',
+  'INTC', 'MU', 'MRVL', 'TSM', 'COST', 'LLY', 'AMC', 'SOFI', 'CRCL', 'SOXL', 'IONQ', 'SNDK',
+  'BYD', 'NINTENDO', 'SAMSUNG', 'SKHYNIX', 'XIAOMI', 'SPCX', 'ANT', 'CBRS', 'DATA', 'DRAM',
+  'ORBIO', 'IOVA', 'BOC', 'BP', 'CARDS', 'CHIP',
+]);
+
+function getPerpCategory(symbol: string): Exclude<PerpCategory, 'all'> {
+  const s = symbol.toUpperCase().replace(/-PERP$/, '').replace(/USD$/, '');
+  if (COMMODITY_SYMS.has(s)) return 'commodities';
+  if (FX_INDEX_SYMS.has(s)) return 'fx_indices';
+  if (EQUITY_RWA_SYMS.has(s)) return 'equities';
+  return 'crypto';
+}
 
 function fmtPrice(p: number): string {
   if (!Number.isFinite(p) || p <= 0) return '—';
@@ -98,10 +116,11 @@ function fmtPrice(p: number): string {
 }
 
 async function fetchFallbackCandles(symbol: string, tf: ChartTimeframe): Promise<DeepBookCandle[]> {
-  const clean = symbol.replace('-PERP', '').toUpperCase();
+  const clean = symbol.replace('-PERP', '').replace(/USD$/, '').toUpperCase();
+  const dbTf = tf === '30m' ? '15m' : tf;
   if (clean === 'SUI' || clean === 'WAL' || clean === 'DEEP') {
     try {
-      const dbCandles = await fetchDeepBookCandles(`${clean}_USDC`, tf, 140);
+      const dbCandles = await fetchDeepBookCandles(`${clean}_USDC`, dbTf, 140);
       if (dbCandles.length > 5) return dbCandles;
     } catch {
       // fall through
@@ -139,6 +158,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
   const [selectedSymbol, setSelectedSymbol] = useState<string>('SUI');
   const [showMarketPicker, setShowMarketPicker] = useState(false);
   const [marketQuery, setMarketQuery] = useState('');
+  const [marketCategory, setMarketCategory] = useState<PerpCategory>('all');
 
   const [orderbook, setOrderbook] = useState<AfMarketOrderbook>({
     bids: [],
@@ -264,9 +284,12 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
 
   const filteredPickerMarkets = useMemo(() => {
     const q = marketQuery.trim().toUpperCase();
-    if (!q) return orderedMarkets;
-    return orderedMarkets.filter((m) => m.symbol.includes(q));
-  }, [orderedMarkets, marketQuery]);
+    return orderedMarkets.filter((m) => {
+      if (marketCategory !== 'all' && getPerpCategory(m.symbol) !== marketCategory) return false;
+      if (!q) return true;
+      return m.symbol.toUpperCase().includes(q);
+    });
+  }, [orderedMarkets, marketQuery, marketCategory]);
 
   const activeMarket = marketsMap[selectedSymbol] || orderedMarkets[0] || null;
   const activePosition = useMemo(
@@ -327,22 +350,23 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
   useEffect(() => {
     if (!activeMarket?.marketId) return;
     let cancelled = false;
+    setCandles([]);
     setCandlesLoading(true);
     (async () => {
       try {
         const afCandles = await fetchAftermathCandles(activeMarket.marketId, timeframe, 200);
-        if (!cancelled && afCandles.length >= 8) {
+        if (!cancelled && afCandles.length >= 4) {
           setCandles(afCandles);
           setCandleSourceLabel('Aftermath Perps');
           return;
         }
         const fb = await fetchFallbackCandles(activeMarket.symbol, timeframe);
         if (!cancelled) {
-          setCandles(fb);
+          setCandles(fb.length > 0 ? fb : afCandles);
           setCandleSourceLabel(fb.length > 0 ? 'Market Reference Feed' : 'Aftermath Perps');
         }
       } catch {
-        // keep existing
+        // handled cleanly
       } finally {
         if (!cancelled) setCandlesLoading(false);
       }
@@ -999,7 +1023,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 onClick={() => setSelectedSymbol(m.symbol)}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap flex items-center gap-1.5 transition-all ${
                   active
-                    ? 'bg-[#00E0B8] text-[#041214] shadow-[0_0_16px_rgba(0,224,184,0.3)] font-bold'
+                    ? 'bg-[#D7F626] text-[#080A0D] shadow-[0_0_16px_rgba(215,246,38,0.28)] font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
                 }`}
               >
@@ -1009,7 +1033,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             );
           })}
 
-          {/* Searchable All Markets Picker */}
+          {/* Searchable Categorized All-Markets Picker */}
           <div className="relative">
             <button
               type="button"
@@ -1017,56 +1041,98 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 setMarketQuery('');
                 setShowMarketPicker((v) => !v);
               }}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap flex items-center gap-1 bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] text-slate-200"
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono whitespace-nowrap flex items-center gap-1.5 border transition-all ${
+                showMarketPicker
+                  ? 'bg-[#D7F626]/15 border-[#D7F626]/45 text-[#D7F626] font-bold'
+                  : 'bg-[#D7F626]/10 hover:bg-[#D7F626]/20 border-[#D7F626]/30 text-[#D7F626] font-semibold'
+              }`}
             >
-              <span>All ({orderedMarkets.length})</span>
+              <span>All Markets ({orderedMarkets.length})</span>
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
             {showMarketPicker && (
-              <div className="absolute left-0 top-full mt-1.5 w-80 panel-carbon border border-white/[0.14] rounded-xl shadow-2xl p-2.5 z-50">
-                <div className="relative mb-2">
+              <div className="absolute left-0 top-full mt-1.5 w-80 sm:w-[460px] panel-carbon border border-white/[0.14] rounded-2xl shadow-2xl p-3 z-50">
+                <div className="relative mb-2.5">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                   <input
                     type="text"
                     autoFocus
                     value={marketQuery}
                     onChange={(e) => setMarketQuery(e.target.value)}
-                    placeholder="Search symbol (e.g. BTC, SOL, PEPE)..."
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#070B10] border border-white/[0.1] text-xs font-mono text-white outline-none focus:border-[#00E0B8]"
+                    placeholder="Search 72 markets (BTC, SUI, NVDA, TSLA, XAUT, US100)..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#0A0C10] border border-white/[0.1] text-xs font-mono text-white outline-none focus:border-[#D7F626]"
                   />
                 </div>
-                <div className="max-h-64 overflow-y-auto divide-y divide-white/[0.05]">
-                  {filteredPickerMarkets.map((m) => (
+                <div className="flex flex-wrap gap-1 mb-2.5">
+                  {(
+                    [
+                      { id: 'all', label: `All (${orderedMarkets.length})` },
+                      { id: 'crypto', label: 'Crypto' },
+                      { id: 'equities', label: 'Stocks / RWA' },
+                      { id: 'commodities', label: 'Commodities' },
+                      { id: 'fx_indices', label: 'Indices & FX' },
+                    ] as const
+                  ).map((cat) => (
                     <button
-                      key={m.marketId}
+                      key={cat.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedSymbol(m.symbol);
-                        setShowMarketPicker(false);
-                      }}
-                      className={`w-full px-2 py-2 flex items-center justify-between text-xs font-mono rounded hover:bg-white/[0.06] ${
-                        m.symbol === activeMarket?.symbol ? 'bg-[#00E0B8]/15 text-[#2AF5D2]' : 'text-slate-200'
+                      onClick={() => setMarketCategory(cat.id)}
+                      className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${
+                        marketCategory === cat.id
+                          ? 'bg-[#D7F626] text-[#080A0D]'
+                          : 'bg-white/[0.05] text-slate-400 hover:text-white'
                       }`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">{m.symbol}-PERP</span>
-                        <span className="text-xs px-1 py-0.5 rounded bg-white/[0.06] text-slate-300">
-                          {m.maxLeverage}x
-                        </span>
-                      </div>
-                      <div className="text-right tabular-nums">
-                        <div className="text-white">${fmtPrice(m.markPrice)}</div>
-                        <div
-                          className={`text-xs ${
-                            m.priceChange24hPct >= 0 ? 'pnl-green' : 'pnl-red'
-                          }`}
-                        >
-                          {m.priceChange24hPct >= 0 ? '+' : ''}
-                          {m.priceChange24hPct.toFixed(2)}%
-                        </div>
-                      </div>
+                      {cat.label}
                     </button>
                   ))}
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-white/[0.05]">
+                  {filteredPickerMarkets.map((m) => {
+                    const cat = getPerpCategory(m.symbol);
+                    const catTag =
+                      cat === 'equities'
+                        ? 'RWA'
+                        : cat === 'commodities'
+                          ? 'CMD'
+                          : cat === 'fx_indices'
+                            ? 'IDX'
+                            : 'CRYP';
+                    return (
+                      <button
+                        key={m.marketId}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSymbol(m.symbol);
+                          setShowMarketPicker(false);
+                        }}
+                        className={`w-full px-2.5 py-2 flex items-center justify-between text-xs font-mono rounded-lg hover:bg-white/[0.06] ${
+                          m.symbol === activeMarket?.symbol ? 'bg-[#D7F626]/15 text-[#D7F626]' : 'text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-bold">{m.symbol}-PERP</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.06] text-slate-300">
+                            {m.maxLeverage}x
+                          </span>
+                          <span className="text-[10px] px-1 py-0.5 rounded bg-white/[0.04] text-slate-400">
+                            {catTag}
+                          </span>
+                        </div>
+                        <div className="text-right tabular-nums shrink-0">
+                          <div className="text-white">${fmtPrice(m.markPrice)}</div>
+                          <div
+                            className={`text-[11px] ${
+                              m.priceChange24hPct >= 0 ? 'text-[#00D98B]' : 'text-[#F6465D]'
+                            }`}
+                          >
+                            {m.priceChange24hPct >= 0 ? '+' : ''}
+                            {m.priceChange24hPct.toFixed(2)}%
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                   {filteredPickerMarkets.length === 0 && (
                     <div className="py-4 text-center text-xs text-slate-400 font-mono">
                       No matching Aftermath markets.
@@ -1107,7 +1173,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             </div>
             <div>
               <span className="text-slate-400 mr-1">Funding/1h</span>
-              <span className="text-[#2AF5D2]">
+              <span className="text-[#D7F626]">
                 {(activeMarket.estimatedFundingRate * 100).toFixed(4)}%
               </span>
             </div>
@@ -1125,7 +1191,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 type="button"
                 onClick={() => setChartTab('chart')}
                 className={`px-2.5 py-1 rounded text-xs font-mono ${
-                  chartTab === 'chart' ? 'bg-[#00E0B8] text-[#041214] font-semibold' : 'text-slate-300'
+                  chartTab === 'chart' ? 'bg-[#D7F626] text-[#080A0D] font-semibold' : 'text-slate-300'
                 }`}
               >
                 Price Chart
@@ -1134,7 +1200,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 type="button"
                 onClick={() => setChartTab('funding')}
                 className={`px-2.5 py-1 rounded text-xs font-mono ${
-                  chartTab === 'funding' ? 'bg-[#00E0B8] text-[#041214] font-semibold' : 'text-slate-300'
+                  chartTab === 'funding' ? 'bg-[#D7F626] text-[#080A0D] font-semibold' : 'text-slate-300'
                 }`}
               >
                 Funding History ({fundingHistory.length})
@@ -1146,16 +1212,19 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
           </div>
 
           {chartTab === 'chart' ? (
-            <ProCandleChart
-              symbolLabel={`${activeMarket?.symbol || selectedSymbol}-PERP · Aftermath`}
-              sourceLabel={candleSourceLabel}
-              candles={candles}
-              timeframe={timeframe}
-              onTimeframeChange={setTimeframe}
-              isLoading={candlesLoading}
-              livePrice={markPrice}
-              heightClass="h-[420px] lg:h-[520px] xl:h-[560px]"
-            />
+            <div className="panel-carbon rounded-2xl p-3">
+              <ProCandleChart
+                symbolLabel={`${activeMarket?.symbol || selectedSymbol}-PERP · Aftermath`}
+                sourceLabel={candleSourceLabel}
+                candles={candles}
+                timeframe={timeframe}
+                onTimeframeChange={setTimeframe}
+                isLoading={candlesLoading}
+                livePrice={markPrice}
+                tvSymbol={resolveTradingViewSymbol(activeMarket?.symbol || selectedSymbol)}
+                heightClass="h-[420px] lg:h-[505px] xl:h-[525px]"
+              />
+            </div>
           ) : (
             <div className="panel-carbon rounded-2xl p-3 h-[460px] lg:h-[560px] xl:h-[600px] overflow-y-auto">
               <div className="text-xs font-semibold text-white mb-2">
@@ -1188,14 +1257,14 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* Orderbook & Recent Trades Column */}
-        <div className="lg:col-span-3 xl:col-span-2 panel-carbon rounded-2xl p-3.5 flex flex-col">
+        <div className="lg:col-span-3 xl:col-span-2 panel-carbon rounded-2xl p-3.5 flex flex-col h-[500px] lg:h-[612px] overflow-hidden">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1 bg-white/[0.04] p-0.5 rounded-lg border border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => setBookTab('book')}
                 className={`px-2 py-1 rounded text-xs font-mono ${
-                  bookTab === 'book' ? 'bg-[#00E0B8] text-[#041214] font-semibold' : 'text-slate-300'
+                  bookTab === 'book' ? 'bg-[#D7F626] text-[#080A0D] font-semibold' : 'text-slate-300'
                 }`}
               >
                 Orderbook
@@ -1204,7 +1273,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 type="button"
                 onClick={() => setBookTab('trades')}
                 className={`px-2 py-1 rounded text-xs font-mono ${
-                  bookTab === 'trades' ? 'bg-[#00E0B8] text-[#041214] font-semibold' : 'text-slate-300'
+                  bookTab === 'trades' ? 'bg-[#D7F626] text-[#080A0D] font-semibold' : 'text-slate-300'
                 }`}
               >
                 Recent Trades
@@ -1222,8 +1291,8 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 <span className="text-right">Size</span>
                 <span className="text-right">Total</span>
               </div>
-              <div className="flex-1 flex flex-col justify-between my-1 space-y-0.5 text-xs font-mono tabular-nums">
-                <div className="space-y-0.5">
+              <div className="flex-1 min-h-0 flex flex-col justify-between my-1 text-xs font-mono tabular-nums overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col justify-end space-y-0.5 overflow-hidden">
                   {orderbook.asks.slice(-8).map((lv, i) => (
                     <button
                       key={`a-${i}`}
@@ -1237,19 +1306,19 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                           width: `${Math.min(100, (lv.totalSize / Math.max(1, orderbook.asks[0]?.totalSize || 1)) * 100)}%`,
                         }}
                       />
-                      <span className="relative pnl-red">{fmtPrice(lv.price)}</span>
+                      <span className="relative text-[#F6465D] font-semibold">{fmtPrice(lv.price)}</span>
                       <span className="relative text-right text-slate-200">{lv.size.toFixed(2)}</span>
                       <span className="relative text-right text-slate-400">{lv.totalSize.toFixed(1)}</span>
                     </button>
                   ))}
                 </div>
 
-                <div className="py-1.5 px-2 my-1 rounded bg-white/[0.04] border border-white/[0.08] flex items-center justify-between text-xs font-mono">
-                  <span className="text-white font-bold">${fmtPrice(markPrice)}</span>
-                  <span className="text-xs text-slate-400">Mark Price</span>
+                <div className="py-1.5 px-2 my-1 rounded-lg bg-[#090B0E] border border-white/[0.08] flex items-center justify-between text-xs font-mono shrink-0">
+                  <span className="text-[#D7F626] font-bold">${fmtPrice(markPrice)}</span>
+                  <span className="text-[11px] text-slate-400">Mark Price</span>
                 </div>
 
-                <div className="space-y-0.5">
+                <div className="flex-1 min-h-0 flex flex-col justify-start space-y-0.5 overflow-hidden">
                   {orderbook.bids.slice(0, 8).map((lv, i) => (
                     <button
                       key={`b-${i}`}
@@ -1258,12 +1327,12 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       className="w-full relative grid grid-cols-3 py-0.5 px-1 rounded overflow-hidden hover:bg-white/[0.08] text-left cursor-pointer"
                     >
                       <span
-                        className="absolute right-0 top-0 bottom-0 bg-[#0ECB81]/15"
+                        className="absolute right-0 top-0 bottom-0 bg-[#00D98B]/15"
                         style={{
                           width: `${Math.min(100, (lv.totalSize / Math.max(1, orderbook.bids.slice(-1)[0]?.totalSize || 1)) * 100)}%`,
                         }}
                       />
-                      <span className="relative pnl-green">{fmtPrice(lv.price)}</span>
+                      <span className="relative text-[#00D98B] font-semibold">{fmtPrice(lv.price)}</span>
                       <span className="relative text-right text-slate-200">{lv.size.toFixed(2)}</span>
                       <span className="relative text-right text-slate-400">{lv.totalSize.toFixed(1)}</span>
                     </button>
@@ -1386,7 +1455,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
           </div>
 
           {/* 5 Order Mode Tabs */}
-          <div className="grid grid-cols-5 gap-1 p-0.5 rounded-lg bg-[#070B10] border border-white/[0.08] text-xs font-mono">
+          <div className="grid grid-cols-5 gap-1 p-0.5 rounded-lg bg-[#0A0C10] border border-white/[0.08] text-xs font-mono">
             {(['market', 'limit', 'stop', 'scale', 'twap'] as OrderMode[]).map((m) => (
               <button
                 key={m}
@@ -1394,7 +1463,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 onClick={() => setOrderMode(m)}
                 className={`py-1.5 rounded capitalize transition-all ${
                   orderMode === m
-                    ? 'bg-[#00E0B8] text-[#041214] font-bold shadow'
+                    ? 'bg-[#D7F626] text-[#080A0D] font-bold shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -1409,7 +1478,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               <span className="text-slate-300">
                 Leverage (Max {activeMarket?.maxLeverage || 20}x)
               </span>
-              <span className="text-[#2AF5D2] font-bold tabular-nums">{leverage}x</span>
+              <span className="text-[#D7F626] font-bold tabular-nums">{leverage}x</span>
             </div>
             <input
               type="range"
@@ -1417,7 +1486,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               max={activeMarket?.maxLeverage || 20}
               value={leverage}
               onChange={(e) => setLeverage(Number(e.target.value))}
-              className="w-full accent-[#00E0B8] cursor-pointer"
+              className="w-full accent-[#D7F626] cursor-pointer"
             />
             {leverageNeedsApply && activePosition && (
               <div className="flex items-center justify-between gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-1 text-xs font-mono">
@@ -1455,7 +1524,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       const p = side === 'long' ? orderbook.bestBid || markPrice : orderbook.bestAsk || markPrice;
                       if (p > 0) setLimitPrice(fmtPrice(p).replace(/,/g, ''));
                     }}
-                    className="px-1.5 py-0.5 rounded bg-[#00E0B8]/20 text-[#2AF5D2]"
+                    className="px-1.5 py-0.5 rounded bg-[#D7F626]/20 text-[#D7F626]"
                   >
                     Best
                   </button>
@@ -1468,7 +1537,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
                 placeholder={markPrice > 0 ? fmtPrice(markPrice) : '0.00'}
-                className="w-full bg-[#070B10] border border-white/[0.1] rounded px-2.5 py-1.5 text-sm font-mono text-white outline-none focus:border-[#00E0B8]"
+                className="w-full bg-[#0A0C10] border border-white/[0.1] rounded px-2.5 py-1.5 text-sm font-mono text-white outline-none focus:border-[#D7F626]"
               />
               <div className="grid grid-cols-4 gap-1 text-xs font-mono">
                 {([
@@ -1483,7 +1552,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     onClick={() => setLimitOrderType(val)}
                     className={`py-1 rounded border ${
                       limitOrderType === val
-                        ? 'bg-[#00E0B8]/20 border-[#00E0B8]/70 text-[#2AF5D2] font-bold'
+                        ? 'bg-[#D7F626]/20 border-[#D7F626]/70 text-[#D7F626] font-bold'
                         : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:text-white'
                     }`}
                   >
@@ -1501,7 +1570,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   type="button"
                   onClick={() => setStopIsLimit(false)}
                   className={`py-1 rounded ${
-                    !stopIsLimit ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06] text-slate-300'
+                    !stopIsLimit ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06] text-slate-300'
                   }`}
                 >
                   Stop Market
@@ -1510,7 +1579,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   type="button"
                   onClick={() => setStopIsLimit(true)}
                   className={`py-1 rounded ${
-                    stopIsLimit ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06] text-slate-300'
+                    stopIsLimit ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06] text-slate-300'
                   }`}
                 >
                   Stop Limit
@@ -1550,7 +1619,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   if (n > 0 && markPrice > 0) setStopTriggerAbove(n >= markPrice);
                 }}
                 placeholder={`Trigger @ (${fmtPrice(markPrice)})`}
-                className="w-full bg-[#070B10] border border-white/[0.1] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#00E0B8]"
+                className="w-full bg-[#0A0C10] border border-white/[0.1] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#D7F626]"
               />
               {stopIsLimit && (
                 <input
@@ -1560,7 +1629,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   value={stopLimitPrice}
                   onChange={(e) => setStopLimitPrice(e.target.value)}
                   placeholder="Limit Execution Price (USD)"
-                  className="w-full bg-[#070B10] border border-white/[0.1] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#00E0B8]"
+                  className="w-full bg-[#0A0C10] border border-white/[0.1] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#D7F626]"
                 />
               )}
               <div className="flex items-center justify-between text-xs text-slate-400">
@@ -1576,7 +1645,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       type="button"
                       onClick={() => setStopTriggerSource(val)}
                       className={`px-1.5 py-0.5 rounded ${
-                        stopTriggerSource === val ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06]'
+                        stopTriggerSource === val ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06]'
                       }`}
                     >
                       {lbl}
@@ -1598,7 +1667,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     value={scaleStartPrice}
                     onChange={(e) => setScaleStartPrice(e.target.value)}
                     placeholder={markPrice > 0 ? fmtPrice(markPrice * 0.96) : '0.00'}
-                    className="w-full bg-[#070B10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#00E0B8]"
+                    className="w-full bg-[#0A0C10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#D7F626]"
                   />
                 </div>
                 <div>
@@ -1609,7 +1678,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     value={scaleEndPrice}
                     onChange={(e) => setScaleEndPrice(e.target.value)}
                     placeholder={markPrice > 0 ? fmtPrice(markPrice * 0.9) : '0.00'}
-                    className="w-full bg-[#070B10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#00E0B8]"
+                    className="w-full bg-[#0A0C10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#D7F626]"
                   />
                 </div>
               </div>
@@ -1621,7 +1690,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   max={15}
                   value={scaleCount}
                   onChange={(e) => setScaleCount(Number(e.target.value))}
-                  className="w-28 accent-[#00E0B8]"
+                  className="w-28 accent-[#D7F626]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-1 text-xs">
@@ -1635,7 +1704,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     onClick={() => setLimitOrderType(val)}
                     className={`py-1 rounded border ${
                       limitOrderType === val
-                        ? 'bg-[#00E0B8]/20 border-[#00E0B8]/70 text-[#2AF5D2] font-bold'
+                        ? 'bg-[#D7F626]/20 border-[#D7F626]/70 text-[#D7F626] font-bold'
                         : 'bg-white/[0.04] border-white/[0.08] text-slate-400'
                     }`}
                   >
@@ -1656,7 +1725,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   max={25}
                   value={twapChunks}
                   onChange={(e) => setTwapChunks(Number(e.target.value))}
-                  className="w-32 accent-[#00E0B8]"
+                  className="w-32 accent-[#D7F626]"
                 />
               </div>
               <div className="flex items-center justify-between text-xs">
@@ -1668,7 +1737,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       type="button"
                       onClick={() => setTwapGapSec(sec)}
                       className={`px-1.5 py-0.5 rounded ${
-                        twapGapSec === sec ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06] text-slate-300'
+                        twapGapSec === sec ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06] text-slate-300'
                       }`}
                     >
                       {sec < 60 ? `${sec}s` : `${sec / 60}m`}
@@ -1689,7 +1758,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       type="button"
                       onClick={() => setTwapMaxSlipBps(Number(bps))}
                       className={`px-1.5 py-0.5 rounded ${
-                        twapMaxSlipBps === bps ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06] text-slate-300'
+                        twapMaxSlipBps === bps ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06] text-slate-300'
                       }`}
                     >
                       {lbl}
@@ -1764,7 +1833,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     setReduceContracts(Math.abs(activePosition.baseAssetAmount).toFixed(4));
                   }
                 }}
-                className="accent-[#00E0B8]"
+                className="accent-[#D7F626]"
               />
               <span>Reduce Only</span>
             </label>
@@ -1775,7 +1844,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   type="checkbox"
                   checked={enableSlTp}
                   onChange={(e) => setEnableSlTp(e.target.checked)}
-                  className="accent-[#00E0B8]"
+                  className="accent-[#D7F626]"
                 />
                 <span>TP / SL</span>
               </label>
@@ -1790,7 +1859,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     type="button"
                     onClick={() => setSlippagePct(v)}
                     className={`px-1.5 py-0.5 rounded ${
-                      slippagePct === v ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06] text-slate-400'
+                      slippagePct === v ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06] text-slate-400'
                     }`}
                   >
                     {v}%
@@ -1815,7 +1884,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                         ? fmtPrice(side === 'long' ? markPrice * 1.15 : markPrice * 0.85)
                         : 'Optional'
                     }
-                    className="w-full bg-[#070B10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#00E599]"
+                    className="w-full bg-[#0A0C10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#00E599]"
                   />
                 </div>
                 <div>
@@ -1830,7 +1899,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                         ? fmtPrice(side === 'long' ? markPrice * 0.92 : markPrice * 1.08)
                         : 'Optional'
                     }
-                    className="w-full bg-[#070B10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#FF4D6A]"
+                    className="w-full bg-[#0A0C10] border border-white/[0.1] rounded px-2 py-1 text-white outline-none focus:border-[#FF4D6A]"
                   />
                 </div>
               </div>
@@ -1847,7 +1916,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       type="button"
                       onClick={() => setSlTpTriggerType(val)}
                       className={`px-1.5 py-0.5 rounded ${
-                        slTpTriggerType === val ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06]'
+                        slTpTriggerType === val ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06]'
                       }`}
                     >
                       {lbl}
@@ -1870,7 +1939,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             </div>
             <div className="flex justify-between text-slate-300">
               <span>Volt Tier Fee ({traderTier.name})</span>
-              <span className="text-[#2AF5D2]">
+              <span className="text-[#D7F626]">
                 {reduceOnly ? '0.00% (Reduce)' : `${(traderTier.feeRate * 100).toFixed(2)}%`}
               </span>
             </div>
@@ -1917,7 +1986,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 onClick={() => setBottomTab(tabId)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
                   bottomTab === tabId
-                    ? 'bg-[#00E0B8] text-[#041214] font-bold'
+                    ? 'bg-[#D7F626] text-[#080A0D] font-bold'
                     : 'text-slate-300 hover:text-white hover:bg-white/[0.05]'
                 }`}
               >
@@ -2007,7 +2076,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                                 setModalTp('');
                                 setModalSl('');
                               }}
-                              className="px-2 py-1 rounded bg-[#00E0B8]/15 hover:bg-[#00E0B8]/25 text-[#2AF5D2] border border-[#00E0B8]/35 inline-flex items-center gap-1"
+                              className="px-2 py-1 rounded bg-[#D7F626]/15 hover:bg-[#D7F626]/25 text-[#D7F626] border border-[#D7F626]/35 inline-flex items-center gap-1"
                             >
                               <ShieldAlert className="w-3 h-3" />
                               TP/SL
@@ -2055,7 +2124,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                                   orderType: 'PERPS',
                                 })
                               }
-                              className="px-2 py-1 rounded bg-[#00E0B8]/15 hover:bg-[#00E0B8]/25 text-[#2AF5D2] border border-[#00E0B8]/35 inline-flex items-center gap-1"
+                              className="px-2 py-1 rounded bg-[#D7F626]/15 hover:bg-[#D7F626]/25 text-[#D7F626] border border-[#D7F626]/35 inline-flex items-center gap-1"
                             >
                               <Share2 className="w-3 h-3" />
                             </button>
@@ -2163,7 +2232,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => loadSignedOrders('stops')}
-                  className="text-[#2AF5D2] hover:underline"
+                  className="text-[#D7F626] hover:underline"
                 >
                   Refresh
                 </button>
@@ -2200,7 +2269,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                                 ? `${so.nonSlTp.triggerIfGeStopIndexPrice ? '>=' : '<='} $${fmtPrice(so.nonSlTp.stopIndexPrice)}${so.limitPrice ? ` → Limit $${fmtPrice(so.limitPrice)}` : ''}`
                                 : '—'}
                           </td>
-                          <td className="py-2 uppercase text-xs text-[#2AF5D2]">{so.orderState}</td>
+                          <td className="py-2 uppercase text-xs text-[#D7F626]">{so.orderState}</td>
                           <td className="py-2 text-right">
                             <button
                               type="button"
@@ -2249,7 +2318,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => loadSignedOrders('twap')}
-                  className="text-[#2AF5D2] hover:underline"
+                  className="text-[#D7F626] hover:underline"
                 >
                   Refresh
                 </button>
@@ -2282,7 +2351,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                           <td className="py-2">
                             {tw.chunksAmount}x every {Math.round(tw.executionGapMs / 1000)}s
                           </td>
-                          <td className="py-2 uppercase text-xs text-[#2AF5D2]">{tw.orderState}</td>
+                          <td className="py-2 uppercase text-xs text-[#D7F626]">{tw.orderState}</td>
                           <td className="py-2 text-right">
                             <button
                               type="button"
@@ -2382,7 +2451,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                                 href={`https://suiscan.xyz/mainnet/tx/${h.txDigest}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[#2AF5D2] hover:underline"
+                                className="inline-flex items-center gap-1 text-[#D7F626] hover:underline"
                               >
                                 {h.txDigest.slice(0, 6)}...
                                 <ExternalLink className="w-3 h-3" />
@@ -2429,7 +2498,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                               href={`https://suiscan.xyz/mainnet/tx/${c.txDigest}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[#2AF5D2] hover:underline"
+                              className="inline-flex items-center gap-1 text-[#D7F626] hover:underline"
                             >
                               {c.txDigest.slice(0, 6)}...
                               <ExternalLink className="w-3 h-3" />
@@ -2528,7 +2597,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   value={modalTp}
                   onChange={(e) => setModalTp(e.target.value)}
                   placeholder="Optional TP Price"
-                  className="w-full bg-[#070B10] border border-white/[0.12] rounded-lg px-3 py-2 text-white outline-none focus:border-[#00E599]"
+                  className="w-full bg-[#0A0C10] border border-white/[0.12] rounded-lg px-3 py-2 text-white outline-none focus:border-[#00E599]"
                 />
               </div>
               <div>
@@ -2539,7 +2608,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   value={modalSl}
                   onChange={(e) => setModalSl(e.target.value)}
                   placeholder="Optional SL Price"
-                  className="w-full bg-[#070B10] border border-white/[0.12] rounded-lg px-3 py-2 text-white outline-none focus:border-[#FF4D6A]"
+                  className="w-full bg-[#0A0C10] border border-white/[0.12] rounded-lg px-3 py-2 text-white outline-none focus:border-[#FF4D6A]"
                 />
               </div>
               <div className="flex items-center justify-between text-slate-300">
@@ -2555,7 +2624,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       type="button"
                       onClick={() => setModalTriggerSrc(val)}
                       className={`px-2 py-1 rounded ${
-                        modalTriggerSrc === val ? 'bg-[#00E0B8] text-[#041214] font-bold' : 'bg-white/[0.06]'
+                        modalTriggerSrc === val ? 'bg-[#D7F626] text-[#080A0D] font-bold' : 'bg-white/[0.06]'
                       }`}
                     >
                       {lbl}
@@ -2606,7 +2675,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 type="button"
                 onClick={() => setMarginModalDir('remove')}
                 className={`py-2 rounded-lg font-bold ${
-                  marginModalDir === 'remove' ? 'bg-[#00E0B8] text-[#041214]' : 'bg-white/[0.06] text-slate-300'
+                  marginModalDir === 'remove' ? 'bg-[#D7F626] text-[#080A0D]' : 'bg-white/[0.06] text-slate-300'
                 }`}
               >
                 Remove Margin

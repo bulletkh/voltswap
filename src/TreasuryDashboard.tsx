@@ -284,7 +284,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-volt/15 border border-volt/30 text-[#2AF5D2] font-mono text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-volt/15 border border-volt/30 text-[#D7F626] font-mono text-xs font-bold uppercase tracking-wider">
               <ShieldCheck className="w-3.5 h-3.5" />
               Real-Time Protocol Treasury · Zero Simulations
             </div>
@@ -311,7 +311,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
               title="Refresh Live Balances & Ledger"
             >
-              <RefreshCw className={`w-4 h-4 text-[#2AF5D2] ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 text-[#D7F626] ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -321,7 +321,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           {/* Card 1: Live Vault Net Worth */}
           <div className="bg-[#151926]/80 border border-white/5 rounded-2xl p-4.5 space-y-1">
             <div className="text-gray-400 text-xs font-mono uppercase flex items-center gap-1.5">
-              <Wallet className="w-3.5 h-3.5 text-[#2AF5D2]" /> Live Treasury Net Worth
+              <Wallet className="w-3.5 h-3.5 text-[#D7F626]" /> Live Treasury Net Worth
             </div>
             <div className="text-2xl font-black text-white font-mono flex items-center gap-2">
               {isLoadingBalance ? (
@@ -330,7 +330,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                 `$${netWorthUsd.toFixed(3)} USD`
               )}
             </div>
-            <div className="text-xs text-[#2AF5D2] font-mono flex items-center gap-1.5">
+            <div className="text-xs text-[#D7F626] font-mono flex items-center gap-1.5">
               <span>≈ {netWorthSui.toFixed(3)} SUI</span>
               <span className="text-gray-500">•</span>
               <span className="text-gray-400">100% On-Chain</span>
@@ -381,23 +381,23 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         <div className="mt-6 pt-5 border-t border-white/5">
           <div className="text-xs font-mono text-gray-400 mb-3 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-[#2AF5D2]" />
+              <Layers className="w-3.5 h-3.5 text-[#D7F626]" />
               On-Chain Protocol Vault Holdings:
             </span>
             <span className="text-gray-500 text-xs">Synced via Suiscan & Sui GraphQL</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#0B1017] border border-white/5 rounded-xl p-3 font-mono">
+            <div className="bg-[#0A0C10] border border-white/5 rounded-xl p-3 font-mono">
               <div className="text-xs text-gray-400 flex items-center justify-between">
                 <span>SUI</span>
-                <span className="text-[#2AF5D2] font-bold">${(treasurySuiBalance * suiPriceUsd).toFixed(2)}</span>
+                <span className="text-[#D7F626] font-bold">${(treasurySuiBalance * suiPriceUsd).toFixed(2)}</span>
               </div>
               <div className="text-sm font-bold text-white mt-1">
                 {treasurySuiBalance.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} SUI
               </div>
             </div>
 
-            <div className="bg-[#0B1017] border border-white/5 rounded-xl p-3 font-mono">
+            <div className="bg-[#0A0C10] border border-white/5 rounded-xl p-3 font-mono">
               <div className="text-xs text-gray-400 flex items-center justify-between">
                 <span>USDC</span>
                 <span className="text-emerald-400 font-bold">${usdcBalance.toFixed(2)}</span>
@@ -407,7 +407,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-[#0B1017] border border-white/5 rounded-xl p-3 font-mono">
+            <div className="bg-[#0A0C10] border border-white/5 rounded-xl p-3 font-mono">
               <div className="text-xs text-gray-400 flex items-center justify-between">
                 <span>VOLT Token</span>
                 <span className="text-cyan-400 font-bold">Genesis</span>
@@ -417,7 +417,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-[#0B1017] border border-white/5 rounded-xl p-3 font-mono">
+            <div className="bg-[#0A0C10] border border-white/5 rounded-xl p-3 font-mono">
               <div className="text-xs text-gray-400 flex items-center justify-between">
                 <span>HAEDAL</span>
                 <span className="text-purple-400 font-bold">Rewards</span>
@@ -433,7 +433,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         <div className="mt-5 pt-4 border-t border-white/5 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
           <div className="flex items-center gap-2">
             <span className="text-gray-400">Treasury Vault:</span>
-            <code className="bg-[#0B1017] px-2.5 py-1 rounded-lg text-[#2AF5D2] border border-white/5 select-all">
+            <code className="bg-[#0A0C10] px-2.5 py-1 rounded-lg text-[#D7F626] border border-white/5 select-all">
               {VOLT_TREASURY_ADDRESS}
             </code>
             <button
@@ -461,12 +461,12 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       {/* Stream Breakdown Cards (Authentic Data) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Stream 1: Market DEX Swaps */}
-        <div className="bg-[#121821] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-[#101318] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between">
-            <div className="w-10 h-10 rounded-2xl bg-volt/10 border border-volt/20 flex items-center justify-center text-[#2AF5D2]">
+            <div className="w-10 h-10 rounded-2xl bg-volt/10 border border-volt/20 flex items-center justify-center text-[#D7F626]">
               <Zap className="w-5 h-5 fill-volt" />
             </div>
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[#00E0B8]/15 text-[#2AF5D2] border border-[#00E0B8]/30">
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-[#D7F626]/15 text-[#D7F626] border border-[#D7F626]/30">
               0.03% - 0.25% VIP Fee
             </span>
           </div>
@@ -491,7 +491,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
 
         {/* Stream 2: Bluefin Perps Clearing */}
-        <div className="bg-[#121821] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-[#101318] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
               <TrendingUp className="w-5 h-5" />
@@ -521,7 +521,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
 
         {/* Stream 3: DeepBook Limit Orders */}
-        <div className="bg-[#121821] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-[#101318] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
               <Target className="w-5 h-5" />
@@ -552,11 +552,11 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       </div>
 
       {/* REAL ON-CHAIN TRANSACTION LEDGER */}
-      <div className="bg-[#121821] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
+      <div className="bg-[#101318] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
           <div>
             <h2 className="text-lg font-black text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-[#2AF5D2]" />
+              <Activity className="w-5 h-5 text-[#D7F626]" />
               On-Chain Verified Transactions Ledger
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
@@ -565,8 +565,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-lg bg-[#0B1017] border border-white/5 text-xs font-mono text-gray-300">
-              Total Transactions: <strong className="text-[#2AF5D2]">{recordedSwaps.length}</strong>
+            <span className="px-2.5 py-1 rounded-lg bg-[#0A0C10] border border-white/5 text-xs font-mono text-gray-300">
+              Total Transactions: <strong className="text-[#D7F626]">{recordedSwaps.length}</strong>
             </span>
           </div>
         </div>
@@ -607,7 +607,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                       <td className="py-3 px-3 text-gray-400 whitespace-nowrap">{timeFormatted}</td>
                       <td className="py-3 px-3 text-gray-300">
                         <div className="flex items-center gap-1.5 max-w-[320px] sm:max-w-none">
-                          <code className="text-xs font-mono text-cyan-300 bg-[#0B1017] px-2 py-0.5 rounded border border-white/10 select-all break-all">
+                          <code className="text-xs font-mono text-cyan-300 bg-[#0A0C10] px-2 py-0.5 rounded border border-white/10 select-all break-all">
                             {fullTraderAddr}
                           </code>
                           <button
@@ -642,7 +642,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                             ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                             : String(item.swapMode).toLowerCase().includes('limit')
                             ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
-                            : 'bg-[#00E0B8]/15 text-[#2AF5D2] border border-[#00E0B8]/30'
+                            : 'bg-[#D7F626]/15 text-[#D7F626] border border-[#D7F626]/30'
                         }`}>
                           {item.swapMode || 'Market'}
                         </span>
@@ -673,11 +673,11 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       </div>
 
       {/* Protocol Ownership & Direct Sui Management */}
-      <div className="bg-[#121821] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
+      <div className="bg-[#101318] border border-white/10 rounded-3xl p-6 shadow-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-[#2AF5D2]" />
+              <Lock className="w-4 h-4 text-[#D7F626]" />
               <h3 className="font-bold text-base text-white">Protocol Treasury Ownership</h3>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono font-bold">
                 Owner Verified

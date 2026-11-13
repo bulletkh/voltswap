@@ -737,6 +737,75 @@ try {
   fail('DeepBook v3 Margin Mainnet Simulation', e?.stack || e?.message || String(e));
 }
 
+// 9. DeepBook v3 1-TX Spot CLOB Market Order (Deposit SUI -> place_market_order -> withdraw_settled_amounts -> withdraw_all -> Share)
+try {
+  const tx = new Transaction();
+  tx.setSender(WALLET);
+  const manager = tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::new_with_custom_owner`,
+    arguments: [tx.pure.address(WALLET)],
+  });
+  const depositCoin = coinWithBalance({ type: SUI_TYPE, balance: 1_010_000_000n })(tx);
+  tx.moveCall({
+    package: DEEPBOOK_PACKAGE_ID,
+    module: 'balance_manager',
+    function: 'deposit',
+    arguments: [manager, depositCoin],
+    typeArguments: [SUI_TYPE],
+  });
+  const tradeProof = tx.moveCall({
+    package: DEEPBOOK_PACKAGE_ID,
+    module: 'balance_manager',
+    function: 'generate_proof_as_owner',
+    arguments: [manager],
+  });
+  tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::pool::place_market_order`,
+    arguments: [
+      tx.object(SUI_USDC_POOL_ID),
+      manager,
+      tradeProof,
+      tx.pure.u64(BigInt(Date.now() + 77)),
+      tx.pure.u8(SelfMatchingOptions.SELF_MATCHING_ALLOWED),
+      tx.pure.u64(1_000_000_000n),
+      tx.pure.bool(false),
+      tx.pure.bool(false),
+      tx.object('0x6'),
+    ],
+    typeArguments: [SUI_TYPE, USDC_TYPE],
+  });
+  tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::pool::withdraw_settled_amounts`,
+    arguments: [tx.object(SUI_USDC_POOL_ID), manager, tradeProof],
+    typeArguments: [SUI_TYPE, USDC_TYPE],
+  });
+  const outBase = tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+    arguments: [manager],
+    typeArguments: [SUI_TYPE],
+  });
+  const outQuote = tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+    arguments: [manager],
+    typeArguments: [USDC_TYPE],
+  });
+  tx.transferObjects([outBase, outQuote], WALLET);
+  tx.moveCall({
+    target: '0x2::transfer::public_share_object',
+    arguments: [manager],
+    typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`],
+  });
+
+  const mktEff = await simulateGrpcOrGql(tx);
+  if (mktEff?.status === 'SUCCESS') {
+    pass('DeepBook v3 1-TX Spot Market Order (SUI_USDC)', 'Create + Deposit + MarketSell + Settle + WithdrawAll + Share');
+  } else {
+    fail('DeepBook v3 1-TX Spot Market Order (SUI_USDC)', JSON.stringify(mktEff));
+  }
+} catch (e) {
+  fail('DeepBook v3 1-TX Spot Market Order (SUI_USDC)', e?.stack || e?.message || String(e));
+}
+
 if (failures > 0) {
   console.error(`\n${failures} simulation check(s) failed.`);
   process.exit(1);

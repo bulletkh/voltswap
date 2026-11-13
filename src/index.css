@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --dapp-kit-background: #0d1219;
+  --dapp-kit-background: #0c0f14;
   --dapp-kit-foreground: #f8fafc;
-  --dapp-kit-primary: #00e0b8;
-  --dapp-kit-primary-foreground: #051316;
-  --dapp-kit-secondary: #151c26;
+  --dapp-kit-primary: #d7f626;
+  --dapp-kit-primary-foreground: #080a0d;
+  --dapp-kit-secondary: #151922;
   --dapp-kit-secondary-foreground: #f8fafc;
   --dapp-kit-border: rgba(255, 255, 255, 0.12);
-  --dapp-kit-accent: rgba(0, 224, 184, 0.16);
-  --dapp-kit-accent-foreground: #2af5d2;
-  --dapp-kit-muted: #151c26;
+  --dapp-kit-accent: rgba(215, 246, 38, 0.14);
+  --dapp-kit-accent-foreground: #e9ff52;
+  --dapp-kit-muted: #151922;
   --dapp-kit-muted-foreground: #cbd5e1;
-  --dapp-kit-popover: #111720;
+  --dapp-kit-popover: #101318;
   --dapp-kit-popover-foreground: #f8fafc;
   --dapp-kit-positive: #00d98b;
   --dapp-kit-destructive: #f6465d;
-  --dapp-kit-ring: #00e0b8;
+  --dapp-kit-ring: #d7f626;
   --dapp-kit-radius: 14px;
 }
 
@@ -32,13 +32,13 @@
   }
 
   html, body {
-    background-color: #0a0e13;
+    background-color: #090b0e;
     background-image:
-      radial-gradient(ellipse 68% 44% at 48% 12%, rgba(0, 224, 184, 0.11), transparent 68%),
-      radial-gradient(circle at 72% 24%, rgba(0, 184, 255, 0.075), transparent 52%),
-      radial-gradient(ellipse 90% 30% at 50% 100%, rgba(0, 224, 184, 0.06), transparent 60%);
+      radial-gradient(ellipse 68% 42% at 48% 10%, rgba(215, 246, 38, 0.065), transparent 68%),
+      radial-gradient(circle at 76% 24%, rgba(0, 217, 139, 0.04), transparent 52%),
+      radial-gradient(ellipse 85% 28% at 50% 100%, rgba(215, 246, 38, 0.045), transparent 62%);
     background-attachment: fixed;
-    @apply text-slate-100 font-sans antialiased selection:bg-[#00E0B8] selection:text-[#041214];
+    @apply text-slate-100 font-sans antialiased selection:bg-[#D7F626] selection:text-[#080A0D];
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden !important;
@@ -46,26 +46,34 @@
 }
 
 .panel-carbon {
-  background: #121821;
+  background: #101318;
   border: 1px solid rgba(255, 255, 255, 0.085);
-  box-shadow: 0 12px 36px -14px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 12px 36px -14px rgba(0, 0, 0, 0.85);
 }
 
 .panel-carbon-sub {
-  background: #0b1017;
+  background: #0a0c10;
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.pnl-green {
+  color: #00d98b;
+}
+
+.pnl-red {
+  color: #f6465d;
+}
+
 .btn-deepbook {
-  background: linear-gradient(135deg, #00e0b8 0%, #00c2ff 100%);
-  color: #041214;
-  font-weight: 700;
-  box-shadow: 0 0 24px rgba(0, 224, 184, 0.28);
+  background: linear-gradient(135deg, #e7ff4d 0%, #d7f626 55%, #b5e600 100%);
+  color: #080a0d;
+  font-weight: 800;
+  box-shadow: 0 0 22px rgba(215, 246, 38, 0.24);
 }
 
 .btn-deepbook:hover {
-  background: linear-gradient(135deg, #1ef0ca 0%, #24ccff 100%);
-  box-shadow: 0 0 30px rgba(0, 224, 184, 0.45);
+  background: linear-gradient(135deg, #f3ff78 0%, #e1ff38 55%, #c5f700 100%);
+  box-shadow: 0 0 28px rgba(215, 246, 38, 0.42);
 }
 
 input[type='number']::-webkit-inner-spin-button,
@@ -89,9 +97,9 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 9999px;
-  background: #00e0b8;
-  border: 2px solid #041214;
-  box-shadow: 0 0 12px rgba(0, 224, 184, 0.75);
+  background: #d7f626;
+  border: 2px solid #080a0d;
+  box-shadow: 0 0 12px rgba(215, 246, 38, 0.75);
   cursor: pointer;
 }
 
@@ -114,7 +122,7 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0e13;
+  background: #090b0e;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -123,7 +131,7 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 224, 184, 0.55);
+  background: rgba(215, 246, 38, 0.55);
 }
 
 @keyframes slideUpSheet {

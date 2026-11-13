@@ -75,23 +75,23 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/80">
       <div className="panel-carbon w-full max-w-md h-full flex flex-col border-l border-white/[0.14]">
-        <div className="px-5 py-4 border-b border-white/[0.1] flex items-center justify-between bg-[#0B1017]">
+        <div className="px-5 py-4 border-b border-white/[0.1] flex items-center justify-between bg-[#0A0C10]">
           <div className="flex items-center gap-2.5">
-            <Wallet className="w-5 h-5 text-[#2AF5D2]" />
+            <Wallet className="w-5 h-5 text-[#D7F626]" />
             <span className="text-base font-bold text-white">Wallet Portfolio</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={loadPortfolio}
-              className="p-2 rounded-xl bg-[#0B1017] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#00E0B8]/50"
+              className="p-2 rounded-xl bg-[#0A0C10] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#D7F626]/50"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-xl bg-[#0B1017] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#00E0B8]/50"
+              className="p-2 rounded-xl bg-[#0A0C10] border border-white/[0.1] text-slate-300 hover:text-white hover:border-[#D7F626]/50"
             >
               <X className="w-4 h-4" />
             </button>
@@ -130,7 +130,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                       >
                         <div>
                           <div className="text-sm font-bold text-white font-sans">{m.coinKey} Vault</div>
-                          <div className="text-xs text-[#00E0B8]">{m.apr.toFixed(2)}% APR</div>
+                          <div className="text-xs text-[#D7F626]">{m.apr.toFixed(2)}% APR</div>
                         </div>
                         <div className="text-right tabular-nums">
                           <div className="text-sm font-semibold text-white">
@@ -151,7 +151,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     href={`https://suiscan.xyz/mainnet/account/${account.address}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-[#2AF5D2] hover:underline font-mono"
+                    className="inline-flex items-center gap-1 text-xs text-[#D7F626] hover:underline font-mono"
                   >
                     <span>Suiscan</span>
                     <ExternalLink className="w-3.5 h-3.5" />

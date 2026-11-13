@@ -1,7 +1,7 @@
 import { deepbook, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
 import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
 import { suiGrpcClient } from './suiClient';
-import { appendVoltFeeCoinSplit } from './voltFee';
+import { appendVoltFeeCoinSplit, addCoinFeeToTx } from './voltFee';
 
 export const DEEPBOOK_INDEXER = 'https://deepbook-indexer.mainnet.mystenlabs.com';
 export const DEEPBOOK_PACKAGE_ID =
@@ -550,6 +550,176 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
 
   if (params.feeMist && params.feeMist > 0n) {
     appendVoltFeeCoinSplit(tx, tx.gas, params.feeMist, params.owner, params.refSharePct ?? 0.25);
+  }
+
+  return tx;
+}
+
+
+/**
+ * Builds a DeepBook v3 Spot CLOB Market Order (Immediate-or-Cancel at Book Price).
+ * Works in 1 transaction whether or not the wallet already has a BalanceManager,
+ * settles matched proceeds immediately, and optionally withdraws output to the wallet.
+ */
+export function buildPlaceDeepBookMarketOrderTx(params: {
+  owner: string;
+  pool: DeepBookPoolMeta;
+  managerId?: string;
+  managerBaseBalance?: number;
+  managerQuoteBalance?: number;
+  quantity: number;
+  estPrice: number;
+  slippagePct?: number;
+  isBid: boolean;
+  payWithDeep?: boolean;
+  settleToWallet?: boolean;
+  feeBps?: number;
+}): Transaction {
+  const {
+    owner,
+    pool,
+    managerId,
+    managerBaseBalance = 0,
+    managerQuoteBalance = 0,
+    quantity,
+    estPrice,
+    slippagePct = 1.5,
+    isBid,
+    payWithDeep = false,
+    settleToWallet = true,
+    feeBps = 25,
+  } = params;
+
+  const tx = new Transaction();
+  tx.setSender(owner);
+
+  const baseScale = Math.pow(10, pool.baseDecimals);
+  const quoteScale = Math.pow(10, pool.quoteDecimals);
+  const lotStep = pool.lotSize > 0 ? pool.lotSize : 0.0001;
+  const alignedQty = Math.max(
+    pool.minSize || lotStep,
+    Math.floor(quantity / lotStep) * lotStep
+  );
+  const qtyRaw = BigInt(Math.round(alignedQty * baseScale));
+  const clientOrderId = BigInt(Date.now());
+  const slipFactor = 1 + Math.max(0.2, slippagePct) / 100;
+  // +0.5% cushion covers DeepBook taker input fee (~0.1%) when payWithDeep=false
+  const feeCushion = payWithDeep ? 1.001 : 1.005;
+
+  const requiredBase = alignedQty * feeCushion;
+  const requiredQuote = alignedQty * Math.max(estPrice, 0.000001) * slipFactor * feeCushion;
+
+  const inputCoinType = isBid ? pool.quoteCoinId : pool.baseCoinId;
+  const inputDecimals = isBid ? pool.quoteDecimals : pool.baseDecimals;
+  const estInputHuman = isBid ? alignedQty * Math.max(estPrice, 0.000001) : alignedQty;
+  const feeAtomic =
+    feeBps > 0
+      ? BigInt(Math.floor((estInputHuman * (feeBps / 10000)) * Math.pow(10, inputDecimals)))
+      : 0n;
+
+  if (feeAtomic > 0n) {
+    addCoinFeeToTx(tx, { coinType: inputCoinType, feeAtomic, sender: owner });
+  }
+
+  let targetManagerArg: any;
+  const isNewManager = !managerId;
+
+  if (managerId) {
+    targetManagerArg = tx.object(managerId);
+    if (isBid) {
+      const deficit = Math.max(0, requiredQuote - managerQuoteBalance);
+      const deficitRaw = BigInt(Math.ceil(deficit * quoteScale));
+      if (deficitRaw > 0n) {
+        const coin = coinWithBalance({ type: pool.quoteCoinId, balance: deficitRaw })(tx);
+        tx.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+          arguments: [targetManagerArg, coin],
+          typeArguments: [pool.quoteCoinId],
+        });
+      }
+    } else {
+      const deficit = Math.max(0, requiredBase - managerBaseBalance);
+      const deficitRaw = BigInt(Math.ceil(deficit * baseScale));
+      if (deficitRaw > 0n) {
+        const coin = coinWithBalance({ type: pool.baseCoinId, balance: deficitRaw })(tx);
+        tx.moveCall({
+          target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+          arguments: [targetManagerArg, coin],
+          typeArguments: [pool.baseCoinId],
+        });
+      }
+    }
+  } else {
+    targetManagerArg = tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::new_with_custom_owner`,
+      arguments: [tx.pure.address(owner)],
+    });
+    if (isBid) {
+      const depRaw = BigInt(Math.ceil(requiredQuote * quoteScale));
+      const coin = coinWithBalance({ type: pool.quoteCoinId, balance: depRaw })(tx);
+      tx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+        arguments: [targetManagerArg, coin],
+        typeArguments: [pool.quoteCoinId],
+      });
+    } else {
+      const depRaw = BigInt(Math.ceil(requiredBase * baseScale));
+      const coin = coinWithBalance({ type: pool.baseCoinId, balance: depRaw })(tx);
+      tx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+        arguments: [targetManagerArg, coin],
+        typeArguments: [pool.baseCoinId],
+      });
+    }
+  }
+
+  const tradeProof = tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
+    arguments: [targetManagerArg],
+  });
+
+  tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::pool::place_market_order`,
+    arguments: [
+      tx.object(pool.poolId),
+      targetManagerArg,
+      tradeProof,
+      tx.pure.u64(clientOrderId),
+      tx.pure.u8(SelfMatchingOptions.SELF_MATCHING_ALLOWED),
+      tx.pure.u64(qtyRaw),
+      tx.pure.bool(isBid),
+      tx.pure.bool(payWithDeep),
+      tx.object('0x6'),
+    ],
+    typeArguments: [pool.baseCoinId, pool.quoteCoinId],
+  });
+
+  tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::pool::withdraw_settled_amounts`,
+    arguments: [tx.object(pool.poolId), targetManagerArg, tradeProof],
+    typeArguments: [pool.baseCoinId, pool.quoteCoinId],
+  });
+
+  if (settleToWallet || isNewManager) {
+    const outBase = tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+      arguments: [targetManagerArg],
+      typeArguments: [pool.baseCoinId],
+    });
+    const outQuote = tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+      arguments: [targetManagerArg],
+      typeArguments: [pool.quoteCoinId],
+    });
+    tx.transferObjects([outBase, outQuote], owner);
+  }
+
+  if (isNewManager) {
+    tx.moveCall({
+      target: '0x2::transfer::public_share_object',
+      arguments: [targetManagerArg],
+      typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`],
+    });
   }
 
   return tx;

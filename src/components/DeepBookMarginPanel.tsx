@@ -296,7 +296,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
 
         {/* Market / Limit Order Sub-Tabs */}
         <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex rounded-xl bg-[#0B1017] border border-white/[0.08] p-1">
+          <div className="inline-flex rounded-xl bg-[#0A0C10] border border-white/[0.08] p-1">
             {(['market', 'limit'] as const).map((style) => (
               <button
                 key={style}
@@ -304,7 +304,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
                 onClick={() => setOrderStyle(style)}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold capitalize transition-all ${
                   orderStyle === style
-                    ? 'bg-[#00E0B8]/15 text-[#2AF5D2] border border-[#00E0B8]/35'
+                    ? 'bg-[#D7F626]/15 text-[#D7F626] border border-[#D7F626]/35'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -313,7 +313,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
             ))}
           </div>
 
-          <span className="text-xs font-mono text-[#2AF5D2]">
+          <span className="text-xs font-mono text-[#D7F626]">
             {riskConfig
               ? `APR ${
                   side === 'long'
@@ -331,7 +331,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
             <button
               type="button"
               onClick={() => setCollateralSide((prev) => (prev === 'quote' ? 'base' : 'quote'))}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] text-[#2AF5D2] font-mono font-semibold"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] text-[#D7F626] font-mono font-semibold"
             >
               <ArrowUpDown className="w-3 h-3" />
               <span>{collateralSide === 'quote' ? pool.quoteSymbol : pool.baseSymbol}</span>
@@ -355,7 +355,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
                 const usable = Math.max(0, bal - reserve);
                 setCollateralInput(usable > 0 ? usable.toFixed(3) : '0');
               }}
-              className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#00E0B8]/15 text-[#2AF5D2] hover:bg-[#00E0B8]/25 font-semibold shrink-0"
+              className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#D7F626]/15 text-[#D7F626] hover:bg-[#D7F626]/25 font-semibold shrink-0"
             >
               MAX (
               {(collateralSide === 'quote' ? walletQuoteBal : walletBaseBal).toFixed(2)})
@@ -367,7 +367,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
         <div className="panel-carbon-sub rounded-xl p-3 space-y-2.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-slate-300 font-medium">Spot Margin Leverage</span>
-            <span className="font-mono font-bold text-[#2AF5D2] text-sm">
+            <span className="font-mono font-bold text-[#D7F626] text-sm">
               {leverage.toFixed(1)}x{' '}
               <span className="text-slate-400 text-xs font-normal">/ {maxLev.toFixed(1)}x max</span>
             </span>
@@ -389,7 +389,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
                 onClick={() => setLeverage(lv)}
                 className={`py-1 rounded-lg text-xs font-mono font-semibold transition-all ${
                   Math.abs(leverage - lv) < 0.05
-                    ? 'bg-[#00E0B8]/20 text-[#2AF5D2] border border-[#00E0B8]/40'
+                    ? 'bg-[#D7F626]/20 text-[#D7F626] border border-[#D7F626]/40'
                     : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300'
                 }`}
               >
@@ -407,7 +407,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
               <button
                 type="button"
                 onClick={() => midPrice > 0 && setLimitPriceInput(midPrice.toFixed(4))}
-                className="text-[#2AF5D2] font-mono hover:underline"
+                className="text-[#D7F626] font-mono hover:underline"
               >
                 Mid {midPrice > 0 ? midPrice.toFixed(4) : ''}
               </button>
@@ -435,7 +435,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
               type="checkbox"
               checked={enableTpSl}
               onChange={(e) => setEnableTpSl(e.target.checked)}
-              className="accent-[#00E0B8] w-4 h-4"
+              className="accent-[#D7F626] w-4 h-4"
             />
           </label>
 
@@ -479,7 +479,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">CLOB Position Size</span>
-            <span className="text-[#2AF5D2] font-bold tabular-nums">
+            <span className="text-[#D7F626] font-bold tabular-nums">
               {orderQuantityBase.toFixed(3)} {pool.baseSymbol}
             </span>
           </div>
@@ -520,7 +520,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
         onClick={handleOpenMarginPosition}
         className={`w-full py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-45 ${
           side === 'long'
-            ? 'bg-gradient-to-r from-[#00E0B8] to-[#00C2FF] text-[#041214] shadow-[0_0_24px_rgba(0,224,184,0.3)] hover:brightness-105'
+            ? 'bg-[#00D98B] hover:bg-[#12E89B] text-[#05120D] shadow-[0_0_24px_rgba(0,217,139,0.28)]'
             : 'bg-[#F6465D] text-white shadow-[0_0_22px_rgba(246,70,93,0.3)] hover:bg-[#ff566c]'
         }`}
       >
@@ -601,7 +601,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
             Connect your wallet to inspect isolated MarginManager health, debt, open orders, and conditional TP/SL triggers.
           </p>
         </div>
-        <span className="text-xs font-mono px-3 py-1.5 rounded-lg bg-[#00E0B8]/15 text-[#2AF5D2] border border-[#00E0B8]/30">
+        <span className="text-xs font-mono px-3 py-1.5 rounded-lg bg-[#D7F626]/15 text-[#D7F626] border border-[#D7F626]/30">
           1-TX Atomic Setup
         </span>
       </div>
@@ -623,7 +623,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
             Isolated Margin Manager ({pool.poolName.replace('_', '/')})
           </span>
           {position ? (
-            <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#00E0B8]/15 text-[#2AF5D2] border border-[#00E0B8]/30">
+            <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#D7F626]/15 text-[#D7F626] border border-[#D7F626]/30">
               {position.managerId.slice(0, 8)}...{position.managerId.slice(-6)}
             </span>
           ) : (
@@ -636,7 +636,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
         <button
           type="button"
           onClick={onRefresh}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[#0B1017] border border-white/[0.1] text-slate-200 hover:border-[#00E0B8]/40"
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-[#0A0C10] border border-white/[0.1] text-slate-200 hover:border-[#D7F626]/40"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           <span>Refresh Position</span>
@@ -777,7 +777,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                       })
                     )
                   }
-                  className="flex-1 py-2 px-3 rounded-xl bg-[#00E0B8]/20 border border-[#00E0B8]/40 text-[#2AF5D2] text-xs font-bold hover:bg-[#00E0B8]/30"
+                  className="flex-1 py-2 px-3 rounded-xl bg-[#D7F626]/20 border border-[#D7F626]/40 text-[#D7F626] text-xs font-bold hover:bg-[#D7F626]/30"
                 >
                   Close & Repay
                 </button>
@@ -807,7 +807,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
               <button
                 type="button"
                 onClick={() => setWithdrawAsset((prev) => (prev === 'quote' ? 'base' : 'quote'))}
-                className="px-2.5 py-2 rounded-lg bg-[#0B1017] border border-white/[0.1] text-xs font-mono text-[#2AF5D2]"
+                className="px-2.5 py-2 rounded-lg bg-[#0A0C10] border border-white/[0.1] text-xs font-mono text-[#D7F626]"
               >
                 {withdrawAsset === 'quote' ? pool.quoteSymbol : pool.baseSymbol}
               </button>
@@ -818,7 +818,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                 value={withdrawAmt}
                 onChange={(e) => setWithdrawAmt(e.target.value)}
                 placeholder="Withdraw amt"
-                className="flex-1 min-w-0 px-2.5 py-2 rounded-lg bg-[#0B1017] border border-white/[0.1] text-xs font-mono text-white outline-none"
+                className="flex-1 min-w-0 px-2.5 py-2 rounded-lg bg-[#0A0C10] border border-white/[0.1] text-xs font-mono text-white outline-none"
               />
               <button
                 type="button"
@@ -844,7 +844,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
           <div className="inline-flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-[#2AF5D2]" />
+            <ShieldAlert className="w-4 h-4 text-[#D7F626]" />
             <span>
               Available {pool.baseSymbol} Liquidity:{' '}
               <strong className="text-white font-mono">

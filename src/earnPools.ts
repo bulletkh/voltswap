@@ -9,7 +9,7 @@ import { buildCetusSwapTx, fetchCetusQuote } from './cetusSwap';
 import { suiGrpcClient, SUI_COIN_TYPE, USDC_COIN_TYPE } from './suiClient';
 import { addCoinFeeToTx, calcFeeUnits } from './voltFee';
 
-export type EarnFilterTab = 'onsite' | 'margin' | 'lst' | 'external';
+export type EarnFilterTab = 'onsite' | 'margin' | 'lst';
 
 export interface DeepBookMarginVault {
   coinKey: keyof typeof mainnetMarginPools;
