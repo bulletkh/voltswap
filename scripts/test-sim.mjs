@@ -375,6 +375,200 @@ try {
   fail('On-Site LST Yield Zap (SUI -> haSUI)', e?.stack || e?.message || String(e));
 }
 
+// 7. Aftermath Spot Router SUI -> USDC + Volt Tier Fee Mainnet Simulation
+try {
+  const afRoute = await fetch('https://aftermath.finance/api/router/trade-route', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      coinInType: SUI_TYPE,
+      coinOutType: USDC_TYPE,
+      coinInAmount: '499000000n',
+    }),
+  }).then((r) => r.json());
+  if (!afRoute?.coinOut?.amount) {
+    fail('Aftermath Spot Router SUI -> USDC route', 'No route returned');
+  } else {
+    const tradeRes = await fetch('https://aftermath.finance/api/router/v1/transactions/trade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: WALLET,
+        completeRoute: afRoute,
+        slippage: 0.015,
+      }),
+    }).then((r) => r.json());
+    if (!tradeRes?.txKind) {
+      fail('Aftermath Spot Router build trade txKind', 'Missing txKind');
+    } else {
+      const afTx = Transaction.fromKind(fromBase64(tradeRes.txKind));
+      const [feeCoin] = afTx.splitCoins(afTx.gas, [1_000_000n]);
+      afTx.transferObjects([feeCoin], '0x7ef65a3b007b79e3b8d9a29f2d5e8584b589186b3a9483b7519c53088c317b93');
+      const afEffects = await simulateGrpcOrGql(afTx);
+      if (afEffects?.status === 'SUCCESS') {
+        pass('Aftermath Spot Router SUI -> USDC + Volt Fee Mainnet gRPC simulation', `out=${afRoute.coinOut.amount}`);
+      } else {
+        fail('Aftermath Spot Router SUI -> USDC + Volt Fee Mainnet gRPC simulation', JSON.stringify(afEffects));
+      }
+    }
+  }
+} catch (e) {
+  fail('Aftermath Spot Router SUI -> USDC', e?.stack || e?.message || String(e));
+}
+
+// 8. Aftermath Perps Limit + PostOnly + Inline TP/SL (ETH) & Set SL/TP + Leverage (SUI)
+try {
+  const owned = await fetch('https://aftermath.finance/api/perpetuals/accounts/owned', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ walletAddress: WALLET }),
+  }).then((r) => r.json());
+  const cap = owned?.accountCaps?.[0];
+  const accountCapId = cap?.objectId;
+  const ethMkt = (mktsData?.marketDatas || []).find((m) => m?.metadata?.symbol?.toUpperCase() === 'ETH');
+
+  if (accountCapId && ethMkt) {
+    const ethIdx = Number(ethMkt.market.indexPrice || 2500);
+    const tick = BigInt(String(ethMkt.market.marketParams.tickSize || '10000n').replace('n', ''));
+    const lot = BigInt(String(ethMkt.market.marketParams.lotSize || '10000n').replace('n', ''));
+    const limitPxUsd = ethIdx * 0.88; // safely below book so PostOnly posts instead of rejecting
+    const alignedPx = (BigInt(Math.floor(limitPxUsd * 1e9)) / tick) * tick;
+    const minNotional = Math.max(Number(ethMkt.market.marketParams.minOrderUsdValue || 2), 3);
+    const sizeContracts = (minNotional * 1.15) / limitPxUsd;
+    const alignedSize = (BigInt(Math.ceil(sizeContracts * 1e9)) / lot) * lot || lot;
+
+    const limRes = await fetch(
+      'https://aftermath.finance/api/perpetuals/account/transactions/place-limit-order',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: WALLET,
+          accountId: ACCOUNT_ID,
+          accountCapId,
+          marketId: ethMkt.market.objectId,
+          side: 0,
+          size: `${alignedSize}n`,
+          price: `${alignedPx}n`,
+          orderType: 2, // PostOnly
+          collateralChange: 0.35,
+          hasPosition: false,
+          cancelSlTp: false,
+          reduceOnly: false,
+          leverage: 10,
+          slTp: {
+            takeProfitPrice: Number((ethIdx * 1.15).toFixed(2)),
+            stopLossPrice: Number((limitPxUsd * 0.92).toFixed(2)),
+            triggerPriceType: 2,
+          },
+        }),
+      }
+    ).then((r) => r.json());
+
+    if (!limRes?.txKind) {
+      fail('Aftermath Perps Limit+PostOnly+SL/TP ETH txKind', JSON.stringify(limRes));
+    } else {
+      const limEff = await simulateGrpcOrGql(Transaction.fromKind(fromBase64(limRes.txKind)));
+      if (limEff?.status === 'SUCCESS') {
+        pass('Aftermath Perps Limit + PostOnly + Inline TP/SL (ETH) Mainnet gRPC simulation', `cap=${accountCapId.slice(0, 10)}`);
+      } else {
+        fail('Aftermath Perps Limit + PostOnly + Inline TP/SL (ETH) Mainnet gRPC simulation', JSON.stringify(limEff));
+      }
+    }
+  }
+
+  if (accountCapId && suiMkt) {
+    const slTpRes = await fetch(
+      'https://aftermath.finance/api/perpetuals/account/transactions/place-sl-tp-orders',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: WALLET,
+          accountId: ACCOUNT_ID,
+          accountCapId,
+          marketId: suiMkt.market.objectId,
+          positionSide: 1,
+          size: '1000000000n',
+          takeProfitPrice: 0.65,
+          stopLossPrice: 0.95,
+          triggerPriceType: 2,
+        }),
+      }
+    ).then((r) => r.json());
+
+    if (!slTpRes?.txKind) {
+      fail('Aftermath Perps Place SL/TP (SUI) txKind', JSON.stringify(slTpRes));
+    } else {
+      const slEff = await simulateGrpcOrGql(Transaction.fromKind(fromBase64(slTpRes.txKind)));
+      if (slEff?.status === 'SUCCESS') {
+        pass('Aftermath Perps Place SL/TP (SUI) Mainnet gRPC simulation', 'TP/SL attached cleanly');
+      } else {
+        fail('Aftermath Perps Place SL/TP (SUI) Mainnet gRPC simulation', JSON.stringify(slEff));
+      }
+    }
+
+    const levPrev = await fetch(
+      'https://aftermath.finance/api/perpetuals/account/previews/set-leverage',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: ACCOUNT_ID,
+          marketId: suiMkt.market.objectId,
+          leverage: 10,
+        }),
+      }
+    ).then((r) => r.json());
+    if (levPrev && !levPrev.error) {
+      const levTxRes = await fetch(
+        'https://aftermath.finance/api/perpetuals/account/transactions/set-leverage',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            walletAddress: WALLET,
+            accountId: ACCOUNT_ID,
+            accountCapId,
+            marketId: suiMkt.market.objectId,
+            leverage: 10,
+            collateralChange: Number(levPrev.collateralChange || 0),
+          }),
+        }
+      ).then((r) => r.json());
+      if (levTxRes?.txKind) {
+        const levEff = await simulateGrpcOrGql(Transaction.fromKind(fromBase64(levTxRes.txKind)));
+        if (levEff?.status === 'SUCCESS') {
+          pass('Aftermath Perps Set Leverage (10x) Mainnet gRPC simulation', `delta=${Number(levPrev.collateralChange || 0).toFixed(4)} USDC`);
+        } else {
+          fail('Aftermath Perps Set Leverage (10x) Mainnet gRPC simulation', JSON.stringify(levEff));
+        }
+      }
+    }
+
+    const candlesRes = await fetch(
+      'https://aftermath.finance/api/perpetuals/market/candle-history',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          marketId: suiMkt.market.objectId,
+          fromTimestamp: Date.now() - 86_400_000,
+          toTimestamp: Date.now(),
+          resolution: '15m',
+        }),
+      }
+    ).then((r) => r.json());
+    if (Array.isArray(candlesRes?.candles) && candlesRes.candles.length > 0) {
+      pass('Aftermath Perps Native Candle History (SUI 15m)', `${candlesRes.candles.length} candles`);
+    } else {
+      fail('Aftermath Perps Native Candle History (SUI 15m)', 'No candles returned');
+    }
+  }
+} catch (e) {
+  fail('Aftermath Perps Extended Pro Checks', e?.stack || e?.message || String(e));
+}
+
 if (failures > 0) {
   console.error(`\n${failures} simulation check(s) failed.`);
   process.exit(1);

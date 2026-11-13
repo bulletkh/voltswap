@@ -20,7 +20,7 @@ import {
   safeNormalizeCoinType,
 } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
-import { buildCetusSwapTx, fetchCetusQuote, type CetusQuoteResult } from '../cetusSwap';
+import { buildBestSwapTx, fetchBestSwapQuote, type SmartSwapQuote } from '../smartSwap';
 import {
   addWalletVolumeUsd,
   calcFeeUnits,
@@ -91,7 +91,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [tokenPickerFor, setTokenPickerFor] = useState<'from' | 'to' | null>(null);
   const [tokenQuery, setTokenQuery] = useState('');
 
-  const [quote, setQuote] = useState<CetusQuoteResult | null>(null);
+  const [quote, setQuote] = useState<SmartSwapQuote | null>(null);
   const [isQuoting, setIsQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
@@ -164,7 +164,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       setQuoteError(null);
       try {
         const atomic = BigInt(Math.floor(val * Math.pow(10, fromToken.decimals)));
-        const q = await fetchCetusQuote({
+        const q = await fetchBestSwapQuote({
           fromCoinType: fromToken.address,
           toCoinType: toToken.address,
           amountInAtomic: atomic,
@@ -298,7 +298,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
     setIsSwapping(true);
     try {
-      const tx = await buildCetusSwapTx({
+      const tx = await buildBestSwapTx({
         sender: account.address,
         fromCoinType: fromToken.address,
         amountInAtomic: atomic,
@@ -700,6 +700,21 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         {v}%
                       </button>
                     ))}
+                    <div className="flex items-center bg-white/[0.06] rounded px-1.5 py-0.5 border border-white/[0.08]">
+                      <input
+                        type="number"
+                        min="0.05"
+                        max="25"
+                        step="0.1"
+                        value={slippagePct}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (Number.isFinite(v) && v >= 0.05 && v <= 25) setSlippagePct(v);
+                        }}
+                        className="w-11 bg-transparent text-right text-xs font-mono text-white outline-none"
+                      />
+                      <span className="text-[11px] font-mono text-slate-400 ml-0.5">%</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -809,12 +824,55 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
               {/* Route & Fee Details */}
               <div className="panel-carbon-sub rounded-lg p-3 space-y-1.5 text-xs font-mono">
+                <div className="flex items-center justify-between gap-2 text-slate-300">
+                  <span>Best Aggregator</span>
+                  <div className="flex items-center gap-1.5">
+                    {quote ? (
+                      <>
+                        <span className="px-1.5 py-0.5 rounded bg-[#1D63FF]/20 text-[#4BA3FF] border border-[#1D63FF]/35 text-[11px] font-bold">
+                          {quote.provider === 'Cetus' ? 'Cetus (incl. Bluefin)' : 'Aftermath Router'}
+                        </span>
+                        {quote.savingsPct > 0.001 && (
+                          <span className="text-[11px] font-bold text-[#00E599]">
+                            +{quote.savingsPct.toFixed(2)}%
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </div>
+                </div>
                 <div className="flex justify-between text-slate-300">
-                  <span>Best Route</span>
+                  <span>DEX Hops</span>
                   <span className="text-white truncate max-w-[220px]">
                     {quote ? quote.dexHops.join(' + ') : '—'}
                   </span>
                 </div>
+                {quote && quote.alternatives.some((a) => a.amountOutAtomic > 0n) && (
+                  <div className="flex items-center justify-between gap-2 pt-0.5 text-[11px] text-slate-400">
+                    <span>Quotes Race</span>
+                    <div className="flex items-center gap-2 tabular-nums">
+                      {quote.alternatives.map((alt) => (
+                        <span
+                          key={alt.provider}
+                          className={
+                            alt.provider === quote.provider
+                              ? 'text-[#00E599] font-semibold'
+                              : 'text-slate-400'
+                          }
+                        >
+                          {alt.provider}:{' '}
+                          {alt.amountOutAtomic > 0n
+                            ? (Number(alt.amountOutAtomic) / Math.pow(10, toToken.decimals)).toFixed(
+                                toToken.decimals > 6 ? 4 : 3
+                              )
+                            : 'N/A'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-300">
                   <span>Volt Tier Fee ({traderTier.name})</span>
                   <span className="text-[#4BA3FF] font-semibold tabular-nums">
