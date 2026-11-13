@@ -329,6 +329,203 @@ function appendConditionalTpSl(params: {
   }
 }
 
+export interface MarginHealthMetrics {
+  hasDebt: boolean;
+  riskRatio: number;
+  liquidationRiskRatio: number;
+  borrowRiskRatio: number;
+  assetUsd: number;
+  debtUsd: number;
+  netEquityUsd: number;
+  healthBufferPct: number;
+  barProgressPct: number;
+  status: 'healthy' | 'caution' | 'danger' | 'idle';
+  estLiquidationPrice: number | null;
+  distanceToLiqPct: number | null;
+  inferredSide: 'long' | 'short';
+}
+
+/**
+ * Computes live Health Factor, buffer to liquidation, and analytical liquidation price
+ * for an active isolated DeepBook MarginManager position.
+ */
+export function computeMarginHealthMetrics(
+  position: MarginManagerPosition | null,
+  riskConfig: MarginPoolRiskConfig | null
+): MarginHealthMetrics {
+  const liquidationRiskRatio = riskConfig?.liquidationRiskRatio ?? 1.1;
+  const borrowRiskRatio = riskConfig?.minBorrowRiskRatio ?? 1.25;
+
+  if (!position) {
+    return {
+      hasDebt: false,
+      riskRatio: 0,
+      liquidationRiskRatio,
+      borrowRiskRatio,
+      assetUsd: 0,
+      debtUsd: 0,
+      netEquityUsd: 0,
+      healthBufferPct: 100,
+      barProgressPct: 100,
+      status: 'idle',
+      estLiquidationPrice: null,
+      distanceToLiqPct: null,
+      inferredSide: 'long',
+    };
+  }
+
+  const assetUsd =
+    position.baseAsset * position.basePythPriceUsd +
+    position.quoteAsset * position.quotePythPriceUsd;
+  const debtUsd =
+    position.baseDebt * position.basePythPriceUsd +
+    position.quoteDebt * position.quotePythPriceUsd;
+  const netEquityUsd = assetUsd - debtUsd;
+  const hasDebt = debtUsd > 1e-8 || position.baseDebt > 0 || position.quoteDebt > 0;
+  const inferredSide: 'long' | 'short' =
+    position.quoteDebt * position.quotePythPriceUsd >= position.baseDebt * position.basePythPriceUsd
+      ? 'long'
+      : 'short';
+
+  if (!hasDebt) {
+    return {
+      hasDebt: false,
+      riskRatio: 99,
+      liquidationRiskRatio,
+      borrowRiskRatio,
+      assetUsd,
+      debtUsd,
+      netEquityUsd,
+      healthBufferPct: 100,
+      barProgressPct: 100,
+      status: 'healthy',
+      estLiquidationPrice: null,
+      distanceToLiqPct: null,
+      inferredSide,
+    };
+  }
+
+  const riskRatio = Number(position.riskRatio || 0);
+  const healthBufferPct =
+    riskRatio > 0 ? Math.max(0, ((riskRatio - liquidationRiskRatio) / riskRatio) * 100) : 0;
+  const barProgressPct = Math.max(
+    4,
+    Math.min(100, ((riskRatio - liquidationRiskRatio) / Math.max(0.4, 2.2 - liquidationRiskRatio)) * 100)
+  );
+  const status: MarginHealthMetrics['status'] =
+    riskRatio >= borrowRiskRatio
+      ? 'healthy'
+      : riskRatio >= liquidationRiskRatio * 1.06
+        ? 'caution'
+        : 'danger';
+
+  let estLiquidationPrice: number | null = null;
+  let distanceToLiqPct: number | null = null;
+  const numUsd =
+    liquidationRiskRatio * position.quoteDebt * position.quotePythPriceUsd -
+    position.quoteAsset * position.quotePythPriceUsd;
+  const denBase = position.baseAsset - liquidationRiskRatio * position.baseDebt;
+  if (Math.abs(denBase) > 1e-9) {
+    const solved = numUsd / denBase;
+    if (Number.isFinite(solved) && solved > 0 && position.basePythPriceUsd > 0) {
+      estLiquidationPrice = solved;
+      distanceToLiqPct = ((solved - position.basePythPriceUsd) / position.basePythPriceUsd) * 100;
+    }
+  }
+
+  return {
+    hasDebt,
+    riskRatio,
+    liquidationRiskRatio,
+    borrowRiskRatio,
+    assetUsd,
+    debtUsd,
+    netEquityUsd,
+    healthBufferPct,
+    barProgressPct,
+    status,
+    estLiquidationPrice,
+    distanceToLiqPct,
+    inferredSide,
+  };
+}
+
+/**
+ * Deposits standalone Base or Quote collateral into an existing MarginManager
+ * to boost Health Factor and push out liquidation price without opening a new trade.
+ */
+export function buildMarginDepositCollateralTx(params: {
+  owner: string;
+  pool: DeepBookPoolMeta;
+  managerId: string;
+  assetSide: 'base' | 'quote';
+  amount: number;
+}): Transaction {
+  const { owner, pool: poolMeta, managerId, assetSide, amount } = params;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Collateral amount must be greater than zero.');
+  }
+  const ext = createDeepBookMarginClient(owner, managerId, poolMeta.poolName);
+  const tx = new Transaction();
+  tx.setSender(owner);
+  if (assetSide === 'base') {
+    tx.add(ext.deepbook.marginManager.depositBase({ managerKey: 'MAIN', amount }));
+  } else {
+    tx.add(ext.deepbook.marginManager.depositQuote({ managerKey: 'MAIN', amount }));
+  }
+  return tx;
+}
+
+/**
+ * Attaches standalone Conditional Take Profit and/or Stop Loss orders onto an
+ * already-open DeepBook MarginManager position.
+ */
+export function buildMarginAttachTpSlTx(params: {
+  owner: string;
+  pool: DeepBookPoolMeta;
+  managerId: string;
+  side: 'long' | 'short';
+  quantity: number;
+  tpPrice?: number;
+  slPrice?: number;
+}): Transaction {
+  const { owner, pool: poolMeta, managerId, side, quantity, tpPrice, slPrice } = params;
+  if ((!tpPrice || tpPrice <= 0) && (!slPrice || slPrice <= 0)) {
+    throw new Error('Enter at least a Take Profit or Stop Loss trigger price.');
+  }
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    throw new Error('Position close size must be greater than zero.');
+  }
+  const { pool, baseCoin, quoteCoin } = getPoolCoins(poolMeta.poolName);
+  const ext = createDeepBookMarginClient(owner, managerId, poolMeta.poolName);
+  const lotAtoms = BigInt(Math.max(1, Math.round(poolMeta.lotSize * baseCoin.scalar)));
+  const rawQtyAtoms = BigInt(Math.max(1, Math.round(quantity * baseCoin.scalar)));
+  const onChainQty = (rawQtyAtoms / lotAtoms) * lotAtoms || lotAtoms;
+  const safeQuantityNum = Number(onChainQty) / baseCoin.scalar;
+
+  const tx = new Transaction();
+  tx.setSender(owner);
+
+  appendConditionalTpSl({
+    tx,
+    db: ext.deepbook,
+    managerArg: managerId,
+    isNewManager: false,
+    poolKey: poolMeta.poolName,
+    baseType: baseCoin.type,
+    quoteType: quoteCoin.type,
+    baseOracle: baseCoin.priceInfoObjectId!,
+    quoteOracle: quoteCoin.priceInfoObjectId!,
+    poolAddress: pool.address,
+    isLong: side === 'long',
+    quantity: safeQuantityNum,
+    tpPrice,
+    slPrice,
+  });
+
+  return tx;
+}
+
 /**
  * Builds an atomic DeepBook v3 Margin Leveraged Order PTB.
  * - Creates + deposits + borrows + places Margin Market/Limit Order + optional TP/SL + shares MarginManager in 1 TX when no manager exists yet.

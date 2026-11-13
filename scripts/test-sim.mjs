@@ -1002,6 +1002,12 @@ try {
   if (derivedBc !== expectedBc || derivedRef !== expectedRef) {
     fail('DeepBook Predict ID derivation', `got bc=${derivedBc}, ref=${derivedRef}`);
   } else {
+    const [bcObjRes, refObjRes] = await Promise.all([
+      grpcClient.core.getObject({ objectId: derivedBc }).catch(() => null),
+      grpcClient.core.getObject({ objectId: derivedRef }).catch(() => null),
+    ]);
+    const bcExists = Boolean(bcObjRes?.object?.objectId);
+    const refExists = Boolean(refObjRes?.object?.objectId);
     const cfg = toGeneratedConfig(PREDICT_MAINNET_CONFIG);
     const accCfg = {
       accountPackageId: PREDICT_MAINNET_CONFIG.packages.account,
@@ -1009,12 +1015,22 @@ try {
       accountPackageIdLatest: PREDICT_MAINNET_CONFIG.packages.accountLatest,
     };
     const txInitPredict = new Transaction();
-    txInitPredict.add(registryMoveCalls.createAndShareBuilderCode({ config: cfg, arguments: { index: 0n } }));
-    const w = txInitPredict.add(accountRegistryMoveCalls._new({ config: accCfg }));
-    txInitPredict.add(accountMoveCalls.share({ config: accCfg, arguments: { self: w } }));
+    txInitPredict.add(
+      registryMoveCalls.createAndShareBuilderCode({
+        config: cfg,
+        arguments: { index: bcExists ? 99n : 0n },
+      })
+    );
+    if (!refExists) {
+      const w = txInitPredict.add(accountRegistryMoveCalls._new({ config: accCfg }));
+      txInitPredict.add(accountMoveCalls.share({ config: accCfg, arguments: { self: w } }));
+    }
     const initEff = await simulateGrpcOrGql(txInitPredict);
     if (initEff?.status === 'SUCCESS') {
-      pass('DeepBook Predict BuilderCode + Referrer Init Mainnet simulation', `bc=${derivedBc.slice(0, 10)}...`);
+      pass(
+        'DeepBook Predict BuilderCode + Referrer Init Mainnet simulation',
+        `bc=${derivedBc.slice(0, 10)}... (liveBc=${bcExists}, liveRef=${refExists})`
+      );
     } else {
       fail('DeepBook Predict BuilderCode + Referrer Init Mainnet simulation', JSON.stringify(initEff));
     }
@@ -1138,6 +1154,369 @@ try {
   }
 } catch (e) {
   fail('DeepBook Predict Live Quote & Enqueue simulation', e?.stack || e?.message || String(e));
+}
+
+// 12. Multi-RPC Failover Pool (gRPC <-> GraphQL Core Parity + Owned Coins Discovery)
+try {
+  const { SuiGraphQLClient } = await import('@mysten/sui/graphql');
+  const gqlClient = new SuiGraphQLClient({ url: GQL_URL, network: 'mainnet' });
+  const [grpcBals, gqlBals, grpcCoins, gqlCoins] = await Promise.all([
+    grpcClient.core.listBalances({ owner: WALLET, limit: 20 }),
+    gqlClient.core.listBalances({ owner: WALLET, limit: 20 }),
+    grpcClient.core.listOwnedObjects({
+      owner: WALLET,
+      type: '0x2::coin::Coin',
+      limit: 50,
+      include: { json: true },
+    }),
+    gqlClient.core.listOwnedObjects({
+      owner: WALLET,
+      type: '0x2::coin::Coin',
+      limit: 50,
+      include: { json: true },
+    }),
+  ]);
+  const grpcBalCount = (grpcBals.balances || []).length;
+  const gqlBalCount = (gqlBals.balances || []).length;
+  const grpcCoinCount = (grpcCoins.objects || []).length;
+  const gqlCoinCount = (gqlCoins.objects || []).length;
+  if (grpcBalCount > 0 && gqlBalCount > 0 && grpcCoinCount > 0 && gqlCoinCount > 0) {
+    pass(
+      'Multi-RPC Failover gRPC <-> GraphQL Core Parity',
+      `gRPC=${grpcBalCount} bals/${grpcCoinCount} coins | GQL=${gqlBalCount} bals/${gqlCoinCount} coins`
+    );
+  } else {
+    fail(
+      'Multi-RPC Failover gRPC <-> GraphQL Core Parity',
+      `Unexpected counts gRPC=${grpcBalCount}/${grpcCoinCount}, GQL=${gqlBalCount}/${gqlCoinCount}`
+    );
+  }
+} catch (e) {
+  fail('Multi-RPC Failover gRPC <-> GraphQL Core Parity', e?.stack || e?.message || String(e));
+}
+
+// 13. Wallet Dust Sweeper (0x2::coin::destroy_zero + Cetus Aggregator v2 Sweep PTB)
+try {
+  const ownedRes = await grpcClient.core.listOwnedObjects({
+    owner: WALLET,
+    type: '0x2::coin::Coin',
+    limit: 50,
+    include: { json: true },
+  });
+  const coinObjs = (ownedRes.objects || []).map((obj) => {
+    const rawType = obj.type || '';
+    const m = rawType.match(/^0x0*2::coin::Coin<(.+)>$/i);
+    return {
+      objectId: obj.objectId,
+      coinType: m ? m[1] : rawType,
+      balance: BigInt(obj.json?.balance ?? '0'),
+    };
+  });
+  const zeroCoins = coinObjs.filter((c) => c.balance === 0n && c.coinType);
+  const nonZeroDust = coinObjs.filter(
+    (c) =>
+      c.balance > 0n &&
+      c.coinType &&
+      normalizeSuiAddress(c.coinType.split('::')[0]) !== '0x0000000000000000000000000000000000000000000000000000000000000002' &&
+      c.coinType.toLowerCase() !== USDC_TYPE.toLowerCase()
+  );
+
+  const cetusDust = new AggregatorClient({ client: grpcClient });
+  let sweepRouter = null;
+  let dustGroup = null;
+  if (nonZeroDust.length > 0) {
+    const targetType = nonZeroDust[0].coinType;
+    const sameTypeCoins = nonZeroDust.filter((c) => c.coinType === targetType);
+    const totalBal = sameTypeCoins.reduce((s, c) => s + c.balance, 0n);
+    const r = await cetusDust.findRouters({
+      from: targetType,
+      target: SUI_TYPE,
+      amount: totalBal.toString(),
+      byAmountIn: true,
+    });
+    if (r?.amountOut && Number(r.amountOut) > 0) {
+      sweepRouter = r;
+      dustGroup = { coinType: targetType, coins: sameTypeCoins, totalBal, outType: SUI_TYPE };
+    }
+  }
+
+  const sweepTx = new Transaction();
+  sweepTx.setSender(WALLET);
+  let burnNote = '';
+  if (zeroCoins.length > 0) {
+    sweepTx.moveCall({
+      target: '0x2::coin::destroy_zero',
+      typeArguments: [zeroCoins[0].coinType],
+      arguments: [sweepTx.object(zeroCoins[0].objectId)],
+    });
+    burnNote = `destroyed real zero coin ${zeroCoins[0].objectId.slice(0, 10)}`;
+  } else {
+    const [emptySui] = sweepTx.splitCoins(sweepTx.gas, [0n]);
+    sweepTx.moveCall({
+      target: '0x2::coin::destroy_zero',
+      typeArguments: [SUI_TYPE],
+      arguments: [emptySui],
+    });
+    burnNote = 'destroyed synthetic 0-SUI coin';
+  }
+
+  let routeNote = '';
+  if (sweepRouter && dustGroup) {
+    const primary = sweepTx.object(dustGroup.coins[0].objectId);
+    if (dustGroup.coins.length > 1) {
+      sweepTx.mergeCoins(
+        primary,
+        dustGroup.coins.slice(1).map((c) => sweepTx.object(c.objectId))
+      );
+    }
+    const outCoin = await cetusDust.routerSwap({
+      router: sweepRouter,
+      inputCoin: primary,
+      slippage: 0.02,
+      txb: sweepTx,
+    });
+    sweepTx.transferObjects([outCoin], WALLET);
+    routeNote = `dust ${dustGroup.coinType.split('::').pop()} -> SUI`;
+  } else {
+    const fallbackRouter = await cetusDust.findRouters({
+      from: SUI_TYPE,
+      target: USDC_TYPE,
+      amount: '150000000',
+      byAmountIn: true,
+    });
+    const [inSui] = sweepTx.splitCoins(sweepTx.gas, [150_000_000n]);
+    const outUsdc = await cetusDust.routerSwap({
+      router: fallbackRouter,
+      inputCoin: inSui,
+      slippage: 0.02,
+      txb: sweepTx,
+    });
+    sweepTx.transferObjects([outUsdc], WALLET);
+    routeNote = '0.15 SUI -> USDC fallback sweep';
+  }
+
+  const dustEff = await simulateGrpcOrGql(sweepTx);
+  if (dustEff?.status === 'SUCCESS') {
+    pass('Wallet Dust Sweeper (Destroy Zero + Cetus Sweep)', `${burnNote} + ${routeNote}`);
+  } else {
+    fail('Wallet Dust Sweeper (Destroy Zero + Cetus Sweep)', JSON.stringify(dustEff));
+  }
+} catch (e) {
+  fail('Wallet Dust Sweeper (Destroy Zero + Cetus Sweep)', e?.stack || e?.message || String(e));
+}
+
+// 14. DeepBook Predict 1-Click Ephemeral Session Key Authorization PTB
+try {
+  const { Ed25519Keypair } = await import('@mysten/sui/keypairs/ed25519');
+  const { SessionsContract, getSessionsConfig } = await import('@mysten/deepbook-v3/sessions');
+  const { MAINNET_CONFIG } = await import('@mysten/deepbook-v3/predict');
+
+  const sc = new SessionsContract(getSessionsConfig('mainnet'));
+  const sessionKp = new Ed25519Keypair();
+  const sessionAddr = sessionKp.toSuiAddress();
+  const wrapperId = sc.deriveAccountWrapperId(WALLET);
+  let hasAccount = false;
+  try {
+    const accObj = await grpcClient.core.getObject({ objectId: wrapperId });
+    hasAccount = Boolean(accObj?.object?.objectId);
+  } catch {
+    hasAccount = false;
+  }
+
+  const accCfg = {
+    accountPackageId: MAINNET_CONFIG.packages.account,
+    accountRegistry: MAINNET_CONFIG.objects.accountRegistry,
+    accountPackageIdLatest: MAINNET_CONFIG.packages.accountLatest,
+  };
+  const txSession = new Transaction();
+  txSession.setSender(WALLET);
+
+  const wrapperTarget = hasAccount
+    ? wrapperId
+    : txSession.add(accountRegistryMoveCalls._new({ config: accCfg }));
+
+  txSession.add(
+    sc.authorizeSession({
+      wrapperId: wrapperTarget,
+      session: sessionAddr,
+      durationMs: 3_600_000,
+    })
+  );
+  const [gasFloatCoin] = txSession.splitCoins(txSession.gas, [50_000_000n]);
+  txSession.transferObjects([gasFloatCoin], sessionAddr);
+  if (!hasAccount) {
+    txSession.add(accountMoveCalls.share({ config: accCfg, arguments: { self: wrapperTarget } }));
+  }
+
+  const sessEff = await simulateGrpcOrGql(txSession);
+  if (sessEff?.status === 'SUCCESS') {
+    pass(
+      'DeepBook Predict 1-Click Session Key Auth + Gas Float',
+      `hasAccount=${hasAccount} session=${sessionAddr.slice(0, 10)}... + 0.05 SUI`
+    );
+  } else {
+    fail('DeepBook Predict 1-Click Session Key Auth + Gas Float', JSON.stringify(sessEff));
+  }
+} catch (e) {
+  fail('DeepBook Predict 1-Click Session Key Auth + Gas Float', e?.stack || e?.message || String(e));
+}
+
+// 15. DeepBook v3 1-TX Spot CLOB 2-Rung Tick-Aligned Limit Order Grid
+try {
+  const dbGridExt = grpcClient.$extend(deepbook({ address: WALLET }));
+  const txGrid = new Transaction();
+  txGrid.setSender(WALLET);
+
+  const manager = txGrid.add(dbGridExt.deepbook.balanceManager.createBalanceManagerWithOwner(WALLET));
+  const depositSui = coinWithBalance({ type: SUI_TYPE, balance: 2_010_000_000n })(txGrid);
+  txGrid.moveCall({
+    package: DEEPBOOK_PACKAGE_ID,
+    module: 'balance_manager',
+    function: 'deposit',
+    arguments: [manager, depositSui],
+    typeArguments: [SUI_TYPE],
+  });
+  const tradeProof = txGrid.moveCall({
+    package: DEEPBOOK_PACKAGE_ID,
+    module: 'balance_manager',
+    function: 'generate_proof_as_owner',
+    arguments: [manager],
+  });
+
+  const rungPrices = [1.2, 1.25];
+  const expireTs = 1844674407370955161n;
+  for (let i = 0; i < rungPrices.length; i++) {
+    const onChainPrice = BigInt(Math.round((rungPrices[i] * 1e9 * 1e6) / 1e9));
+    const onChainQty = 1_000_000_000n;
+    txGrid.moveCall({
+      package: DEEPBOOK_PACKAGE_ID,
+      module: 'pool',
+      function: 'place_limit_order',
+      arguments: [
+        txGrid.object(SUI_USDC_POOL_ID),
+        manager,
+        tradeProof,
+        txGrid.pure.u64(BigInt(Date.now() + 200 + i)),
+        txGrid.pure.u8(OrderType.NO_RESTRICTION),
+        txGrid.pure.u8(SelfMatchingOptions.SELF_MATCHING_ALLOWED),
+        txGrid.pure.u64(onChainPrice),
+        txGrid.pure.u64(onChainQty),
+        txGrid.pure.bool(false),
+        txGrid.pure.bool(false),
+        txGrid.pure.u64(expireTs),
+        txGrid.object('0x6'),
+      ],
+      typeArguments: [SUI_TYPE, USDC_TYPE],
+    });
+  }
+
+  txGrid.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
+    arguments: [manager, txGrid.object(mainnetPackageIds.REGISTRY_ID)],
+  });
+  txGrid.add(dbGridExt.deepbook.balanceManager.shareBalanceManager(manager));
+
+  const gridEff = await simulateGrpcOrGql(txGrid);
+  if (gridEff?.status === 'SUCCESS') {
+    pass('DeepBook v3 1-TX Spot CLOB 2-Rung Grid (SUI_USDC)', '2 ask rungs ($1.20 & $1.25) in 1 atomic PTB');
+  } else {
+    fail('DeepBook v3 1-TX Spot CLOB 2-Rung Grid (SUI_USDC)', JSON.stringify(gridEff));
+  }
+} catch (e) {
+  fail('DeepBook v3 1-TX Spot CLOB 2-Rung Grid (SUI_USDC)', e?.stack || e?.message || String(e));
+}
+
+// 16. DeepBook Margin Pro (Collateral + Borrow Quote + Dual Conditional TP & SL Bracket)
+try {
+  const dbProExt = grpcClient.$extend(deepbook({ network: 'mainnet', address: WALLET }));
+  const dbPro = dbProExt.deepbook;
+  const suiPool = mainnetPools.SUI_USDC;
+  const suiCoin = mainnetCoins.SUI;
+  const usdcCoin = mainnetCoins.USDC;
+  const usdcMarginPool = mainnetMarginPools.USDC;
+
+  const txPro = new Transaction();
+  txPro.setSender(WALLET);
+  const { manager, initializer } = dbPro.marginManager.newMarginManagerWithInitializer('SUI_USDC')(txPro);
+  txPro.add(
+    dbPro.marginManager.depositDuringInitialization({
+      manager,
+      poolKey: 'SUI_USDC',
+      coinType: suiPool.baseCoin,
+      amount: 1.6,
+    })
+  );
+  txPro.moveCall({
+    target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::margin_manager_upgraded::borrow_quote`,
+    arguments: [
+      manager,
+      txPro.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+      txPro.object(usdcMarginPool.address),
+      txPro.object(suiCoin.priceInfoObjectId),
+      txPro.object(usdcCoin.priceInfoObjectId),
+      txPro.object(suiPool.address),
+      txPro.pure.u64(1_000_000n),
+      txPro.object('0x6'),
+    ],
+    typeArguments: [suiCoin.type, usdcCoin.type],
+  });
+
+  // Attach both TP (triggerAbove $1.60) and SL (triggerBelow $0.45) conditional bracket orders
+  const tpCond = dbPro.marginTPSL.newCondition('SUI_USDC', false, 1.6)(txPro);
+  const tpPending = dbPro.marginTPSL.newPendingMarketOrder('SUI_USDC', {
+    clientOrderId: String(Date.now() + 301),
+    quantity: 1,
+    isBid: false,
+    payWithDeep: false,
+  })(txPro);
+  txPro.moveCall({
+    target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::margin_manager_upgraded::add_conditional_order`,
+    arguments: [
+      manager,
+      txPro.object(suiPool.address),
+      txPro.object(suiCoin.priceInfoObjectId),
+      txPro.object(usdcCoin.priceInfoObjectId),
+      txPro.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+      txPro.pure.u64(BigInt(Date.now() + 301)),
+      tpCond,
+      tpPending,
+      txPro.object('0x6'),
+    ],
+    typeArguments: [suiCoin.type, usdcCoin.type],
+  });
+
+  const slCond = dbPro.marginTPSL.newCondition('SUI_USDC', true, 0.45)(txPro);
+  const slPending = dbPro.marginTPSL.newPendingMarketOrder('SUI_USDC', {
+    clientOrderId: String(Date.now() + 302),
+    quantity: 1,
+    isBid: false,
+    payWithDeep: false,
+  })(txPro);
+  txPro.moveCall({
+    target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::margin_manager_upgraded::add_conditional_order`,
+    arguments: [
+      manager,
+      txPro.object(suiPool.address),
+      txPro.object(suiCoin.priceInfoObjectId),
+      txPro.object(usdcCoin.priceInfoObjectId),
+      txPro.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+      txPro.pure.u64(BigInt(Date.now() + 302)),
+      slCond,
+      slPending,
+      txPro.object('0x6'),
+    ],
+    typeArguments: [suiCoin.type, usdcCoin.type],
+  });
+
+  txPro.add(dbPro.marginManager.shareMarginManager('SUI_USDC', manager, initializer));
+  const proEff = await simulateGrpcOrGql(txPro);
+  if (proEff?.status === 'SUCCESS') {
+    pass('DeepBook Margin Pro (Collateral + Borrow + Dual TP/SL)', 'Init + Deposit + Borrow + TP($1.60) + SL($0.45)');
+  } else {
+    fail('DeepBook Margin Pro (Collateral + Borrow + Dual TP/SL)', JSON.stringify(proEff));
+  }
+} catch (e) {
+  fail('DeepBook Margin Pro (Collateral + Borrow + Dual TP/SL)', e?.stack || e?.message || String(e));
 }
 
 if (failures > 0) {

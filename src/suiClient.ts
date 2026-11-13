@@ -1,13 +1,32 @@
 import { createDAppKit } from '@mysten/dapp-kit-react';
-import { SuiGrpcClient } from '@mysten/sui/grpc';
 import { normalizeStructTag, normalizeSuiAddress, isValidSuiAddress } from '@mysten/sui/utils';
+import {
+  PRIMARY_SUI_GRPC_URL,
+  PRIMARY_SUI_GRAPHQL_URL,
+  primaryGrpcClient,
+  cachedRead,
+  invalidateRpcCache,
+  rpcFetchGraphql,
+  rpcExecuteSignedTransaction,
+  rpcListAllOwnedCoins,
+  getRpcPoolStats,
+  withRawCoreFailover,
+} from './suiRpcPool';
 
-export const SUI_MAINNET_GRPC_URL = 'https://fullnode.mainnet.sui.io:443';
+export const SUI_MAINNET_GRPC_URL = PRIMARY_SUI_GRPC_URL;
+export const SUI_MAINNET_GRAPHQL_URL = PRIMARY_SUI_GRAPHQL_URL;
 
-export const suiGrpcClient = new SuiGrpcClient({
-  network: 'mainnet',
-  baseUrl: SUI_MAINNET_GRPC_URL,
-});
+export const suiGrpcClient = primaryGrpcClient;
+
+export {
+  cachedRead,
+  invalidateRpcCache,
+  rpcFetchGraphql,
+  rpcExecuteSignedTransaction,
+  rpcListAllOwnedCoins,
+  getRpcPoolStats,
+  withRawCoreFailover,
+};
 
 export const dAppKit = createDAppKit({
   networks: ['mainnet'],

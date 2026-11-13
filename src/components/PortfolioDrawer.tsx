@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ExternalLink, Loader2, RefreshCw, Wallet, X } from 'lucide-react';
+import { ExternalLink, Loader2, RefreshCw, Sparkles, Wallet, X } from 'lucide-react';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { POPULAR_TOKENS } from '../constants';
-import { fetchWalletBalances, readBalanceFromMap } from '../suiClient';
+import { fetchWalletBalances, getRpcPoolStats, readBalanceFromMap } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
 import { useDAppKit as usePredictDAppKit } from '@mysten/dapp-kit-react';
 import { buildPredictWithdrawTx, fetchPredictBoard } from '../deepbookPredict';
 import { extractTxDigest as extractPredictTxDigest } from '../suiClient';
 import { fetchAftermathAccountState, type AfAccountState } from '../aftermathPerps';
+import { DustSweeperModal } from './DustSweeperModal';
 import {
   buildWithdrawAllManagersAndCancelTx,
   DEFAULT_DEEPBOOK_POOLS,
@@ -107,6 +108,8 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
   const [predictPendingUsd, setPredictPendingUsd] = useState(0);
   const [isWithdrawingPredict, setIsWithdrawingPredict] = useState(false);
   const [predictStatusMsg, setPredictStatusMsg] = useState<string | null>(null);
+  const [isDustModalOpen, setIsDustModalOpen] = useState(false);
+  const rpcStats = isOpen ? getRpcPoolStats() : null;
 
   const loadPredictState = async (owner?: string) => {
     if (!owner) {
@@ -293,6 +296,33 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                 </div>
               )}
 
+              <div className="panel-carbon-sub rounded-2xl p-3.5 flex items-center justify-between gap-3 border border-[#18C8FF]/20">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#18C8FF]" />
+                    <span>Dust &amp; SUI Rebate Sweeper</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    Burn 0-balance coins for SUI gas rebate or swap dust -&gt; SUI / USDC
+                  </div>
+                  {rpcStats && (
+                    <div className="text-[10px] font-mono text-slate-500 mt-1">
+                      RPC: {rpcStats.activeEndpoint.label}
+                      {rpcStats.activeEndpoint.latencyMs > 0
+                        ? ` (${rpcStats.activeEndpoint.latencyMs}ms)`
+                        : ''}
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDustModalOpen(true)}
+                  className="px-3 py-2 rounded-xl text-xs font-bold bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 shrink-0"
+                >
+                  Open Sweeper
+                </button>
+              </div>
+
               {hasClobFundsOrOrders && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1">
@@ -471,6 +501,13 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
           )}
         </div>
       </div>
+      <DustSweeperModal
+        isOpen={isDustModalOpen}
+        onClose={() => setIsDustModalOpen(false)}
+        onSuccess={() => {
+          loadPortfolio();
+        }}
+      />
     </div>
   );
 };

@@ -2,7 +2,7 @@ import { deepbook, mainnetPackageIds, mainnetPools, OrderType, SelfMatchingOptio
 import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
 import { normalizeSuiAddress } from '@mysten/sui/utils';
 import { VOLT_TREASURY_ADDRESS } from './constants';
-import { suiGrpcClient } from './suiClient';
+import { suiGrpcClient, safeNormalizeCoinType, SUI_COIN_TYPE } from './suiClient';
 import { appendVoltFeeCoinSplit, addCoinFeeToTx } from './voltFee';
 
 export const DEEPBOOK_INDEXER = 'https://deepbook-indexer.mainnet.mystenlabs.com';
@@ -1034,6 +1034,176 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
       arguments: [targetManagerArg],
       typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`],
     });
+  }
+
+  return tx;
+}
+
+export interface DeepBookGridOrderRung {
+  price: number;
+  quantity: number;
+  isBid: boolean;
+}
+
+/**
+ * Atomically deploys an N-rung Spot CLOB Limit Order Grid on DeepBook v3 in 1 transaction:
+ * - Creates & registers BalanceManager (binding Volt native Spot Referral if available) when none exists,
+ * - Deposits only the net Base & Quote collateral shortfall required across all grid rungs,
+ * - Aligns every price strictly to pool tickSize & quantity to pool lotSize to guarantee zero Move aborts,
+ * - Places all limit rungs inside one PTB + shares BalanceManager if new.
+ */
+export function buildPlaceDeepBookGridTx(params: {
+  owner: string;
+  pool: DeepBookPoolMeta;
+  managerId?: string | null;
+  managerBaseBalance?: number;
+  managerQuoteBalance?: number;
+  orders: DeepBookGridOrderRung[];
+  postOnly?: boolean;
+  payWithDeep?: boolean;
+  feeMist?: bigint;
+  refSharePct?: number;
+  spotReferralId?: string | null;
+  existingManagerReferralId?: string | null;
+}): Transaction {
+  const {
+    owner,
+    pool,
+    managerId,
+    managerBaseBalance = 0,
+    managerQuoteBalance = 0,
+    orders,
+    postOnly = false,
+    payWithDeep = false,
+    feeMist = 0n,
+    refSharePct = 0.25,
+    spotReferralId,
+    existingManagerReferralId,
+  } = params;
+
+  if (!orders || orders.length === 0) {
+    throw new Error('Grid requires at least one limit order rung.');
+  }
+
+  const tx = new Transaction();
+  tx.setSender(owner);
+
+  const baseScale = Math.pow(10, pool.baseDecimals);
+  const quoteScale = Math.pow(10, pool.quoteDecimals);
+  const onChainTickSize = BigInt(Math.max(1, Math.round((pool.tickSize * 1e9 * quoteScale) / baseScale)));
+  const lotAtoms = BigInt(Math.max(1, Math.round(pool.lotSize * baseScale)));
+  const minQtyAtoms = BigInt(Math.max(1, Math.round(pool.minSize * baseScale)));
+
+  const normalizedOrders = orders.map((ord) => {
+    const rawPrice = BigInt(Math.max(1, Math.round((ord.price * 1e9 * quoteScale) / baseScale)));
+    const snappedPrice = ((rawPrice + onChainTickSize / 2n) / onChainTickSize) * onChainTickSize || onChainTickSize;
+    const rawQty = BigInt(Math.max(1, Math.round(ord.quantity * baseScale)));
+    const steppedQty = (rawQty / lotAtoms) * lotAtoms;
+    const finalQty = steppedQty >= minQtyAtoms ? steppedQty : minQtyAtoms;
+    const snappedUiPrice = Number(snappedPrice) / ((1e9 * quoteScale) / baseScale);
+    const snappedUiQty = Number(finalQty) / baseScale;
+    return {
+      isBid: ord.isBid,
+      onChainPrice: snappedPrice,
+      onChainQty: finalQty,
+      uiPrice: snappedUiPrice,
+      uiQty: snappedUiQty,
+    };
+  });
+
+  const totalQuoteNeeded = normalizedOrders
+    .filter((o) => o.isBid)
+    .reduce((acc, o) => acc + o.uiPrice * o.uiQty * 1.005, 0);
+  const totalBaseNeeded = normalizedOrders
+    .filter((o) => !o.isBid)
+    .reduce((acc, o) => acc + o.uiQty * 1.005, 0);
+
+  const isNewManager = !managerId;
+  const quoteDeficit = Math.max(0, totalQuoteNeeded - (isNewManager ? 0 : managerQuoteBalance));
+  const baseDeficit = Math.max(0, totalBaseNeeded - (isNewManager ? 0 : managerBaseBalance));
+
+  const targetManagerArg: any = isNewManager
+    ? tx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::new_with_custom_owner`,
+        arguments: [tx.pure.address(owner)],
+      })
+    : tx.object(managerId);
+
+  if (!isNewManager && spotReferralId && !existingManagerReferralId) {
+    attachSpotReferralInTx(tx, targetManagerArg, spotReferralId, owner);
+  }
+
+  if (quoteDeficit > 0.000001) {
+    const quoteRaw = BigInt(Math.max(1, Math.ceil(quoteDeficit * quoteScale)));
+    const qCoin = coinWithBalance({ type: pool.quoteCoinId, balance: quoteRaw })(tx);
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+      arguments: [targetManagerArg, qCoin],
+      typeArguments: [pool.quoteCoinId],
+    });
+  }
+
+  if (baseDeficit > 0.000001) {
+    const baseRaw = BigInt(Math.max(1, Math.ceil(baseDeficit * baseScale)));
+    const isSuiBase = safeNormalizeCoinType(pool.baseCoinId) === safeNormalizeCoinType(SUI_COIN_TYPE);
+    const bCoin = coinWithBalance({
+      type: pool.baseCoinId,
+      balance: baseRaw,
+      useGasCoin: isSuiBase,
+    })(tx);
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+      arguments: [targetManagerArg, bCoin],
+      typeArguments: [pool.baseCoinId],
+    });
+  }
+
+  const tradeProof = tx.moveCall({
+    target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
+    arguments: [targetManagerArg],
+  });
+
+  const orderType = postOnly ? OrderType.POST_ONLY : OrderType.NO_RESTRICTION;
+  const selfMatching = SelfMatchingOptions.SELF_MATCHING_ALLOWED;
+  const expireTs = 1844674407370955161n;
+  const baseOrderId = BigInt(Date.now());
+
+  normalizedOrders.forEach((ord, idx) => {
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::pool::place_limit_order`,
+      arguments: [
+        tx.object(pool.poolId),
+        targetManagerArg,
+        tradeProof,
+        tx.pure.u64(baseOrderId + BigInt(idx)),
+        tx.pure.u8(orderType),
+        tx.pure.u8(selfMatching),
+        tx.pure.u64(ord.onChainPrice),
+        tx.pure.u64(ord.onChainQty),
+        tx.pure.bool(ord.isBid),
+        tx.pure.bool(payWithDeep),
+        tx.pure.u64(expireTs),
+        tx.object('0x6'),
+      ],
+      typeArguments: [pool.baseCoinId, pool.quoteCoinId],
+    });
+  });
+
+  if (isNewManager) {
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::register_balance_manager`,
+      arguments: [targetManagerArg, tx.object(DEEPBOOK_REGISTRY_ID)],
+    });
+    attachSpotReferralInTx(tx, targetManagerArg, spotReferralId, owner);
+    tx.moveCall({
+      target: '0x2::transfer::public_share_object',
+      arguments: [targetManagerArg],
+      typeArguments: [`${DEEPBOOK_PACKAGE_ID}::balance_manager::BalanceManager`],
+    });
+  }
+
+  if (feeMist > 0n) {
+    appendVoltFeeCoinSplit(tx, tx.gas, feeMist, owner, refSharePct);
   }
 
   return tx;

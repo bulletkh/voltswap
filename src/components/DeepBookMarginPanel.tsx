@@ -13,10 +13,13 @@ import {
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import {
   buildDeepBookMarginOrderTx,
+  buildMarginAttachTpSlTx,
   buildMarginCancelTx,
   buildMarginCloseAndRepayTx,
+  buildMarginDepositCollateralTx,
   buildMarginRepayTx,
   buildMarginWithdrawCollateralTx,
+  computeMarginHealthMetrics,
   fetchMarginPoolConfig,
   fetchMarginPositionForPool,
   type MarginManagerPosition,
@@ -567,6 +570,11 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [withdrawAsset, setWithdrawAsset] = useState<'base' | 'quote'>('quote');
   const [withdrawAmt, setWithdrawAmt] = useState<string>('');
+  const [collatAsset, setCollatAsset] = useState<'base' | 'quote'>('quote');
+  const [collatAmt, setCollatAmt] = useState<string>('');
+  const [tpTriggerInput, setTpTriggerInput] = useState<string>('');
+  const [slTriggerInput, setSlTriggerInput] = useState<string>('');
+  const [tpSlSide, setTpSlSide] = useState<'long' | 'short'>('long');
 
   const runAction = async (label: string, buildFn: () => ReturnType<typeof buildMarginRepayTx>) => {
     if (!account?.address) return;
@@ -584,6 +592,9 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
         digest ? 'View on Suiscan' : undefined,
         digest ? `https://suiscan.xyz/mainnet/tx/${digest}` : undefined
       );
+      setCollatAmt('');
+      setTpTriggerInput('');
+      setSlTriggerInput('');
       onRefresh();
     } catch (err: any) {
       onNotify('error', `${label} Failed`, err?.message || 'Transaction aborted.');
@@ -609,6 +620,17 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
   }
 
   const hasDebt = Boolean(position && (position.baseDebt > 0 || position.quoteDebt > 0));
+  const healthMetrics = computeMarginHealthMetrics(position, riskConfig);
+  const defaultCloseQty = position
+    ? healthMetrics.inferredSide === 'long'
+      ? Math.max(pool.minSize, position.baseAsset)
+      : Math.max(
+          pool.minSize,
+          position.baseDebt > 0
+            ? position.baseDebt
+            : position.quoteAsset / Math.max(0.0001, position.basePythPriceUsd)
+        )
+    : pool.minSize;
   const closeQty = position
     ? position.quoteDebt > 0
       ? Math.max(0, position.baseAsset - pool.minSize * 0.05)
@@ -644,7 +666,156 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
       </div>
 
       {position ? (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        <div className="space-y-4">
+          {/* Live Health Factor Gauge + Est. Liquidation + Standalone Pro Controls */}
+          <div className="rounded-xl bg-[#0A1019] border border-white/[0.08] p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-center">
+            <div className="lg:col-span-4 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Margin Health Gauge</span>
+                <span
+                  className={`font-mono font-bold tabular-nums ${
+                    healthMetrics.status === 'healthy'
+                      ? 'text-[#00E599]'
+                      : healthMetrics.status === 'caution'
+                        ? 'text-amber-400'
+                        : 'text-[#FF5E7A]'
+                  }`}
+                >
+                  {hasDebt
+                    ? `${healthMetrics.riskRatio.toFixed(2)}x (${healthMetrics.healthBufferPct.toFixed(1)}% buffer)`
+                    : 'Healthy · 0 Debt'}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    healthMetrics.status === 'healthy'
+                      ? 'bg-gradient-to-r from-[#18C8FF] to-[#00E599]'
+                      : healthMetrics.status === 'caution'
+                        ? 'bg-amber-400'
+                        : 'bg-[#F6465D]'
+                  }`}
+                  style={{ width: `${Math.round(healthMetrics.barProgressPct)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 tabular-nums">
+                <span>Liq Floor: {healthMetrics.liquidationRiskRatio.toFixed(2)}x</span>
+                <span>
+                  {healthMetrics.estLiquidationPrice !== null
+                    ? `Est. Liq $${healthMetrics.estLiquidationPrice.toFixed(3)} (${healthMetrics.distanceToLiqPct?.toFixed(1)}%)`
+                    : `Net Equity $${healthMetrics.netEquityUsd.toFixed(2)}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-lg p-0.5 bg-[#060B12] border border-white/[0.08] text-[11px] font-mono">
+                <button
+                  type="button"
+                  onClick={() => setCollatAsset('quote')}
+                  className={`px-2 py-1 rounded ${
+                    collatAsset === 'quote' ? 'bg-[#18C8FF]/20 text-[#9CE7FF]' : 'text-slate-400'
+                  }`}
+                >
+                  {pool.quoteSymbol}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCollatAsset('base')}
+                  className={`px-2 py-1 rounded ${
+                    collatAsset === 'base' ? 'bg-[#18C8FF]/20 text-[#9CE7FF]' : 'text-slate-400'
+                  }`}
+                >
+                  {pool.baseSymbol}
+                </button>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={collatAmt}
+                onChange={(e) => setCollatAmt(e.target.value)}
+                placeholder={`Add ${collatAsset === 'quote' ? pool.quoteSymbol : pool.baseSymbol}`}
+                className="w-24 px-2.5 py-1.5 rounded-lg bg-[#060B12] border border-white/[0.1] text-xs font-mono text-white outline-none focus:border-[#18C8FF]"
+              />
+              <button
+                type="button"
+                disabled={busyAction !== null || !(parseFloat(collatAmt) > 0)}
+                onClick={() =>
+                  runAction('Add Margin Collateral', () =>
+                    buildMarginDepositCollateralTx({
+                      owner: account.address,
+                      pool,
+                      managerId: position.managerId,
+                      assetSide: collatAsset,
+                      amount: parseFloat(collatAmt),
+                    })
+                  )
+                }
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 disabled:opacity-45"
+              >
+                {busyAction === 'Add Margin Collateral' ? '...' : '+ Collateral'}
+              </button>
+            </div>
+
+            <div className="lg:col-span-4 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setTpSlSide((s) => (s === 'long' ? 'short' : 'long'))}
+                className={`px-2 py-1.5 rounded-lg text-[11px] font-mono border ${
+                  tpSlSide === 'long'
+                    ? 'bg-[#00D98B]/15 border-[#00D98B]/35 text-[#00E599]'
+                    : 'bg-[#F6465D]/15 border-[#F6465D]/35 text-[#FF5E7A]'
+                }`}
+                title="Click to toggle Close Long vs Close Short TP/SL direction"
+              >
+                {tpSlSide.toUpperCase()}
+              </button>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={tpTriggerInput}
+                onChange={(e) => setTpTriggerInput(e.target.value)}
+                placeholder="TP $"
+                className="w-20 px-2 py-1.5 rounded-lg bg-[#060B12] border border-white/[0.1] text-xs font-mono text-[#00E599] placeholder:text-slate-500 outline-none focus:border-[#00E599]"
+              />
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={slTriggerInput}
+                onChange={(e) => setSlTriggerInput(e.target.value)}
+                placeholder="SL $"
+                className="w-20 px-2 py-1.5 rounded-lg bg-[#060B12] border border-white/[0.1] text-xs font-mono text-[#FF5E7A] placeholder:text-slate-500 outline-none focus:border-[#F6465D]"
+              />
+              <button
+                type="button"
+                disabled={
+                  busyAction !== null ||
+                  !(parseFloat(tpTriggerInput) > 0 || parseFloat(slTriggerInput) > 0)
+                }
+                onClick={() =>
+                  runAction('Attach Conditional TP/SL', () =>
+                    buildMarginAttachTpSlTx({
+                      owner: account.address,
+                      pool,
+                      managerId: position.managerId,
+                      side: tpSlSide,
+                      quantity: defaultCloseQty,
+                      tpPrice: parseFloat(tpTriggerInput) > 0 ? parseFloat(tpTriggerInput) : undefined,
+                      slPrice: parseFloat(slTriggerInput) > 0 ? parseFloat(slTriggerInput) : undefined,
+                    })
+                  )
+                }
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.08] border border-white/[0.14] text-white hover:border-[#18C8FF]/50 disabled:opacity-45"
+              >
+                {busyAction === 'Attach Conditional TP/SL' ? '...' : 'Set TP/SL'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           {/* Health + Assets & Debts */}
           <div className="xl:col-span-5 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono">
             <div className="panel-carbon-sub rounded-xl p-3">
@@ -840,6 +1011,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
               </button>
             </div>
           </div>
+        </div>
         </div>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">

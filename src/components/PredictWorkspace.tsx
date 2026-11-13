@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Zap,
+  Bot,
 } from 'lucide-react';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { rawToUsdc, usdcToRaw, snapStrike, MAINNET_CONFIG, type MintPlan } from '@mysten/deepbook-v3/predict';
@@ -35,6 +36,14 @@ import { extractTxDigest, fetchWalletBalances, readBalanceFromMap } from '../sui
 import { simulateTxBeforeWallet } from '../suiSimulate';
 import { VOLT_TREASURY_ADDRESS } from '../constants';
 import { addWalletVolumeUsd, getValidReferrerForSender, resolveTraderTier } from '../voltFee';
+import {
+  buildSessionPredictBetTx,
+  executeWithLocalSessionKey,
+  fetchSessionStatus,
+  type SessionStatusSnapshot,
+} from '../deepbookSessions';
+import { PredictSessionPanel } from './PredictSessionPanel';
+import { AiCopilotModal } from './AiCopilotModal';
 import { ProCandleChart, type ChartTimeframe } from './ProCandleChart';
 import type { PnlTradeData } from '../PnlShareModal';
 
@@ -121,16 +130,22 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
   const [timeframe, setTimeframe] = useState<ChartTimeframe>('1m');
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [bottomTab, setBottomTab] = useState<'orders' | 'positions'>('orders');
+  const [sessionStatus, setSessionStatus] = useState<SessionStatusSnapshot | null>(null);
+  const [isAiCopilotOpen, setIsAiCopilotOpen] = useState(false);
 
   const strikeInitializedRef = useRef<string>('');
 
   const loadBoard = useCallback(async () => {
     try {
-      const [nextBoard, balMap] = await Promise.all([
+      const [nextBoard, balMap, nextSession] = await Promise.all([
         fetchPredictBoard(account?.address),
         account?.address ? fetchWalletBalances(account.address) : Promise.resolve({}),
+        account?.address
+          ? fetchSessionStatus(account.address).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setBoard(nextBoard);
+      setSessionStatus(nextSession);
       if (account?.address) {
         setWalletUsdc(readBalanceFromMap(balMap, MAINNET_CONFIG.quoteCoinType, 6));
       } else {
@@ -321,33 +336,69 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
 
     setIsSubmitting(true);
     try {
-      const tx = buildPredictPlaceBetTx({
-        sender: account.address,
-        market: selectedMarket.market,
-        side,
-        strike: parsedStrike,
-        lowerStrike: parsedLower,
-        upperStrike: parsedUpper,
-        maxCostRaw: quotePlan.raw.maxCost ?? quotePlan.raw.budget,
-        minQuantityRaw: quotePlan.raw.minQuantity,
-        totalDebitRaw,
-        hasAccount: Boolean(board.account?.hasAccount),
-        availableRaw,
-        protocol: board.protocol,
-      });
+      const canUseSession = Boolean(
+        sessionStatus?.isActiveNow &&
+          sessionStatus.localKey &&
+          sessionStatus.sessionGasSui >= 0.005 &&
+          availableRaw >= totalDebitRaw
+      );
 
-      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
-      if (!sim.ok) {
-        onNotify(
-          'error',
-          'Predict Preflight Failed',
-          sim.errorMessage || 'Transaction would abort on-chain.'
-        );
-        return;
+      let digest = '';
+      if (canUseSession && sessionStatus?.localKey) {
+        const tx = buildSessionPredictBetTx({
+          owner: account.address,
+          sessionAddress: sessionStatus.localKey.sessionAddress,
+          market: selectedMarket.market,
+          side,
+          strike: parsedStrike,
+          lowerStrike: parsedLower,
+          upperStrike: parsedUpper,
+          maxCostRaw: quotePlan.raw.maxCost ?? quotePlan.raw.budget,
+          minQuantityRaw: quotePlan.raw.minQuantity,
+        });
+        const sim = await simulateTxBeforeWallet(tx, {
+          sender: sessionStatus.localKey.sessionAddress,
+        });
+        if (!sim.ok) {
+          onNotify(
+            'error',
+            'Session Preflight Failed',
+            sim.errorMessage || 'Session transaction would abort on-chain.'
+          );
+          return;
+        }
+        const exec = await executeWithLocalSessionKey(tx, account.address);
+        digest = exec.digest;
+      } else {
+        const tx = buildPredictPlaceBetTx({
+          sender: account.address,
+          market: selectedMarket.market,
+          side,
+          strike: parsedStrike,
+          lowerStrike: parsedLower,
+          upperStrike: parsedUpper,
+          maxCostRaw: quotePlan.raw.maxCost ?? quotePlan.raw.budget,
+          minQuantityRaw: quotePlan.raw.minQuantity,
+          totalDebitRaw,
+          hasAccount: Boolean(board.account?.hasAccount),
+          availableRaw,
+          protocol: board.protocol,
+        });
+
+        const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+        if (!sim.ok) {
+          onNotify(
+            'error',
+            'Predict Preflight Failed',
+            sim.errorMessage || 'Transaction would abort on-chain.'
+          );
+          return;
+        }
+
+        const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+        digest = extractTxDigest(res);
       }
 
-      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
-      const digest = extractTxDigest(res);
       const sideText =
         side === 'up'
           ? `BTC > $${parsedStrike.toLocaleString()}`
@@ -357,8 +408,8 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
 
       onNotify(
         'success',
-        `Predict ${side.toUpperCase()} Enqueued`,
-        `${sideText} · Est. Payout $${quotePlan.potentialPayout.toFixed(2)} (${quotePlan.payoutMultiple.toFixed(2)}x)`,
+        canUseSession ? `1-Click ${side.toUpperCase()} Enqueued` : `Predict ${side.toUpperCase()} Enqueued`,
+        `${sideText} · Est. Payout $${quotePlan.potentialPayout.toFixed(2)} (${quotePlan.payoutMultiple.toFixed(2)}x)${canUseSession ? ' · 0-popup session' : ''}`,
         'Suiscan',
         `https://suiscan.xyz/mainnet/tx/${digest}`
       );
@@ -588,6 +639,14 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               )}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => setIsAiCopilotOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 text-xs font-bold transition-colors"
+          >
+            <Bot className="w-3.5 h-3.5" />
+            <span>AI Copilot</span>
+          </button>
           <button
             type="button"
             onClick={loadBoard}
@@ -1126,12 +1185,24 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               <>
                 <Zap className="w-4 h-4" />
                 <span>
-                  {board?.account?.hasAccount ? 'Place' : 'Create Vault & Place'}{' '}
-                  {side.toUpperCase()} (${parsedAmount.toFixed(2)})
+                  {sessionStatus?.isActiveNow &&
+                  shortfallUsd <= 0.0001 &&
+                  (sessionStatus?.sessionGasSui ?? 0) >= 0.005
+                    ? `1-Click Bet (No Popup) ${side.toUpperCase()} ($${parsedAmount.toFixed(2)})`
+                    : `${board?.account?.hasAccount ? 'Place' : 'Create Vault & Place'} ${side.toUpperCase()} ($${parsedAmount.toFixed(2)})`}
                 </span>
               </>
             )}
           </button>
+
+          <PredictSessionPanel
+            hasAccount={Boolean(board?.account?.hasAccount)}
+            availableUsdc={availableUsdc}
+            protocol={board?.protocol ?? null}
+            sessionStatus={sessionStatus}
+            onSessionUpdated={loadBoard}
+            onNotify={onNotify}
+          />
 
           {/* Native Monetization Status */}
           <div className="rounded-xl bg-[#0A1019]/80 border border-white/[0.06] px-3 py-2 text-[11px] text-slate-400 flex items-center justify-between">
@@ -1147,6 +1218,15 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           </div>
         </div>
       </div>
+
+      <AiCopilotModal
+        isOpen={isAiCopilotOpen}
+        initialTab="predict"
+        onClose={() => setIsAiCopilotOpen(false)}
+        defaultCandles={btcCandles}
+        onNotify={onNotify}
+        onDeployed={loadBoard}
+      />
     </div>
   );
 };

@@ -10,6 +10,8 @@ import {
   RefreshCw,
   CheckCircle2,
   BarChart2,
+  Sparkles,
+  Bot,
 } from 'lucide-react';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { POPULAR_TOKENS, type Token } from '../constants';
@@ -64,6 +66,8 @@ import {
   type MarginPoolRiskConfig,
 } from '../deepbookMargin';
 import type { PnlTradeData } from '../PnlShareModal';
+import { DustSweeperModal } from './DustSweeperModal';
+import { AiCopilotModal } from './AiCopilotModal';
 
 export type SwapMode = 'market' | 'limit' | 'margin';
 
@@ -103,6 +107,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [slippagePct, setSlippagePct] = useState<number>(0.5);
   const [showSettings, setShowSettings] = useState(false);
   const [showMarketChart, setShowMarketChart] = useState(false);
+  const [showDustSweeper, setShowDustSweeper] = useState(false);
+  const [showAiCopilot, setShowAiCopilot] = useState(false);
   const [tokenPickerFor, setTokenPickerFor] = useState<'from' | 'to' | null>(null);
   const [tokenQuery, setTokenQuery] = useState('');
 
@@ -843,7 +849,23 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-2.5 text-xs sm:text-sm font-mono text-slate-300">
+        <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm font-mono text-slate-300">
+          <button
+            type="button"
+            onClick={() => setShowDustSweeper(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#00E599]/10 border border-[#00E599]/35 text-[#00E599] hover:bg-[#00E599]/20 font-sans font-bold text-xs transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Sweep Dust</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAiCopilot(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/40 text-[#9CE7FF] hover:bg-[#18C8FF]/25 font-sans font-bold text-xs transition-colors"
+          >
+            <Bot className="w-3.5 h-3.5" />
+            <span>AI Copilot</span>
+          </button>
           <span className="px-3.5 py-2 rounded-xl panel-carbon">
             {traderTier.badgeEmoji} <span className="text-white font-semibold">{traderTier.name}</span> ·{' '}
             <span className="text-[#18C8FF] font-bold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
@@ -1826,6 +1848,29 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           </div>
         </div>
       )}
+
+      <DustSweeperModal
+        isOpen={showDustSweeper}
+        onClose={() => setShowDustSweeper(false)}
+        onSuccess={(msg) => {
+          onNotify('success', 'Wallet Cleanup Complete', msg);
+          refreshBalances();
+        }}
+      />
+
+      <AiCopilotModal
+        isOpen={showAiCopilot}
+        initialTab={mode === 'margin' ? 'yield' : 'grid'}
+        onClose={() => setShowAiCopilot(false)}
+        defaultPool={activePool}
+        defaultCandles={candles}
+        marginPosition={marginPosition}
+        marginRiskConfig={marginRiskConfig}
+        onNotify={onNotify}
+        onDeployed={async () => {
+          await Promise.all([refreshDeepBookAccount(), refreshBalances()]);
+        }}
+      />
     </div>
   );
 };
