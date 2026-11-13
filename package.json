@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:sim": "node scripts/test-sim.mjs"
   },
   "dependencies": {
     "@7kprotocol/sdk-ts": "^4.0.0",

@@ -52,6 +52,7 @@ import {
   buildWithdrawCollateralTx,
   buildPlaceMarketOrderTx,
 } from './aftermathPerps';
+import { simulateTxBeforeWallet } from './suiSimulate';
 import {
   playClickSound,
   playOrderSubmittedSound,
@@ -1247,6 +1248,11 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
         slippage: 0.02,
         feeMist,
       });
+
+      const simCheck = await simulateTxBeforeWallet(orderTx, { client: suiClient, sender: walletAddr });
+      if (!simCheck.ok) {
+        throw new Error(simCheck.errorMessage || 'Order pre-flight simulation failed.');
+      }
 
       const res = await signAndExecute({ transaction: orderTx });
       const digest = (res as any)?.digest || '';
