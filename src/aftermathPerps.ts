@@ -1,4 +1,6 @@
 import { Transaction } from '@mysten/sui/transactions';
+import { bcs } from '@mysten/sui/bcs';
+import { fromBase64, toBase64 } from '@mysten/bcs';
 import { VOLT_TREASURY_ADDRESS } from './EarnVaultsHub';
 
 export const AF_PERPS_API = 'https://aftermath.finance/api/perpetuals';
@@ -57,15 +59,99 @@ function parseBigIntN(val: unknown, fallback = 1n): bigint {
   return fallback;
 }
 
-export function txFromKindBase64(txKindBase64: string, sender: string): Transaction {
-  const bin = atob(txKindBase64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) {
-    bytes[i] = bin.charCodeAt(i);
+const ReservationV2 = bcs.enum('Reservation', { MaxAmountU64: bcs.u64() });
+const WithdrawalTypeV2 = bcs.enum('WithdrawalType', { Balance: bcs.TypeTag });
+const WithdrawFromV2 = bcs.enum('WithdrawFrom', {
+  Sender: null,
+  Sponsor: null,
+  SenderAllowance: bcs.struct('SenderAllowance', { funder: bcs.Address, allowance: bcs.Address }),
+});
+const FundsWithdrawalV2 = bcs.struct('FundsWithdrawal', {
+  reservation: ReservationV2,
+  typeArg: WithdrawalTypeV2,
+  withdrawFrom: WithdrawFromV2,
+});
+const CallArgV2 = bcs.enum('CallArg', {
+  Pure: bcs.struct('Pure', {
+    bytes: bcs.byteVector().transform({
+      input: (val: any) => (typeof val === 'string' ? fromBase64(val) : val),
+      output: (val: Uint8Array) => toBase64(val),
+    }),
+  }),
+  Object: bcs.ObjectArg,
+  FundsWithdrawal: FundsWithdrawalV2,
+});
+const ProgrammableTxV2 = bcs.struct('ProgrammableTransaction', {
+  inputs: bcs.vector(CallArgV2),
+  commands: bcs.vector(bcs.Command),
+});
+const TxKindV2 = bcs.enum('TransactionKind', {
+  ProgrammableTransaction: ProgrammableTxV2,
+});
+
+function stripKindKeys(val: any): any {
+  if (val === null || val === undefined) return val;
+  if (Array.isArray(val)) return val.map(stripKindKeys);
+  if (typeof val === 'object') {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (k === '$kind') continue;
+      out[k] = stripKindKeys(v);
+    }
+    return out;
   }
-  const tx = Transaction.fromKind(bytes);
-  tx.setSender(sender);
-  return tx;
+  return val;
+}
+
+export function txFromKindBase64(
+  txKindBase64: string,
+  sender: string,
+  feeMist?: bigint
+): Transaction | string {
+  const bytes = fromBase64(txKindBase64);
+  try {
+    const tx = Transaction.fromKind(bytes);
+    tx.setSender(sender);
+    if (feeMist && feeMist > 0n) {
+      appendVoltFeeToTx(tx, feeMist);
+    }
+    return tx;
+  } catch {
+    // Fallback for @mysten/sui v2 txKind containing CallArg::FundsWithdrawal (enum 2)
+    const parsed = TxKindV2.parse(bytes);
+    const ptx = stripKindKeys(parsed.ProgrammableTransaction);
+    const inputs: any[] = ptx.inputs || [];
+    const commands: any[] = ptx.commands || [];
+
+    if (feeMist && feeMist > 0n) {
+      const feeIdx = inputs.length;
+      inputs.push({ Pure: { bytes: toBase64(bcs.u64().serialize(feeMist).toBytes()) } });
+      const addrIdx = inputs.length;
+      inputs.push({ Pure: { bytes: toBase64(bcs.Address.serialize(VOLT_TREASURY_ADDRESS).toBytes()) } });
+      const splitCmdIdx = commands.length;
+      commands.push({
+        SplitCoins: {
+          coin: { GasCoin: true },
+          amounts: [{ Input: feeIdx }],
+        },
+      });
+      commands.push({
+        TransferObjects: {
+          objects: [{ NestedResult: [splitCmdIdx, 0] }],
+          address: { Input: addrIdx },
+        },
+      });
+    }
+
+    return JSON.stringify({
+      version: 2,
+      sender,
+      expiration: null,
+      gasData: { budget: null, price: null, owner: null, payment: null },
+      inputs,
+      commands,
+    });
+  }
 }
 
 export function appendVoltFeeToTx(tx: Transaction, feeMist: bigint): void {
@@ -181,7 +267,12 @@ export async function fetchAftermathAccountState(walletAddress: string): Promise
   };
 }
 
-async function postTxKind(path: string, body: Record<string, any>, sender: string): Promise<Transaction> {
+async function postTxKind(
+  path: string,
+  body: Record<string, any>,
+  sender: string,
+  feeMist?: bigint
+): Promise<Transaction | string> {
   const res = await fetch(`${AF_PERPS_API}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -202,10 +293,10 @@ async function postTxKind(path: string, body: Record<string, any>, sender: strin
   if (!data?.txKind) {
     throw new Error(`Aftermath API did not return txKind for ${path}`);
   }
-  return txFromKindBase64(data.txKind, sender);
+  return txFromKindBase64(data.txKind, sender, feeMist);
 }
 
-export async function buildCreateAccountTx(walletAddress: string): Promise<Transaction> {
+export async function buildCreateAccountTx(walletAddress: string): Promise<Transaction | string> {
   return postTxKind(
     '/transactions/create-account',
     { walletAddress, collateralCoinType: AF_USDC_COIN_TYPE },
@@ -217,7 +308,7 @@ export async function buildDepositCollateralTx(
   walletAddress: string,
   accountId: string,
   amountUsdc: number
-): Promise<Transaction> {
+): Promise<Transaction | string> {
   const baseUnits = BigInt(Math.max(1, Math.floor(amountUsdc * 1e6)));
   return postTxKind(
     '/account/transactions/deposit-collateral',
@@ -235,7 +326,7 @@ export async function buildWithdrawCollateralTx(
   walletAddress: string,
   accountId: string,
   amountUsdc: number
-): Promise<Transaction> {
+): Promise<Transaction | string> {
   const baseUnits = BigInt(Math.max(1, Math.floor(amountUsdc * 1e6)));
   return postTxKind(
     '/account/transactions/withdraw-collateral',
@@ -264,12 +355,12 @@ export async function buildPlaceMarketOrderTx(params: {
   cancelSlTp: boolean;
   slippage?: number;
   feeMist?: bigint;
-}): Promise<Transaction> {
+}): Promise<Transaction | string> {
   const lot = params.lotSize > 0n ? params.lotSize : 10000n;
   const rawSize = BigInt(Math.max(1, Math.round(params.sizeContracts * 1e9)));
   const alignedSize = (rawSize / lot) * lot || lot;
 
-  const tx = await postTxKind(
+  return postTxKind(
     '/account/transactions/place-market-order',
     {
       walletAddress: params.walletAddress,
@@ -284,11 +375,7 @@ export async function buildPlaceMarketOrderTx(params: {
       cancelSlTp: params.cancelSlTp,
       slippage: params.slippage ?? 0.02,
     },
-    params.walletAddress
+    params.walletAddress,
+    params.feeMist
   );
-
-  if (params.feeMist && params.feeMist > 0n) {
-    appendVoltFeeToTx(tx, params.feeMist);
-  }
-  return tx;
 }

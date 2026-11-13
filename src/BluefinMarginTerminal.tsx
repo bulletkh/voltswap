@@ -346,7 +346,7 @@ export const BLUEFIN_MARKETS: BluefinMarket[] = [
 interface BluefinMarginTerminalProps {
   currentAccount?: any;
   suiClient?: any;
-  signAndExecute?: (args: { transaction: Transaction }) => Promise<any>;
+  signAndExecute?: (args: { transaction: any }) => Promise<any>;
   currentAccountAddress?: string | null;
   userBalances?: Record<string, string>;
   feeRate?: number;
