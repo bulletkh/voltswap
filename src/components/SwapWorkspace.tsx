@@ -10,7 +10,6 @@ import {
   RefreshCw,
   CheckCircle2,
   BarChart2,
-  Sparkles,
   Bot,
   Search,
 } from 'lucide-react';
@@ -68,7 +67,6 @@ import {
   type MarginPoolRiskConfig,
 } from '../deepbookMargin';
 import type { PnlTradeData } from '../PnlShareModal';
-import { DustSweeperModal } from './DustSweeperModal';
 import { AiCopilotModal } from './AiCopilotModal';
 
 export type SwapMode = 'market' | 'limit' | 'margin';
@@ -198,7 +196,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [showMarketChart, setShowMarketChart] = useState<boolean>(() =>
     typeof window === 'undefined' ? true : window.innerWidth >= 1024
   );
-  const [showDustSweeper, setShowDustSweeper] = useState(false);
   const [showAiCopilot, setShowAiCopilot] = useState(false);
   const [tokenPickerFor, setTokenPickerFor] = useState<'from' | 'to' | null>(null);
   const [tokenQuery, setTokenQuery] = useState('');
@@ -1012,14 +1009,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-slate-300">
-          <button
-            type="button"
-            onClick={() => setShowDustSweeper(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#06070A] border border-[#1E232D] text-slate-200 hover:border-[#08D189]/55 hover:text-white font-sans font-semibold text-xs transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#08D189]" />
-            <span>Sweep Dust</span>
-          </button>
           <button
             type="button"
             onClick={() => setShowAiCopilot(true)}
@@ -2224,15 +2213,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           </div>
         </div>
       )}
-
-      <DustSweeperModal
-        isOpen={showDustSweeper}
-        onClose={() => setShowDustSweeper(false)}
-        onSuccess={(msg) => {
-          onNotify('success', 'Wallet Cleanup Complete', msg);
-          refreshBalances();
-        }}
-      />
 
       <AiCopilotModal
         isOpen={showAiCopilot}

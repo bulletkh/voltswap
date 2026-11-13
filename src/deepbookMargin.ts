@@ -910,3 +910,135 @@ export function buildMarginCancelTx(params: {
   }
   return tx;
 }
+
+/** Discovers all MarginManagers owned by `owner` and returns live positions in a single pass. */
+export async function fetchAllMarginPositionsForOwner(
+  owner: string,
+  pools: DeepBookPoolMeta[]
+): Promise<MarginManagerPosition[]> {
+  const probe = createDeepBookMarginClient(owner);
+  const ids = await probe.deepbook.getMarginManagerIdsForOwner(owner).catch(() => [] as string[]);
+  if (!ids.length) return [];
+
+  const poolById = new Map(pools.map((p) => [p.poolId.toLowerCase(), p]));
+  const matchedEntries: Array<{ managerId: string; pool: DeepBookPoolMeta }> = [];
+
+  await Promise.all(
+    ids.map(async (id) => {
+      const obj = await suiGrpcClient.core
+        .getObject({ objectId: id, include: { json: true } })
+        .catch(() => null);
+      const poolField = String((obj?.object?.json as any)?.deepbook_pool || '').toLowerCase();
+      const matchedPool = poolById.get(poolField);
+      if (matchedPool) {
+        matchedEntries.push({ managerId: id, pool: matchedPool });
+      }
+    })
+  );
+
+  const positions = await Promise.all(
+    matchedEntries.map(async ({ managerId, pool }) => {
+      try {
+        const ext = createDeepBookMarginClient(owner, managerId, pool.poolName);
+        const db = ext.deepbook;
+        const { baseCoin, quoteCoin } = getPoolCoins(pool.poolName);
+        const [state, balances, rawOrders, tpslIds] = await Promise.all([
+          db.getMarginManagerState('MAIN', 6).catch(() => null),
+          db.getMarginManagerBalances({ [managerId]: pool.poolName }, 6).catch(() => null),
+          db.getAccountOrderDetails(pool.poolName, 'MAIN').catch(() => []),
+          db.getConditionalOrderIds('MAIN').catch(() => []),
+        ]);
+        if (!state) return null;
+
+        const openOrders: MarginOpenOrder[] = await Promise.all(
+          (Array.isArray(rawOrders) ? rawOrders : []).map(async (ord: any) => {
+            const norm = await db.getOrderNormalized(pool.poolName, ord.order_id).catch(() => null);
+            return {
+              orderId: String(ord.order_id),
+              isBid: Boolean(norm?.isBid ?? BigInt(ord.order_id) >> 127n === 0n),
+              price: Number(norm?.normalized_price || 0),
+              quantity: norm ? Number(norm.quantity) : Number(ord.quantity || 0) / baseCoin.scalar,
+              filledQuantity: norm
+                ? Number(norm.filled_quantity)
+                : Number(ord.filled_quantity || 0) / baseCoin.scalar,
+              status: Number(ord.status || 0),
+            };
+          })
+        );
+
+        const balEntry = balances?.[managerId];
+        const basePyth =
+          Number(state.basePythPrice || 0) / Math.pow(10, Math.abs(state.basePythDecimals || 8));
+        const quotePyth =
+          Number(state.quotePythPrice || 0) / Math.pow(10, Math.abs(state.quotePythDecimals || 8));
+
+        return {
+          managerId: state.managerId,
+          poolKey: pool.poolName,
+          deepbookPoolId: state.deepbookPoolId,
+          riskRatio: Number(state.riskRatio || 0),
+          baseAsset: Number(state.baseAsset || 0),
+          quoteAsset: Number(state.quoteAsset || 0),
+          baseDebt: Number(state.baseDebt || 0),
+          quoteDebt: Number(state.quoteDebt || 0),
+          baseBalance: Number(balEntry?.base ?? state.baseAsset ?? 0),
+          quoteBalance: Number(balEntry?.quote ?? state.quoteAsset ?? 0),
+          deepBalance: Number(balEntry?.deep ?? 0),
+          basePythPriceUsd: basePyth > 0 ? basePyth : 1,
+          quotePythPriceUsd: quotePyth > 0 ? quotePyth : 1 / quoteCoin.scalar || 1,
+          openOrders,
+          conditionalOrderIds: Array.isArray(tpslIds) ? tpslIds.map(String) : [],
+        } satisfies MarginManagerPosition;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return positions.filter((p): p is MarginManagerPosition => p !== null);
+}
+
+/** Cancels open orders/TP-SL if present and withdraws all free base/quote/DEEP from a MarginManager. */
+export function buildMarginWithdrawAllFreeTx(params: {
+  owner: string;
+  pool: DeepBookPoolMeta;
+  position: MarginManagerPosition;
+}): Transaction {
+  const { owner, pool, position } = params;
+  const { baseCoin, quoteCoin } = getPoolCoins(pool.poolName);
+  const ext = createDeepBookMarginClient(owner, position.managerId, pool.poolName);
+  const db = ext.deepbook;
+  const tx = new Transaction();
+  tx.setSender(owner);
+
+  for (const ord of position.openOrders) {
+    tx.add(db.poolProxy.cancelOrder('MAIN', ord.orderId));
+  }
+  if (position.conditionalOrderIds.length > 0) {
+    tx.add(db.marginTPSL.cancelAllConditionalOrders('MAIN'));
+  }
+  tx.add(db.poolProxy.withdrawSettledAmounts('MAIN'));
+
+  const coinsToReturn: any[] = [];
+  const rawBase = Math.max(position.baseBalance, position.baseAsset);
+  const safeBase = Math.floor(rawBase * baseCoin.scalar) / baseCoin.scalar;
+  if (safeBase > 0 && position.baseDebt === 0) {
+    coinsToReturn.push(tx.add(db.marginManager.withdrawBase('MAIN', safeBase)));
+  }
+
+  const rawQuote = Math.max(position.quoteBalance, position.quoteAsset);
+  const safeQuote = Math.floor(rawQuote * quoteCoin.scalar) / quoteCoin.scalar;
+  if (safeQuote > 0 && position.quoteDebt === 0) {
+    coinsToReturn.push(tx.add(db.marginManager.withdrawQuote('MAIN', safeQuote)));
+  }
+
+  const safeDeep = Math.floor(position.deepBalance * 1e6) / 1e6;
+  if (safeDeep > 0) {
+    coinsToReturn.push(tx.add(db.marginManager.withdrawDeep('MAIN', safeDeep)));
+  }
+
+  if (coinsToReturn.length > 0) {
+    tx.transferObjects(coinsToReturn, owner);
+  }
+  return tx;
+}

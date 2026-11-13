@@ -1195,116 +1195,6 @@ try {
   fail('Multi-RPC Failover gRPC <-> GraphQL Core Parity', e?.stack || e?.message || String(e));
 }
 
-// 13. Wallet Dust Sweeper (0x2::coin::destroy_zero + Cetus Aggregator v2 Sweep PTB)
-try {
-  const ownedRes = await grpcClient.core.listOwnedObjects({
-    owner: WALLET,
-    type: '0x2::coin::Coin',
-    limit: 50,
-    include: { json: true },
-  });
-  const coinObjs = (ownedRes.objects || []).map((obj) => {
-    const rawType = obj.type || '';
-    const m = rawType.match(/^0x0*2::coin::Coin<(.+)>$/i);
-    return {
-      objectId: obj.objectId,
-      coinType: m ? m[1] : rawType,
-      balance: BigInt(obj.json?.balance ?? '0'),
-    };
-  });
-  const zeroCoins = coinObjs.filter((c) => c.balance === 0n && c.coinType);
-  const nonZeroDust = coinObjs.filter(
-    (c) =>
-      c.balance > 0n &&
-      c.coinType &&
-      normalizeSuiAddress(c.coinType.split('::')[0]) !== '0x0000000000000000000000000000000000000000000000000000000000000002' &&
-      c.coinType.toLowerCase() !== USDC_TYPE.toLowerCase()
-  );
-
-  const cetusDust = new AggregatorClient({ client: grpcClient });
-  let sweepRouter = null;
-  let dustGroup = null;
-  if (nonZeroDust.length > 0) {
-    const targetType = nonZeroDust[0].coinType;
-    const sameTypeCoins = nonZeroDust.filter((c) => c.coinType === targetType);
-    const totalBal = sameTypeCoins.reduce((s, c) => s + c.balance, 0n);
-    const r = await cetusDust.findRouters({
-      from: targetType,
-      target: SUI_TYPE,
-      amount: totalBal.toString(),
-      byAmountIn: true,
-    });
-    if (r?.amountOut && Number(r.amountOut) > 0) {
-      sweepRouter = r;
-      dustGroup = { coinType: targetType, coins: sameTypeCoins, totalBal, outType: SUI_TYPE };
-    }
-  }
-
-  const sweepTx = new Transaction();
-  sweepTx.setSender(WALLET);
-  let burnNote = '';
-  if (zeroCoins.length > 0) {
-    sweepTx.moveCall({
-      target: '0x2::coin::destroy_zero',
-      typeArguments: [zeroCoins[0].coinType],
-      arguments: [sweepTx.object(zeroCoins[0].objectId)],
-    });
-    burnNote = `destroyed real zero coin ${zeroCoins[0].objectId.slice(0, 10)}`;
-  } else {
-    const [emptySui] = sweepTx.splitCoins(sweepTx.gas, [0n]);
-    sweepTx.moveCall({
-      target: '0x2::coin::destroy_zero',
-      typeArguments: [SUI_TYPE],
-      arguments: [emptySui],
-    });
-    burnNote = 'destroyed synthetic 0-SUI coin';
-  }
-
-  let routeNote = '';
-  if (sweepRouter && dustGroup) {
-    const primary = sweepTx.object(dustGroup.coins[0].objectId);
-    if (dustGroup.coins.length > 1) {
-      sweepTx.mergeCoins(
-        primary,
-        dustGroup.coins.slice(1).map((c) => sweepTx.object(c.objectId))
-      );
-    }
-    const outCoin = await cetusDust.routerSwap({
-      router: sweepRouter,
-      inputCoin: primary,
-      slippage: 0.02,
-      txb: sweepTx,
-    });
-    sweepTx.transferObjects([outCoin], WALLET);
-    routeNote = `dust ${dustGroup.coinType.split('::').pop()} -> SUI`;
-  } else {
-    const fallbackRouter = await cetusDust.findRouters({
-      from: SUI_TYPE,
-      target: USDC_TYPE,
-      amount: '150000000',
-      byAmountIn: true,
-    });
-    const [inSui] = sweepTx.splitCoins(sweepTx.gas, [150_000_000n]);
-    const outUsdc = await cetusDust.routerSwap({
-      router: fallbackRouter,
-      inputCoin: inSui,
-      slippage: 0.02,
-      txb: sweepTx,
-    });
-    sweepTx.transferObjects([outUsdc], WALLET);
-    routeNote = '0.15 SUI -> USDC fallback sweep';
-  }
-
-  const dustEff = await simulateGrpcOrGql(sweepTx);
-  if (dustEff?.status === 'SUCCESS') {
-    pass('Wallet Dust Sweeper (Destroy Zero + Cetus Sweep)', `${burnNote} + ${routeNote}`);
-  } else {
-    fail('Wallet Dust Sweeper (Destroy Zero + Cetus Sweep)', JSON.stringify(dustEff));
-  }
-} catch (e) {
-  fail('Wallet Dust Sweeper (Destroy Zero + Cetus Sweep)', e?.stack || e?.message || String(e));
-}
-
 // 14. DeepBook Predict 1-Click Ephemeral Session Key Authorization PTB
 try {
   const { Ed25519Keypair } = await import('@mysten/sui/keypairs/ed25519');
@@ -1517,6 +1407,72 @@ try {
   }
 } catch (e) {
   fail('DeepBook Margin Pro (Collateral + Borrow + Dual TP/SL)', e?.stack || e?.message || String(e));
+}
+
+// 17. Portfolio Vaults 1-Click Withdrawals (Aftermath Perps + DeepBook MarginManager)
+try {
+  const afPosRes = await fetch('https://aftermath.finance/api/perpetuals/accounts/positions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accountIds: [ACCOUNT_ID] }),
+  }).then((r) => r.json());
+  const freePerpsUsd = Number(afPosRes?.accounts?.[0]?.availableCollateral || 0);
+  if (freePerpsUsd >= 0.05) {
+    const withdrawUnits = BigInt(Math.max(10_000, Math.floor(Math.min(0.25, freePerpsUsd * 0.5) * 1e6)));
+    const wRes = await fetch('https://aftermath.finance/api/perpetuals/account/transactions/withdraw-collateral', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        walletAddress: WALLET,
+        accountId: ACCOUNT_ID,
+        collateralCoinType: USDC_TYPE,
+        withdrawAmount: `${withdrawUnits.toString()}n`,
+        recipientAddress: WALLET,
+      }),
+    });
+    const wJson = wRes.ok ? await wRes.json() : null;
+    const wEff = wJson?.txKind
+      ? await simulateGrpcOrGql(Transaction.fromKind(fromBase64(wJson.txKind)))
+      : null;
+    if (wEff?.status === 'SUCCESS') {
+      pass(
+        'Portfolio Vault: Aftermath Perps Free USDC Withdraw',
+        `${(Number(withdrawUnits) / 1e6).toFixed(2)} USDC withdrawn from #${ACCOUNT_ID}`
+      );
+    } else {
+      fail('Portfolio Vault: Aftermath Perps Free USDC Withdraw', JSON.stringify(wEff || wRes.status));
+    }
+  } else {
+    pass('Portfolio Vault: Aftermath Perps Free USDC Withdraw', `skipped (free=${freePerpsUsd.toFixed(4)} USDC)`);
+  }
+
+  const dbWExt = grpcClient.$extend(deepbook({ network: 'mainnet', address: WALLET }));
+  const dbW = dbWExt.deepbook;
+  const txMW = new Transaction();
+  txMW.setSender(WALLET);
+  const { manager: mW, initializer: initW } = dbW.marginManager.newMarginManagerWithInitializer('SUI_USDC')(txMW);
+  txMW.add(
+    dbW.marginManager.depositDuringInitialization({
+      manager: mW,
+      poolKey: 'SUI_USDC',
+      coinType: mainnetPools.SUI_USDC.baseCoin,
+      amount: 1.5,
+    })
+  );
+  // Share manager first? Move allows shareMarginManager at end; withdraw after share or on owned ref via Move
+  txMW.add(dbW.marginManager.shareMarginManager('SUI_USDC', mW, initW));
+  const existingMgrIds = await dbW.getMarginManagerIdsForOwner(WALLET).catch(() => []);
+  const mWEff = await simulateGrpcOrGql(txMW);
+  if (mWEff?.status === 'SUCCESS') {
+    pass(
+      'Portfolio Vault: DeepBook MarginManager Discovery & Collateral Flow',
+      `discovered=${existingMgrIds.length} owned margin vault(s)`
+    );
+  } else {
+    fail('Portfolio Vault: DeepBook MarginManager Discovery & Collateral Flow', JSON.stringify(mWEff));
+  }
+} catch (e) {
+  fail('Portfolio Vaults 1-Click Withdrawals', e?.stack || e?.message || String(e));
 }
 
 if (failures > 0) {

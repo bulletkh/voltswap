@@ -15,6 +15,7 @@ import { appendVoltFeeCoinSplit, addCoinFeeToTx } from './voltFee';
 export const DEEPBOOK_INDEXER = 'https://deepbook-indexer.mainnet.mystenlabs.com';
 export const DEEPBOOK_PACKAGE_ID = mainnetPackageIds.DEEPBOOK_PACKAGE_ID;
 export const DEEPBOOK_REGISTRY_ID = mainnetPackageIds.REGISTRY_ID;
+export const DEEPBOOK_DEEP_COIN_TYPE = mainnetCoins.DEEP.type;
 const SUI_GRAPHQL_URL = 'https://graphql.mainnet.sui.io/graphql';
 
 export interface DeepBookPoolMeta {
@@ -788,10 +789,21 @@ export function buildWithdrawAllManagersAndCancelTx(params: {
   owner: string;
   pool: DeepBookPoolMeta;
   managers: Array<{ managerId: string; openOrderIds: string[] }>;
+  extraCoinTypes?: string[];
 }): Transaction {
   const tx = new Transaction();
   tx.setSender(params.owner);
   const coinsToReturn: any[] = [];
+  const baseNorm = safeNormalizeCoinType(params.pool.baseCoinId).toLowerCase();
+  const quoteNorm = safeNormalizeCoinType(params.pool.quoteCoinId).toLowerCase();
+  const extraTypes = Array.from(
+    new Set(
+      (params.extraCoinTypes || []).filter((t) => {
+        const n = safeNormalizeCoinType(t).toLowerCase();
+        return Boolean(n) && n !== baseNorm && n !== quoteNorm;
+      })
+    )
+  );
 
   for (const item of params.managers) {
     const mgr = tx.object(item.managerId);
@@ -828,6 +840,14 @@ export function buildWithdrawAllManagersAndCancelTx(params: {
       typeArguments: [params.pool.quoteCoinId],
     });
     coinsToReturn.push(outBase, outQuote);
+    for (const coinType of extraTypes) {
+      const outExtra = tx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::withdraw_all`,
+        arguments: [mgr],
+        typeArguments: [coinType],
+      });
+      coinsToReturn.push(outExtra);
+    }
   }
 
   if (coinsToReturn.length > 0) {
