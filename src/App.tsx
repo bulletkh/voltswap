@@ -192,7 +192,7 @@ export function App() {
       {/* Main Workspace */}
       <main
         className={`flex-1 w-full flex flex-col ${
-          activeTab === 'swap' || activeTab === 'perps'
+          activeTab === 'swap' || activeTab === 'perps' || activeTab === 'predict'
             ? ''
             : 'max-w-[1440px] mx-auto px-3 sm:px-6 py-4'
         }`}

@@ -95,14 +95,53 @@ export function createDeepBookMarginClient(owner: string, managerId?: string, po
 }
 
 /** Filters spot pool list down to Mainnet pools enabled for DeepBook v3 Margin Trading. */
-export function filterMarginEnabledPools(pools: DeepBookPoolMeta[]): DeepBookPoolMeta[] {
+export function filterMarginEnabledPools(
+  pools: DeepBookPoolMeta[],
+  extraEnabledKeys?: string[]
+): DeepBookPoolMeta[] {
   const byName = new Map(pools.map((p) => [p.poolName, p]));
+  const orderedKeys = [...MARGIN_ENABLED_POOL_KEYS, ...(extraEnabledKeys || [])];
+  const seen = new Set<string>();
   const result: DeepBookPoolMeta[] = [];
-  for (const key of MARGIN_ENABLED_POOL_KEYS) {
+  for (const key of orderedKeys) {
+    if (seen.has(key)) continue;
     const found = byName.get(key);
-    if (found) result.push(found);
+    if (found) {
+      seen.add(key);
+      result.push(found);
+    }
   }
   return result;
+}
+
+/** Auto-checks candidate SDK pools via on-chain MarginRegistry so future governance additions unlock automatically. */
+export async function discoverMarginEnabledPoolKeys(pools: DeepBookPoolMeta[]): Promise<string[]> {
+  const known = new Set<string>(MARGIN_ENABLED_POOL_KEYS);
+  const candidates = pools.filter((p) => {
+    if (known.has(p.poolName)) return false;
+    const sdkPool = mainnetPools[p.poolName as keyof typeof mainnetPools];
+    if (!sdkPool) return false;
+    const bc = mainnetCoins[sdkPool.baseCoin as keyof typeof mainnetCoins];
+    const qc = mainnetCoins[sdkPool.quoteCoin as keyof typeof mainnetCoins];
+    const bm = mainnetMarginPools[sdkPool.baseCoin as keyof typeof mainnetMarginPools];
+    const qm = mainnetMarginPools[sdkPool.quoteCoin as keyof typeof mainnetMarginPools];
+    return Boolean(bc?.priceInfoObjectId && qc?.priceInfoObjectId && bm && qm);
+  });
+  if (candidates.length === 0) return Array.from(known);
+
+  const db = createDeepBookMarginClient(
+    '0x0000000000000000000000000000000000000000000000000000000000000000'
+  ).deepbook;
+  const checks = await Promise.all(
+    candidates.map(async (p) => {
+      const enabled = await db.isPoolEnabledForMargin(p.poolName).catch(() => false);
+      return enabled ? p.poolName : null;
+    })
+  );
+  for (const k of checks) {
+    if (k) known.add(k);
+  }
+  return Array.from(known);
 }
 
 /** Fetches live risk bounds, interest rates, and available borrow liquidity for a margin pair. */

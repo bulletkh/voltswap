@@ -80,14 +80,14 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           </p>
         </div>
 
-        <div className="inline-flex items-center p-1.5 rounded-2xl panel-carbon self-start sm:self-auto">
+        <div className="inline-flex items-center p-1 rounded-xl bg-[#06070A] border border-[#1E232D] self-start sm:self-auto gap-1">
           <button
             type="button"
             onClick={() => setSubTab('traders')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 transition-all ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-all ${
               subTab === 'traders'
-                ? 'bg-gradient-to-r from-[#18C8FF] to-[#0EA5E9] text-[#04111D] shadow-[0_0_20px_rgba(24, 200, 255,0.28)]'
-                : 'text-slate-300 hover:text-white'
+                ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.28)]'
+                : 'text-[#8E98A8] hover:text-white'
             }`}
           >
             <Award className="w-4 h-4" />
@@ -96,10 +96,10 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           <button
             type="button"
             onClick={() => setSubTab('referrers')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold inline-flex items-center gap-2 transition-all ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold inline-flex items-center gap-2 transition-all ${
               subTab === 'referrers'
-                ? 'bg-gradient-to-r from-[#18C8FF] to-[#0EA5E9] text-[#04111D] shadow-[0_0_20px_rgba(24, 200, 255,0.28)]'
-                : 'text-slate-300 hover:text-white'
+                ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.28)]'
+                : 'text-[#8E98A8] hover:text-white'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -114,11 +114,11 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           {/* Active Tier Hero Progress Card */}
           <div className="panel-carbon rounded-2xl p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
             <div className="lg:col-span-5 flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-[#0A1019] border border-[#18C8FF]/30 flex items-center justify-center text-3xl shadow-[0_0_24px_rgba(24, 200, 255,0.14)]">
+              <div className="w-14 h-14 rounded-2xl bg-[#000000] border border-[#2B7FFF]/40 flex items-center justify-center text-3xl shadow-[0_0_24px_rgba(43,127,255,0.16)]">
                 {traderTier.badgeEmoji}
               </div>
               <div>
-                <div className="text-xs font-mono uppercase tracking-wider text-[#18C8FF]">
+                <div className="text-xs font-mono uppercase tracking-wider text-[#60A5FA]">
                   Active Trader Tier
                 </div>
                 <div className="text-xl font-bold text-white mt-0.5">{traderTier.name}</div>
@@ -140,14 +140,14 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                     : 'Maximum Tier Reached'}
                 </span>
               </div>
-              <div className="w-full h-2.5 rounded-full bg-white/[0.08] overflow-hidden">
+              <div className="w-full h-2.5 rounded-full bg-[#121620] overflow-hidden border border-[#1E232D]">
                 <div
-                  className="h-full bg-gradient-to-r from-[#18C8FF] to-[#0EA5E9] transition-all"
+                  className="h-full bg-gradient-to-r from-[#2B7FFF] to-[#08D189] transition-all"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
               {activeReferrer && (
-                <div className="text-xs font-mono text-[#00E599] inline-flex items-center gap-1.5 pt-1">
+                <div className="text-xs font-mono text-[#08D189] inline-flex items-center gap-1.5 pt-1">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>
                     Invited by {activeReferrer.slice(0, 8)}...{activeReferrer.slice(-6)} · -20%
@@ -157,12 +157,12 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
               )}
             </div>
 
-            <div className="lg:col-span-2 panel-carbon-sub rounded-xl p-3.5 text-center border border-[#18C8FF]/25">
-              <div className="text-xs text-slate-400">Your Protocol Fee</div>
-              <div className="text-2xl font-mono font-bold text-[#18C8FF] mt-0.5">
+            <div className="lg:col-span-2 panel-carbon-sub rounded-xl p-3.5 text-center border border-[#2B7FFF]/35">
+              <div className="text-xs text-[#8E98A8]">Your Protocol Fee</div>
+              <div className="text-2xl font-mono font-bold text-[#60A5FA] mt-0.5">
                 {(traderTier.feeRate * 100).toFixed(2)}%
               </div>
-              <div className="text-xs text-[#00E599] font-mono">
+              <div className="text-xs text-[#08D189] font-mono">
                 {traderTier.discountPct > 0 ? `-${traderTier.discountPct}% Rebate` : 'Base Rate'}
               </div>
             </div>
@@ -170,26 +170,26 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
 
           {/* 6 Dynamic Trader Fee Tiers */}
           <div className="panel-carbon rounded-2xl overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-white/[0.08] flex flex-wrap items-center justify-between gap-2 bg-[#0F151E]">
+            <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
               <span className="text-base font-bold text-white flex items-center gap-2">
-                <TrendingDown className="w-4 h-4 text-[#18C8FF]" />
+                <TrendingDown className="w-4 h-4 text-[#60A5FA]" />
                 Volume Discount Schedule
               </span>
-              <span className="text-xs text-slate-300 font-mono">
+              <span className="text-xs text-[#8E98A8] font-mono">
                 Applies across Market Swap · DeepBook Limit · Margin · Perps · Earn
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-[#000000]">
               {TRADER_TIERS.map((tier) => {
                 const isActive = tier.id === traderTier.id;
                 return (
                   <div
                     key={tier.id}
-                    className={`rounded-2xl p-4 space-y-2.5 border transition-all ${
+                    className={`rounded-xl p-4 space-y-2.5 border transition-all ${
                       isActive
-                        ? 'bg-[#18C8FF]/10 border-[#18C8FF]/45 shadow-[0_0_24px_rgba(24, 200, 255,0.14)]'
-                        : 'panel-carbon-sub hover:border-white/[0.16]'
+                        ? 'bg-[#2B7FFF]/12 border-[#2B7FFF]/60 shadow-[0_0_24px_rgba(43,127,255,0.14)]'
+                        : 'panel-carbon-sub hover:border-[#2B7FFF]/35'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -197,7 +197,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                         <span className="text-2xl">{tier.badgeEmoji}</span>
                         <div>
                           <div className="text-sm font-bold text-white">{tier.name}</div>
-                          <div className="text-xs font-mono text-slate-400">
+                          <div className="text-xs font-mono text-[#8E98A8]">
                             {tier.minVolumeUsd === 0
                               ? 'Entry Tier'
                               : `$${tier.minVolumeUsd.toLocaleString()}+ Vol`}
@@ -206,7 +206,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                       </div>
                       <span
                         className={`text-base font-mono font-bold ${
-                          isActive ? 'text-[#18C8FF]' : 'text-white'
+                          isActive ? 'text-[#60A5FA]' : 'text-white'
                         }`}
                       >
                         {(tier.feeRate * 100).toFixed(2)}%
@@ -217,12 +217,12 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
 
                     <div className="pt-1 flex flex-wrap gap-1.5">
                       {tier.discountPct > 0 && (
-                        <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[#18C8FF]/15 text-[#18C8FF]">
+                        <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[#2B7FFF]/15 text-[#60A5FA]">
                           -{tier.discountPct}% Discount
                         </span>
                       )}
                       {isActive && (
-                        <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[#00D98B]/20 text-[#00E599] font-semibold">
+                        <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[#08D189]/18 text-[#08D189] font-semibold">
                           Your Current Tier
                         </span>
                       )}
@@ -242,20 +242,20 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           <div className="panel-carbon rounded-2xl p-5 sm:p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/35 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-[#18C8FF]" />
+                <div className="w-11 h-11 rounded-xl bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-[#60A5FA]" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">
                     Instant On-Chain PTB Revenue Share
                   </h2>
-                  <p className="text-xs text-slate-300">
+                  <p className="text-xs text-[#8E98A8]">
                     Your share executes inside the trader&apos;s transaction block — zero claim buttons, zero delays.
                   </p>
                 </div>
               </div>
 
-              <span className="text-sm font-mono font-bold px-3.5 py-1.5 rounded-xl bg-[#18C8FF]/15 border border-[#18C8FF]/35 text-[#18C8FF]">
+              <span className="text-sm font-mono font-bold px-3.5 py-1.5 rounded-xl bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 text-[#60A5FA]">
                 {refTier.name} · {Math.round(refTier.revSharePct * 100)}% Instant Split
               </span>
             </div>
@@ -269,7 +269,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                   type="text"
                   readOnly
                   value={refUrl}
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#070B10] border border-white/[0.12] text-sm font-mono text-white outline-none"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#000000] border border-[#1E232D] text-sm font-mono text-white outline-none"
                 />
                 <button
                   type="button"
@@ -319,28 +319,28 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
               return (
                 <div
                   key={r.name}
-                  className={`panel-carbon rounded-2xl p-5 space-y-3 border transition-all ${
+                  className={`panel-carbon rounded-xl p-5 space-y-3 border transition-all ${
                     isCurrent
-                      ? 'border-[#18C8FF]/55 shadow-[0_0_28px_rgba(24, 200, 255,0.16)]'
-                      : 'border-white/[0.085]'
+                      ? 'border-[#2B7FFF]/65 shadow-[0_0_24px_rgba(43,127,255,0.16)]'
+                      : 'border-[#1E232D]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-base font-bold text-white">{r.name}</span>
                     <span
                       className="text-xl font-mono font-bold"
-                      style={{ color: isCurrent ? '#18C8FF' : r.badgeColor }}
+                      style={{ color: isCurrent ? '#60A5FA' : r.badgeColor }}
                     >
                       {Math.round(r.revSharePct * 100)}%
                     </span>
                   </div>
-                  <div className="text-xs font-mono text-slate-300">
+                  <div className="text-xs font-mono text-[#8E98A8]">
                     Required Volume Threshold: ${r.minVolumeUsd.toLocaleString()}
                   </div>
                   <p className="text-sm text-slate-300 leading-relaxed">{r.description}</p>
                   {isCurrent && (
                     <div className="pt-1">
-                      <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#18C8FF]/15 text-[#18C8FF] font-semibold">
+                      <span className="text-xs font-mono px-2.5 py-1 rounded-lg bg-[#2B7FFF]/15 text-[#60A5FA] font-semibold">
                         Active Affiliate Tier
                       </span>
                     </div>
@@ -353,9 +353,9 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
       )}
 
       {/* Footer Verification Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-300 px-1 pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#8E98A8] px-1 pt-1">
         <span className="inline-flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-[#00E599]" />
+          <ShieldCheck className="w-4 h-4 text-[#08D189]" />
           All fee splits execute atomically on Sui Mainnet without off-chain custody
         </span>
         {account?.address && (
@@ -363,7 +363,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
             href={`https://suiscan.xyz/mainnet/account/${account.address}`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-[#18C8FF] hover:underline font-semibold"
+            className="inline-flex items-center gap-1.5 text-[#60A5FA] hover:underline font-semibold"
           >
             <span>Inspect Payouts on Suiscan</span>
             <ExternalLink className="w-3.5 h-3.5" />

@@ -967,11 +967,11 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                       }}
                       className={`w-7 h-7 rounded flex items-center justify-center transition-colors ${
                         active
-                          ? 'bg-[#2B7FFF]/20 text-[#2B7FFF]'
-                          : 'text-[#7B8494] hover:text-white hover:bg-white/[0.06]'
+                          ? 'bg-[#2B7FFF]/25 text-[#60A5FA] border border-[#2B7FFF]/50'
+                          : 'text-[#9CA3AF] hover:text-white hover:bg-white/[0.08] border border-transparent'
                       }`}
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className="w-4 h-4 stroke-[2]" />
                     </button>
                   );
                 })}
@@ -989,9 +989,9 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                     }
                     setDrawings((prev) => prev.slice(0, -1));
                   }}
-                  className="w-7 h-7 rounded flex items-center justify-center text-[#7B8494] hover:text-white hover:bg-white/[0.06] disabled:opacity-30 transition-colors"
+                  className="w-7 h-7 rounded flex items-center justify-center text-[#9CA3AF] hover:text-white hover:bg-white/[0.08] disabled:opacity-30 transition-colors"
                 >
-                  <Undo2 className="w-3.5 h-3.5" />
+                  <Undo2 className="w-4 h-4 stroke-[2]" />
                 </button>
                 <button
                   type="button"
@@ -1001,9 +1001,9 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                     setDraftDrawing(null);
                     setDrawings([]);
                   }}
-                  className="w-7 h-7 rounded flex items-center justify-center text-[#7B8494] hover:text-[#F0525E] hover:bg-[#F0525E]/10 disabled:opacity-30 transition-colors"
+                  className="w-7 h-7 rounded flex items-center justify-center text-[#9CA3AF] hover:text-[#F0525E] hover:bg-[#F0525E]/15 disabled:opacity-30 transition-colors"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4 stroke-[2]" />
                 </button>
               </div>
             </div>

@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Loader2,
   RefreshCw,
-  ShieldAlert,
   TrendingDown,
   TrendingUp,
   X,
@@ -267,17 +266,17 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
   };
 
   return (
-    <div className="bg-[#000000] p-3.5 flex flex-col justify-between gap-3 h-full">
-      <div className="space-y-3">
+    <div className="bg-[#000000] p-3 flex flex-col gap-3">
+      <div className="space-y-2.5">
         {/* Long / Short Toggle */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-md bg-[#06070A] border border-[#1A1E26]">
+        <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => setSide('long')}
-            className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 rounded-md text-xs font-extrabold uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all border ${
               side === 'long'
-                ? 'bg-[#08D189]/15 text-[#08D189] border border-[#08D189]/50'
-                : 'text-slate-400 hover:text-white border border-transparent'
+                ? 'bg-[#08D189]/20 text-[#08D189] border-[#08D189] shadow-[inset_0_0_12px_rgba(8,209,137,0.14)]'
+                : 'bg-[#06070A] text-[#94A3B8] hover:text-white border-[#1E232D]'
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
@@ -286,10 +285,10 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
           <button
             type="button"
             onClick={() => setSide('short')}
-            className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 rounded-md text-xs font-extrabold uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all border ${
               side === 'short'
-                ? 'bg-[#F0525E]/15 text-[#F0525E] border border-[#F0525E]/50'
-                : 'text-slate-400 hover:text-white border border-transparent'
+                ? 'bg-[#F0525E]/20 text-[#F0525E] border-[#F0525E] shadow-[inset_0_0_12px_rgba(240,82,94,0.14)]'
+                : 'bg-[#06070A] text-[#94A3B8] hover:text-white border-[#1E232D]'
             }`}
           >
             <TrendingDown className="w-3.5 h-3.5" />
@@ -567,6 +566,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
 }) => {
   const account = useCurrentAccount();
   const dAppKit = useDAppKit();
+  const [dockTab, setDockTab] = useState<'position' | 'liquidity'>('position');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [withdrawAsset, setWithdrawAsset] = useState<'base' | 'quote'>('quote');
   const [withdrawAmt, setWithdrawAmt] = useState<string>('');
@@ -603,18 +603,69 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
     }
   };
 
+  const liquidityCards = (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs font-mono tabular-nums">
+      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+        <div className="text-[11px] text-[#8E98A8] mb-1">Pool Liquidity ({pool.baseSymbol})</div>
+        <div className="text-white font-bold text-sm">
+          {riskConfig
+            ? riskConfig.baseAvailableLiquidity.toLocaleString(undefined, { maximumFractionDigits: 1 })
+            : '—'}{' '}
+          <span className="text-[11px] text-[#8E98A8] font-normal">{pool.baseSymbol}</span>
+        </div>
+        <div className="text-[11px] text-[#60A5FA] mt-0.5">
+          Borrow APR {riskConfig ? `${riskConfig.baseBorrowAprPct.toFixed(2)}%` : '—'}
+        </div>
+      </div>
+      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+        <div className="text-[11px] text-[#8E98A8] mb-1">Pool Liquidity ({pool.quoteSymbol})</div>
+        <div className="text-white font-bold text-sm">
+          {riskConfig
+            ? riskConfig.quoteAvailableLiquidity.toLocaleString(undefined, { maximumFractionDigits: 1 })
+            : '—'}{' '}
+          <span className="text-[11px] text-[#8E98A8] font-normal">{pool.quoteSymbol}</span>
+        </div>
+        <div className="text-[11px] text-[#60A5FA] mt-0.5">
+          Borrow APR {riskConfig ? `${riskConfig.quoteBorrowAprPct.toFixed(2)}%` : '—'}
+        </div>
+      </div>
+      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+        <div className="text-[11px] text-[#8E98A8] mb-1">Risk Ratio Thresholds</div>
+        <div className="text-white font-bold text-sm">
+          Open {(riskConfig?.minOpenRiskRatio ?? 1.18).toFixed(2)}x · Borrow{' '}
+          {(riskConfig?.minBorrowRiskRatio ?? 1.25).toFixed(2)}x
+        </div>
+        <div className="text-[11px] text-[#F0525E] mt-0.5">
+          Liq Floor {(riskConfig?.liquidationRiskRatio ?? 1.1).toFixed(2)}x
+        </div>
+      </div>
+      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+        <div className="text-[11px] text-[#8E98A8] mb-1">Custody &amp; Max Leverage</div>
+        <div className="text-[#08D189] font-bold text-sm">
+          Up to {(riskConfig?.maxLeverageSafe ?? 4.5).toFixed(1)}x Isolated
+        </div>
+        <div className="text-[11px] text-[#8E98A8] mt-0.5">
+          1-TX Atomic MarginManager
+        </div>
+      </div>
+    </div>
+  );
+
   if (!account?.address) {
     return (
-      <div className="bg-[#000000] p-4 flex items-center justify-between gap-3">
-        <div className="space-y-1">
-          <div className="text-xs font-bold uppercase tracking-wider text-white">DeepBook v3 Margin Manager</div>
-          <p className="text-xs text-slate-400">
-            Connect your wallet to inspect isolated MarginManager health, debt, open orders, and conditional TP/SL triggers.
-          </p>
+      <div className="bg-[#000000] p-3.5 sm:p-4 space-y-3 min-h-[210px]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A1E26] pb-2">
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <span className="pb-1 border-b-2 border-[#2B7FFF] text-white font-semibold -mb-[9px]">
+              Isolated Margin Manager ({pool.poolName.replace('_', '/')})
+            </span>
+            <span className="text-[#8E98A8]">Connect wallet for 1-TX atomic position setup</span>
+          </div>
+          <span className="text-[11px] font-mono px-2.5 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35">
+            DeepBook v3 MarginRegistry
+          </span>
         </div>
-        <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 shrink-0">
-          1-TX Atomic Setup
-        </span>
+        {liquidityCards}
       </div>
     );
   }
@@ -638,19 +689,38 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
     : 0;
 
   return (
-    <div className="bg-[#000000] p-3.5 sm:p-4 space-y-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A1E26] pb-2.5">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-white">
-            Isolated Margin Manager ({pool.poolName.replace('_', '/')})
-          </span>
+    <div className="bg-[#000000] p-3.5 sm:p-4 space-y-3.5 min-h-[210px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A1E26] pb-2">
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setDockTab('position')}
+            className={`pb-1 text-xs font-mono border-b-2 -mb-[9px] transition-colors ${
+              dockTab === 'position'
+                ? 'border-[#2B7FFF] text-white font-semibold'
+                : 'border-transparent text-[#8E98A8] hover:text-white'
+            }`}
+          >
+            Margin Position ({position ? 'Active' : '0'})
+          </button>
+          <button
+            type="button"
+            onClick={() => setDockTab('liquidity')}
+            className={`pb-1 text-xs font-mono border-b-2 -mb-[9px] transition-colors ${
+              dockTab === 'liquidity'
+                ? 'border-[#2B7FFF] text-white font-semibold'
+                : 'border-transparent text-[#8E98A8] hover:text-white'
+            }`}
+          >
+            MarginPool Liquidity &amp; Rules
+          </button>
           {position ? (
             <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35">
               {position.managerId.slice(0, 8)}...{position.managerId.slice(-6)}
             </span>
           ) : (
-            <span className="text-xs font-mono text-slate-500">
-              Auto-created in 1 TX on your first trade
+            <span className="text-[11px] font-mono text-[#8E98A8]">
+              1-TX auto-created on first trade
             </span>
           )}
         </div>
@@ -658,14 +728,16 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
         <button
           type="button"
           onClick={onRefresh}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded bg-[#06070A] border border-[#1A1E26] text-slate-300 hover:border-[#2B7FFF]/50 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded bg-[#06070A] border border-[#1E232D] text-slate-300 hover:border-[#2B7FFF]/50 hover:text-white transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           <span>Refresh Position</span>
         </button>
       </div>
 
-      {position ? (
+      {dockTab === 'liquidity' ? (
+        liquidityCards
+      ) : position ? (
         <div className="space-y-3">
           {/* Live Health Factor Gauge + Est. Liquidation + Standalone Pro Controls */}
           <div className="rounded-lg bg-[#06070A] border border-[#1A1E26] p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
@@ -1014,24 +1086,17 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
         </div>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-          <div className="inline-flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-[#60A5FA]" />
+        <div className="space-y-3">
+          {liquidityCards}
+          <div className="flex items-center justify-between text-xs text-[#8E98A8] px-0.5">
             <span>
-              Available {pool.baseSymbol} Liquidity:{' '}
-              <strong className="text-white font-mono">
-                {riskConfig ? riskConfig.baseAvailableLiquidity.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—'}
-              </strong>{' '}
-              · Available {pool.quoteSymbol}:{' '}
-              <strong className="text-white font-mono">
-                {riskConfig ? riskConfig.quoteAvailableLiquidity.toLocaleString(undefined, { maximumFractionDigits: 1 }) : '—'}
-              </strong>
+              No open margin position on <strong className="text-white">{pool.baseSymbol}/{pool.quoteSymbol}</strong>. Enter collateral &amp; choose leverage on the right ticket to deploy.
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-[#08D189] font-mono shrink-0">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Up to {(riskConfig?.maxLeverageSafe ?? 4.5).toFixed(1)}x Isolated
             </span>
           </div>
-          <span className="inline-flex items-center gap-1.5 text-[#08D189] font-mono">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Non-custodial Isolated MarginManager (up to {riskConfig?.maxLeverageSafe ?? 4.5}x)
-          </span>
         </div>
       )}
     </div>

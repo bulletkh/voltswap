@@ -551,118 +551,117 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
   );
 
   return (
-    <div className="max-w-[1440px] mx-auto px-3 sm:px-6 pt-4 pb-10 space-y-4 animate-panel-in">
-      {/* Top Market & Expiry Strip */}
-      <div className="bg-[#06070A] rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 border border-[#1B1F27]">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#2B7FFF]/15 border border-[#2B7FFF]/45 flex items-center justify-center">
-              <Target className="w-4 h-4 text-[#60A5FA]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white tracking-tight">BTC / USD Predict</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#08D189]/12 text-[#08D189] border border-[#08D189]/30">
-                  DeepBook v3 Native
-                </span>
+    <div className="w-full overflow-x-hidden bg-[#000000] border-b border-[#1A1E26] animate-panel-in">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_355px] xl:grid-cols-[minmax(0,1fr)_385px]">
+        {/* Row 1, Col 1: Flush Market & Expiry Header Strip */}
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1 bg-[#000000] border-b lg:border-r border-[#1A1E26] px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-md bg-[#2B7FFF]/15 border border-[#2B7FFF]/45 flex items-center justify-center shrink-0">
+                <Target className="w-3.5 h-3.5 text-[#60A5FA]" />
               </div>
-              <div className="text-[11px] text-slate-400">
-                Pyth Lazer + Black-Scholes · Mainnet Entry Band 15%–50%
-              </div>
-            </div>
-          </div>
-
-          <div className="h-7 w-px bg-[#1A1E26] hidden sm:block" />
-
-          <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider text-slate-500">BTC Forward</span>
-            <span className="text-base font-mono font-bold text-white tabular-nums">
-              {forward > 0 ? `$${forward.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--'}
-            </span>
-          </div>
-
-          {/* Expiry Windows */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {(board?.markets || []).slice(0, 6).map((item) => {
-              const isSelected = selectedMarket?.market.id === item.market.id;
-              const remMs = Number(item.market.expiryMs) - nowMs;
-              return (
-                <button
-                  key={item.market.id}
-                  type="button"
-                  onClick={() => {
-                    strikeInitializedRef.current = '';
-                    setSelectedMarketId(item.market.id);
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-mono border transition-all flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-[#2B7FFF]/18 border-[#2B7FFF] text-white'
-                      : 'bg-[#000000] border-[#1A1E26] text-slate-400 hover:text-white hover:border-[#2B7FFF]/40'
-                  }`}
-                >
-                  <Clock className="w-3 h-3 text-[#60A5FA]" />
-                  <span className="font-semibold">{formatWindowLabel(item, nowMs)}</span>
-                  <span className="text-[10px] text-slate-400 tabular-nums">
-                    {formatCountdown(remMs)}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-white tracking-tight">BTC / USD Predict</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#08D189]/12 text-[#08D189] border border-[#08D189]/30">
+                    DeepBook v3
                   </span>
-                </button>
-              );
-            })}
+                </div>
+                <div className="text-[11px] text-[#8E98A8]">
+                  Pyth Lazer · Band 15%–50%
+                </div>
+              </div>
+            </div>
+
+            <div className="h-6 w-px bg-[#1A1E26] hidden sm:block" />
+
+            <div className="flex flex-col">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[#8E98A8]">BTC Forward</span>
+              <span className="text-sm font-mono font-bold text-white tabular-nums">
+                {forward > 0 ? `$${forward.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '--'}
+              </span>
+            </div>
+
+            {/* Expiry Windows */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(board?.markets || []).slice(0, 6).map((item) => {
+                const isSelected = selectedMarket?.market.id === item.market.id;
+                const remMs = Number(item.market.expiryMs) - nowMs;
+                return (
+                  <button
+                    key={item.market.id}
+                    type="button"
+                    onClick={() => {
+                      strikeInitializedRef.current = '';
+                      setSelectedMarketId(item.market.id);
+                    }}
+                    className={`px-2 py-1 rounded text-xs font-mono border transition-all flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-[#2B7FFF]/18 border-[#2B7FFF] text-white font-semibold'
+                        : 'bg-[#06070A] border-[#1E232D] text-[#8E98A8] hover:text-white hover:border-[#2B7FFF]/40'
+                    }`}
+                  >
+                    <Clock className="w-3 h-3 text-[#60A5FA]" />
+                    <span>{formatWindowLabel(item, nowMs)}</span>
+                    <span className="text-[10px] text-[#8E98A8] tabular-nums">
+                      {formatCountdown(remMs)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Account Balance & Refresh */}
+          <div className="flex items-center gap-2 shrink-0">
+            {account && (
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-[#06070A] border border-[#1E232D] text-xs font-mono">
+                <span className="text-[#8E98A8]">Vault:</span>
+                <span className="text-white font-semibold tabular-nums">
+                  ${availableUsdc.toFixed(2)}
+                </span>
+                {pendingUsdc > 0 && (
+                  <span className="text-amber-300 text-[11px]">(+${pendingUsdc.toFixed(2)})</span>
+                )}
+                {availableUsdc > 0.01 && (
+                  <button
+                    type="button"
+                    disabled={isWithdrawing}
+                    onClick={handleWithdrawAvailable}
+                    className="ml-1 px-2 py-0.5 rounded bg-[#08D189]/15 border border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/25 text-[11px] font-sans font-semibold inline-flex items-center gap-1"
+                  >
+                    {isWithdrawing ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <ArrowDownToLine className="w-3 h-3" />
+                    )}
+                    Withdraw
+                  </button>
+                )}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsAiCopilotOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#06070A] border border-[#1E232D] text-slate-200 hover:border-[#2B7FFF]/60 text-xs font-semibold transition-colors"
+            >
+              <Bot className="w-3.5 h-3.5 text-[#60A5FA]" />
+              <span>AI Copilot</span>
+            </button>
+            <button
+              type="button"
+              onClick={loadBoard}
+              className="p-1.5 rounded-md bg-[#06070A] border border-[#1E232D] text-[#8E98A8] hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
+              title="Refresh Predict markets"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingBoard ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
 
-        {/* Account Balance & Refresh */}
-        <div className="flex items-center gap-2">
-          {account && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#000000] border border-[#1A1E26] text-xs font-mono">
-              <span className="text-slate-400">Predict Vault:</span>
-              <span className="text-white font-semibold tabular-nums">
-                ${availableUsdc.toFixed(2)}
-              </span>
-              {pendingUsdc > 0 && (
-                <span className="text-amber-300 text-[11px]">(+${pendingUsdc.toFixed(2)} pend)</span>
-              )}
-              {availableUsdc > 0.01 && (
-                <button
-                  type="button"
-                  disabled={isWithdrawing}
-                  onClick={handleWithdrawAvailable}
-                  className="ml-1 px-2 py-0.5 rounded bg-[#08D189]/15 border border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/25 text-[11px] font-sans font-semibold inline-flex items-center gap-1"
-                >
-                  {isWithdrawing ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <ArrowDownToLine className="w-3 h-3" />
-                  )}
-                  Withdraw
-                </button>
-              )}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setIsAiCopilotOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#2B7FFF]/12 border border-[#2B7FFF]/40 text-[#60A5FA] hover:bg-[#2B7FFF]/20 text-xs font-semibold transition-colors"
-          >
-            <Bot className="w-3.5 h-3.5" />
-            <span>AI Copilot</span>
-          </button>
-          <button
-            type="button"
-            onClick={loadBoard}
-            className="p-2 rounded-lg bg-[#000000] border border-[#1A1E26] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
-            title="Refresh Predict markets"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoadingBoard ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </div>
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* Left: Chart + Strike Probability Ladder + Open/Orders */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="bg-[#000000] rounded-xl overflow-hidden border border-[#1B1F27]">
+        {/* Col 1, Row 2: Chart + Institutional Strike Matrix + Orders/Positions */}
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:border-r border-[#1A1E26] divide-y divide-[#1A1E26]">
+          <div className="bg-[#000000]">
             <ProCandleChart
               symbolLabel="BTC/USD"
               sourceLabel="Pyth Forward + Binance Feed"
@@ -670,27 +669,27 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               timeframe={timeframe}
               onTimeframeChange={setTimeframe}
               isLoading={candlesLoading}
-              heightClass="h-[310px]"
+              heightClass="h-[340px] lg:h-[385px]"
               livePrice={forward}
               tvSymbol="BINANCE:BTCUSDT"
             />
           </div>
 
-          {/* Interactive Strike Odds Ladder */}
-          <div className="bg-[#06070A] rounded-xl p-4 border border-[#1B1F27] space-y-3">
+          {/* Institutional Option Strike Matrix (Table) */}
+          <div className="bg-[#000000] p-3.5 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#60A5FA]" />
-                <span className="text-sm font-bold text-white">
-                  Live Option Strike Ladder
+                <Sparkles className="w-3.5 h-3.5 text-[#60A5FA]" />
+                <span className="text-xs font-bold uppercase tracking-wider text-white">
+                  Option Strike Matrix
                 </span>
-                <span className="text-[11px] text-slate-400">
-                  Click any shaded [15%–50%] strike to load it into your ticket
+                <span className="text-[11px] text-[#8E98A8]">
+                  Click UP or DOWN cell in shaded 15%–50% band to load ticket
                 </span>
               </div>
               {selectedMarket && (
-                <div className="text-[11px] font-mono text-slate-300 flex items-center gap-3">
-                  <span>Pool Cash: ${selectedMarket.spareCashUsdc.toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
+                <div className="text-[11px] font-mono text-[#8E98A8] flex items-center gap-3">
+                  <span>Pool Cash: <strong className="text-white">${selectedMarket.spareCashUsdc.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong></span>
                   {selectedMarket.referencePrice && (
                     <span className="text-[#60A5FA]">
                       Anchor: ${selectedMarket.referencePrice.toLocaleString()}
@@ -701,85 +700,93 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
             </div>
 
             {isLoadingLadder && ladder.length === 0 ? (
-              <div className="py-6 flex items-center justify-center text-xs text-slate-400 gap-2">
+              <div className="py-6 flex items-center justify-center text-xs text-[#8E98A8] gap-2 font-mono">
                 <Loader2 className="w-4 h-4 animate-spin text-[#60A5FA]" />
-                Loading live Black-Scholes strike probabilities...
+                Loading Black-Scholes strike probabilities...
               </div>
             ) : ladder.length === 0 ? (
-              <div className="py-5 text-center text-xs text-slate-500">
+              <div className="py-5 text-center text-xs text-[#8E98A8] font-mono">
                 No active Predict expiry markets returned right now. Wait a few seconds for the next window roll.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {ladder.map((row) => {
-                  const isStrikeSelected = Number(strikeInput) === row.strike && side !== 'range';
-                  return (
-                    <div
-                      key={row.strike}
-                      className={`rounded-lg p-2.5 border bg-[#000000] transition-all ${
-                        isStrikeSelected
-                          ? 'border-[#2B7FFF] bg-[#0B1528]/40'
-                          : 'border-[#1A1E26] hover:border-[#2B7FFF]/35'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-mono font-bold text-white">
-                          ${row.strike.toLocaleString()}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {forward > 0
-                            ? `${row.strike >= forward ? '+' : ''}${(((row.strike - forward) / forward) * 100).toFixed(2)}%`
-                            : ''}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSide('up');
-                            setStrikeInput(String(row.strike));
-                          }}
-                          className={`px-2 py-1.5 rounded text-left text-[11px] font-mono border transition-colors ${
-                            row.upInBand
-                              ? 'bg-[#08D189]/12 border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/20'
-                              : 'bg-[#06070A] border-[#1A1E26] text-slate-500 hover:text-slate-300'
+              <div className="overflow-x-auto border border-[#1E232D] rounded-lg">
+                <table className="w-full text-xs font-mono tabular-nums">
+                  <thead>
+                    <tr className="bg-[#06070A] text-[#8E98A8] border-b border-[#1A1E26] text-[11px]">
+                      <th className="text-left py-2 px-3">Strike Price</th>
+                      <th className="text-right py-2 px-3">Distance</th>
+                      <th className="text-center py-2 px-3 text-[#08D189]">Call / UP (Payout · Prob)</th>
+                      <th className="text-center py-2 px-3 text-[#F0525E]">Put / DOWN (Payout · Prob)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#141821]">
+                    {ladder.map((row) => {
+                      const isStrikeSelected = Number(strikeInput) === row.strike && side !== 'range';
+                      const isUpActive = isStrikeSelected && side === 'up';
+                      const isDownActive = isStrikeSelected && side === 'down';
+                      const distPct = forward > 0 ? ((row.strike - forward) / forward) * 100 : null;
+                      return (
+                        <tr
+                          key={row.strike}
+                          className={`transition-colors ${
+                            isStrikeSelected ? 'bg-[#2B7FFF]/8' : 'hover:bg-white/[0.02]'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span>UP</span>
-                            <span className="font-bold">{row.upMultiple.toFixed(2)}x</span>
-                          </div>
-                          <div className="text-[10px] opacity-80">{(row.upProb * 100).toFixed(1)}%</div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSide('down');
-                            setStrikeInput(String(row.strike));
-                          }}
-                          className={`px-2 py-1.5 rounded text-left text-[11px] font-mono border transition-colors ${
-                            row.downInBand
-                              ? 'bg-[#F0525E]/12 border-[#F0525E]/35 text-[#F0525E] hover:bg-[#F0525E]/20'
-                              : 'bg-[#06070A] border-[#1A1E26] text-slate-500 hover:text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span>DOWN</span>
-                            <span className="font-bold">{row.downMultiple.toFixed(2)}x</span>
-                          </div>
-                          <div className="text-[10px] opacity-80">{(row.downProb * 100).toFixed(1)}%</div>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                          <td className="py-2 px-3 font-bold text-white">
+                            ${row.strike.toLocaleString()}
+                          </td>
+                          <td className="py-2 px-3 text-right text-[#8E98A8]">
+                            {distPct !== null ? `${distPct >= 0 ? '+' : ''}${distPct.toFixed(2)}%` : '—'}
+                          </td>
+                          <td className="py-1.5 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSide('up');
+                                setStrikeInput(String(row.strike));
+                              }}
+                              className={`w-full max-w-[190px] mx-auto px-2.5 py-1 rounded border inline-flex items-center justify-between gap-2 transition-all ${
+                                isUpActive
+                                  ? 'bg-[#08D189]/25 border-[#08D189] text-white font-bold'
+                                  : row.upInBand
+                                    ? 'bg-[#08D189]/10 border-[#08D189]/35 text-[#08D189] hover:bg-[#08D189]/20'
+                                    : 'bg-[#06070A] border-[#1A1E26] text-[#6B7280] hover:text-slate-300'
+                              }`}
+                            >
+                              <span className="font-bold">{row.upMultiple.toFixed(2)}x</span>
+                              <span className="text-[11px] opacity-90">{(row.upProb * 100).toFixed(1)}%</span>
+                            </button>
+                          </td>
+                          <td className="py-1.5 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSide('down');
+                                setStrikeInput(String(row.strike));
+                              }}
+                              className={`w-full max-w-[190px] mx-auto px-2.5 py-1 rounded border inline-flex items-center justify-between gap-2 transition-all ${
+                                isDownActive
+                                  ? 'bg-[#F0525E]/25 border-[#F0525E] text-white font-bold'
+                                  : row.downInBand
+                                    ? 'bg-[#F0525E]/10 border-[#F0525E]/35 text-[#F0525E] hover:bg-[#F0525E]/20'
+                                    : 'bg-[#06070A] border-[#1A1E26] text-[#6B7280] hover:text-slate-300'
+                              }`}
+                            >
+                              <span className="font-bold">{row.downMultiple.toFixed(2)}x</span>
+                              <span className="text-[11px] opacity-90">{(row.downProb * 100).toFixed(1)}%</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
 
-          {/* Orders & Positions */}
-          <div className="bg-[#06070A] rounded-xl p-4 border border-[#1B1F27] space-y-3">
+          {/* Orders & Positions Dock */}
+          <div className="bg-[#000000] p-3.5 sm:p-4 space-y-3 min-h-[190px]">
             <div className="flex items-center gap-4 border-b border-[#1A1E26] pb-2">
               <button
                 type="button"
@@ -927,8 +934,8 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           </div>
         </div>
 
-        {/* Right: Order Ticket */}
-        <div className="lg:col-span-4 bg-[#06070A] rounded-xl p-4 border border-[#1B1F27] space-y-3.5 lg:sticky lg:top-16">
+        {/* Right: Flush Order Ticket */}
+        <div className="min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2 bg-[#000000] p-3.5 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-white tracking-tight">Place Binary Option</span>
             <span className="text-[11px] font-mono text-slate-400">
@@ -1141,20 +1148,21 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
           )}
 
           {!quoteError && quotePlan && !quotePlan.accepting && !isVaultFundingOnly && (
-            <div className="rounded-lg bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
-              <span>
-                Refused ({quotePlan.refusal || 'limits'}): Mainnet Predict admits strikes inside the 15%–50% probability band with min $1.00 premium.
+            <div className="rounded bg-amber-500/8 border border-amber-400/25 px-2.5 py-1.5 text-[11px] text-amber-200 flex items-center gap-2 font-mono">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span className="truncate">
+                Outside 15%–50% band or min $1.00 ({quotePlan.refusal || 'limits'})
               </span>
             </div>
           )}
 
           {!quoteError && account && canSubmitPredict && shortfallUsd > walletUsdc + 0.0001 && (
-            <div className="rounded-lg bg-amber-500/10 border border-amber-400/30 px-3 py-2 text-[11px] text-amber-200 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
-              <span>
-                Insufficient wallet USDC: need ${shortfallUsd.toFixed(2)} USDC for this 1-tx deposit (wallet holds ${walletUsdc.toFixed(2)} USDC).
+            <div className="rounded bg-amber-500/8 border border-amber-400/25 px-2.5 py-1.5 text-[11px] text-amber-200 flex items-center justify-between gap-2 font-mono">
+              <span className="inline-flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                <span>Need ${shortfallUsd.toFixed(2)} USDC</span>
               </span>
+              <span className="text-[#8E98A8]">Wallet: ${walletUsdc.toFixed(2)}</span>
             </div>
           )}
 

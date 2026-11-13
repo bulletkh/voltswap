@@ -1010,13 +1010,13 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
   };
 
   return (
-    <div className="w-full bg-[#000000] border-b border-[#1A1E26] animate-panel-in">
+    <div className="w-full overflow-x-hidden bg-[#000000] border-b border-[#1A1E26] animate-panel-in">
       {/* Main Institutional DeepBook-Pro Flush Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_270px_330px] xl:grid-cols-[minmax(0,1fr)_295px_345px]">
+      <div className="w-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_265px_325px] xl:grid-cols-[minmax(0,1fr)_290px_345px]">
         {/* 1. Live Perp Market Ribbon (Row 1, Cols 1-2) */}
-        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-1 bg-[#000000] border-b lg:border-r border-[#1A1E26] px-3 py-2 flex flex-wrap items-center justify-between gap-3 relative z-20">
-          <div className="flex items-center gap-1 flex-wrap">
-            {orderedMarkets.slice(0, 6).map((m) => {
+        <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-1 bg-[#000000] border-b lg:border-r border-[#1A1E26] px-3 py-2 flex flex-wrap items-center justify-between gap-2.5 relative z-20">
+          <div className="min-w-0 flex items-center gap-1 flex-wrap">
+            {orderedMarkets.slice(0, 5).map((m) => {
               const active = activeMarket?.symbol === m.symbol;
               return (
                 <button
@@ -1261,7 +1261,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* 3. Order Book & Trades Pane (Row 2, Col 2) */}
-        <div className="lg:col-start-2 lg:row-start-2 bg-[#000000] border-b lg:border-r border-[#1A1E26] flex flex-col h-[465px] lg:h-[590px] xl:h-[620px] overflow-hidden">
+        <div className="min-w-0 lg:col-start-2 lg:row-start-2 bg-[#000000] border-b lg:border-r border-[#1A1E26] flex flex-col h-[465px] lg:h-[590px] xl:h-[620px] overflow-hidden">
           <div className="px-3 py-2 border-b border-[#1A1E26] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <button
@@ -1375,7 +1375,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* 4. Right Full-Height Order Ticket (Col 3, Rows 1-3) */}
-        <div className="lg:col-start-3 lg:row-start-1 lg:row-span-3 bg-[#000000] border-b lg:border-b-0 border-[#1A1E26] p-3.5 space-y-3">
+        <div className="min-w-0 overflow-hidden lg:col-start-3 lg:row-start-1 lg:row-span-3 bg-[#000000] border-b lg:border-b-0 border-[#1A1E26] p-3 space-y-2.5">
           {/* Account Banner */}
           <div className="bg-[#06070A] border border-[#1B1F27] rounded-md p-2.5 space-y-2">
             <div className="flex items-center justify-between text-xs">
@@ -1975,7 +1975,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* 5. Bottom Account Dock (Row 3, Cols 1-2 directly below Chart & Orderbook!) */}
-        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-3 bg-[#000000] lg:border-r border-[#1A1E26] p-3 sm:px-4 space-y-3 min-h-[210px]">
+        <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-3 bg-[#000000] lg:border-r border-[#1A1E26] p-3 sm:px-4 space-y-3 min-h-[210px]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A1E26] pb-2">
             <div className="flex items-center gap-3 flex-wrap">
               {([

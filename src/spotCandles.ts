@@ -1,14 +1,31 @@
 import { fetchDeepBookCandles, type DeepBookCandle, type DeepBookPoolMeta } from './deepbookV3';
 import type { ChartTimeframe } from './components/ProCandleChart';
 
-const STABLES = new Set(['USDC', 'USDT', 'SUSDT', 'AUSD', 'BUCK', 'FUSD', 'USDY', 'USD']);
+const STABLES = new Set([
+  'USDC',
+  'USDT',
+  'WUSDC',
+  'WUSDT',
+  'SUSDT',
+  'SUIUSDE',
+  'USDSUI',
+  'AUSD',
+  'BUCK',
+  'FUSD',
+  'USDY',
+  'USD',
+]);
 
 function canonicalBase(sym: string): string {
   const s = sym.toUpperCase().trim();
-  if (s === 'WBTC' || s === 'XBTC' || s === 'LBTC' || s === 'CBTC') return 'BTC';
-  if (s === 'WETH' || s === 'SETH') return 'ETH';
+  if (s === 'WBTC' || s === 'XBTC' || s === 'HBTC' || s === 'LZWBTC' || s === 'LBTC' || s === 'CBTC') {
+    return 'BTC';
+  }
+  if (s === 'WETH' || s === 'BWETH' || s === 'BETH' || s === 'SETH') return 'ETH';
   if (s === 'WSOL') return 'SOL';
   if (s === 'HASUI' || s === 'VSUI' || s === 'AFSUI' || s === 'SPRING') return 'SUI';
+  if (s === 'WUSDC') return 'USDC';
+  if (s === 'WUSDT' || s === 'SUSDT') return 'USDT';
   return s;
 }
 

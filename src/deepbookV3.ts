@@ -1,4 +1,11 @@
-import { deepbook, mainnetPackageIds, mainnetPools, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
+import {
+  deepbook,
+  mainnetCoins,
+  mainnetPackageIds,
+  mainnetPools,
+  OrderType,
+  SelfMatchingOptions,
+} from '@mysten/deepbook-v3';
 import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
 import { normalizeSuiAddress } from '@mysten/sui/utils';
 import { VOLT_TREASURY_ADDRESS } from './constants';
@@ -22,6 +29,12 @@ export interface DeepBookPoolMeta {
   tickSize: number;
   lotSize: number;
   minSize: number;
+  lastPrice?: number;
+  change24hPct?: number;
+  volume24hUsd?: number;
+  baseVolume24h?: number;
+  high24h?: number;
+  low24h?: number;
 }
 
 export interface DeepBookLevel {
@@ -179,8 +192,8 @@ export const DEFAULT_DEEPBOOK_POOLS: DeepBookPoolMeta[] = [
   },
   {
     poolId: '0x1109352b9112717bd2a7c3eb9a416fff1ba6951760f5bdd5424cf5e4e5b3e65c',
-    poolName: 'BETH_USDC',
-    baseSymbol: 'BETH',
+    poolName: 'BWETH_USDC',
+    baseSymbol: 'BWETH',
     quoteSymbol: 'USDC',
     baseCoinId: '0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH',
     quoteCoinId: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
@@ -190,37 +203,160 @@ export const DEFAULT_DEEPBOOK_POOLS: DeepBookPoolMeta[] = [
     lotSize: 0.001,
     minSize: 0.01,
   },
+  {
+    poolId: '0x0fac1cebf35bde899cd9ecdd4371e0e33f44ba83b8a2902d69186646afa3a94b',
+    poolName: 'SUIUSDE_USDC',
+    baseSymbol: 'SUIUSDE',
+    quoteSymbol: 'USDC',
+    baseCoinId: '0x41d587e5336f1c86cad50d38a7136db99333bb9bda91cea4ba69115defeb1402::sui_usde::SUI_USDE',
+    quoteCoinId: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
+    baseDecimals: 6,
+    quoteDecimals: 6,
+    tickSize: 0.0001,
+    lotSize: 0.1,
+    minSize: 1,
+  },
+  {
+    poolId: '0x034f3a42e7348de2084406db7a725f9d9d132a56c68324713e6e623601fb4fd7',
+    poolName: 'SUI_SUIUSDE',
+    baseSymbol: 'SUI',
+    quoteSymbol: 'SUIUSDE',
+    baseCoinId: '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
+    quoteCoinId: '0x41d587e5336f1c86cad50d38a7136db99333bb9bda91cea4ba69115defeb1402::sui_usde::SUI_USDE',
+    baseDecimals: 9,
+    quoteDecimals: 6,
+    tickSize: 0.0001,
+    lotSize: 0.1,
+    minSize: 1,
+  },
 ];
 
 const FEATURED_POOL_ORDER = [
   'SUI_USDC',
-  'DEEP_SUI',
   'DEEP_USDC',
   'WAL_USDC',
   'XBTC_USDC',
-  'BETH_USDC',
+  'BWETH_USDC',
+  'DEEP_SUI',
+  'SUIUSDE_USDC',
+  'SUI_SUIUSDE',
   'NS_USDC',
   'SEND_USDC',
 ];
 
+const USD_QUOTES = new Set(['USDC', 'USDT', 'WUSDC', 'WUSDT', 'SUIUSDE', 'USDSUI', 'AUSD']);
+
+type SdkCoinEntry = {
+  address: string;
+  type: string;
+  scalar: number;
+  feed?: string;
+  currencyId?: string;
+  priceInfoObjectId?: string;
+};
+
+type SdkPoolEntry = {
+  address: string;
+  baseCoin: string;
+  quoteCoin: string;
+};
+
+const dynamicCoins: Record<string, SdkCoinEntry> = {
+  ...(mainnetCoins as unknown as Record<string, SdkCoinEntry>),
+};
+
+const dynamicPools: Record<string, SdkPoolEntry> = {
+  ...(mainnetPools as unknown as Record<string, SdkPoolEntry>),
+};
+
+function registerPoolsInSdkCache(pools: DeepBookPoolMeta[]) {
+  for (const p of pools) {
+    if (!dynamicCoins[p.baseSymbol] && p.baseCoinId) {
+      dynamicCoins[p.baseSymbol] = {
+        address: p.baseCoinId.split('::')[0] || p.baseCoinId,
+        type: safeNormalizeCoinType(p.baseCoinId),
+        scalar: Math.pow(10, p.baseDecimals),
+      };
+    }
+    if (!dynamicCoins[p.quoteSymbol] && p.quoteCoinId) {
+      dynamicCoins[p.quoteSymbol] = {
+        address: p.quoteCoinId.split('::')[0] || p.quoteCoinId,
+        type: safeNormalizeCoinType(p.quoteCoinId),
+        scalar: Math.pow(10, p.quoteDecimals),
+      };
+    }
+    if (!dynamicPools[p.poolName] && p.poolId) {
+      dynamicPools[p.poolName] = {
+        address: p.poolId,
+        baseCoin: p.baseSymbol,
+        quoteCoin: p.quoteSymbol,
+      };
+    }
+  }
+}
+
+registerPoolsInSdkCache(DEFAULT_DEEPBOOK_POOLS);
+
 export async function fetchDeepBookPools(): Promise<DeepBookPoolMeta[]> {
   try {
-    const res = await fetch(`${DEEPBOOK_INDEXER}/get_pools`);
-    if (!res.ok) return DEFAULT_DEEPBOOK_POOLS;
-    const raw: any[] = await res.json();
-    const mapped: DeepBookPoolMeta[] = raw
-      .filter((p) => FEATURED_POOL_ORDER.includes(String(p.pool_name)))
+    const [poolsRes, summaryRes] = await Promise.all([
+      fetch(`${DEEPBOOK_INDEXER}/get_pools`),
+      fetch(`${DEEPBOOK_INDEXER}/summary`).catch(() => null),
+    ]);
+    if (!poolsRes.ok) return DEFAULT_DEEPBOOK_POOLS;
+    const raw: any[] = await poolsRes.json();
+
+    const summaryByPair = new Map<string, any>();
+    let suiUsdRef = 0;
+    if (summaryRes && summaryRes.ok) {
+      try {
+        const sumRows: any[] = await summaryRes.json();
+        for (const row of Array.isArray(sumRows) ? sumRows : []) {
+          const key = String(row?.trading_pairs || '');
+          if (key) summaryByPair.set(key, row);
+          if (key === 'SUI_USDC' && Number(row?.last_price) > 0) {
+            suiUsdRef = Number(row.last_price);
+          }
+        }
+      } catch {
+        // Ignore malformed /summary payload; /get_pools still works
+      }
+    }
+
+    const mapped: DeepBookPoolMeta[] = (Array.isArray(raw) ? raw : [])
+      .filter((p) => p?.pool_id && p?.pool_name && p?.base_asset_symbol && p?.quote_asset_symbol)
       .map((p) => {
         const baseDecimals = Number(p.base_asset_decimals || 9);
         const quoteDecimals = Number(p.quote_asset_decimals || 6);
         const baseScale = Math.pow(10, baseDecimals);
         const rawTick = Number(p.tick_size || 100000);
         const humanTick = (rawTick / 1e9) * Math.pow(10, baseDecimals - quoteDecimals);
+        const poolName = String(p.pool_name);
+        const quoteSymbol = String(p.quote_asset_symbol);
+        const s = summaryByPair.get(poolName);
+        const lastPrice = s && Number(s.last_price) > 0 ? Number(s.last_price) : undefined;
+        const change24hPct =
+          s && s.price_change_percent_24h !== undefined && s.price_change_percent_24h !== null
+            ? Number(s.price_change_percent_24h)
+            : undefined;
+        const rawQuoteVol = s ? Number(s.quote_volume || 0) : 0;
+        const baseVolume24h = s && Number(s.base_volume) >= 0 ? Number(s.base_volume) : undefined;
+        const volume24hUsd =
+          rawQuoteVol > 0
+            ? USD_QUOTES.has(quoteSymbol.toUpperCase())
+              ? rawQuoteVol
+              : quoteSymbol.toUpperCase() === 'SUI' && suiUsdRef > 0
+                ? rawQuoteVol * suiUsdRef
+                : rawQuoteVol
+            : undefined;
+        const high24h = s && Number(s.highest_price_24h) > 0 ? Number(s.highest_price_24h) : undefined;
+        const low24h = s && Number(s.lowest_price_24h) > 0 ? Number(s.lowest_price_24h) : undefined;
+
         return {
           poolId: String(p.pool_id),
-          poolName: String(p.pool_name),
+          poolName,
           baseSymbol: String(p.base_asset_symbol),
-          quoteSymbol: String(p.quote_asset_symbol),
+          quoteSymbol,
           baseCoinId: String(p.base_asset_id),
           quoteCoinId: String(p.quote_asset_id),
           baseDecimals,
@@ -228,13 +364,29 @@ export async function fetchDeepBookPools(): Promise<DeepBookPoolMeta[]> {
           tickSize: Number(humanTick.toPrecision(4)) || 0.0001,
           lotSize: Number(p.lot_size || 1e8) / baseScale,
           minSize: Number(p.min_size || 1e9) / baseScale,
+          lastPrice,
+          change24hPct: Number.isFinite(change24hPct as number) ? change24hPct : undefined,
+          volume24hUsd,
+          baseVolume24h,
+          high24h,
+          low24h,
         };
       });
 
-    mapped.sort(
-      (a, b) => FEATURED_POOL_ORDER.indexOf(a.poolName) - FEATURED_POOL_ORDER.indexOf(b.poolName)
-    );
-    return mapped.length > 0 ? mapped : DEFAULT_DEEPBOOK_POOLS;
+    mapped.sort((a, b) => {
+      const ia = FEATURED_POOL_ORDER.indexOf(a.poolName);
+      const ib = FEATURED_POOL_ORDER.indexOf(b.poolName);
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return (b.volume24hUsd || 0) - (a.volume24hUsd || 0);
+    });
+
+    if (mapped.length > 0) {
+      registerPoolsInSdkCache(mapped);
+      return mapped;
+    }
+    return DEFAULT_DEEPBOOK_POOLS;
   } catch {
     return DEFAULT_DEEPBOOK_POOLS;
   }
@@ -325,6 +477,8 @@ export function createDeepBookClient(owner: string, managerId?: string) {
   return suiGrpcClient.$extend(
     deepbook({
       address: owner,
+      coins: dynamicCoins,
+      pools: dynamicPools,
       balanceManagers: managerId ? { MAIN: { address: managerId } } : undefined,
     })
   );
