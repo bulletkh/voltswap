@@ -37,7 +37,21 @@ import {
   Activity
 } from 'lucide-react';
 import { Transaction } from '@mysten/sui/transactions';
+import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
+import BN from 'bn.js';
 import { VOLT_TREASURY_ADDRESS } from './EarnVaultsHub';
+import {
+  AF_SUI_COIN_TYPE,
+  AF_USDC_COIN_TYPE,
+  AfAccountState,
+  AfMarketInfo,
+  fetchAftermathMarkets,
+  fetchAftermathAccountState,
+  buildCreateAccountTx,
+  buildDepositCollateralTx,
+  buildWithdrawCollateralTx,
+  buildPlaceMarketOrderTx,
+} from './aftermathPerps';
 import {
   playClickSound,
   playOrderSubmittedSound,
@@ -100,6 +114,8 @@ export interface BluefinPosition {
   roePct: number;
   openedAt: number;
   digest: string;
+  isOnChain?: boolean;
+  afMarketId?: string;
 }
 
 export const BLUEFIN_MARKETS: BluefinMarket[] = [
@@ -757,7 +773,70 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     return 0;
   }, [userBalances, currentAccountAddress]);
 
-  const availableCollateralBal = collateralAsset === 'SUI' ? suiBalance : usdcBalance;
+  // Aftermath On-Chain Perpetuals State
+  const [afMarkets, setAfMarkets] = useState<Record<string, AfMarketInfo>>({});
+  const [afAccount, setAfAccount] = useState<AfAccountState | null>(null);
+  const [isSyncingAccount, setIsSyncingAccount] = useState(false);
+
+  const cetusClient = useMemo(
+    () =>
+      new AggregatorClient({
+        endpoint: 'https://api-sui.cetus.zone/router_v2/find_routes',
+        signer: currentAccount?.address || undefined,
+        client: suiClient,
+      }),
+    [currentAccount?.address, suiClient]
+  );
+
+  // Fetch Aftermath Perpetuals markets on mount
+  useEffect(() => {
+    let mounted = true;
+    const loadAfMarkets = async () => {
+      try {
+        const mkts = await fetchAftermathMarkets();
+        if (mounted) setAfMarkets(mkts);
+      } catch (e) {
+        console.warn('Aftermath markets fetch warning:', e);
+      }
+    };
+    loadAfMarkets();
+    const timer = setInterval(loadAfMarkets, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const refreshAftermathAccount = async (addr: string) => {
+    setIsSyncingAccount(true);
+    try {
+      const state = await fetchAftermathAccountState(addr);
+      setAfAccount(state);
+      return state;
+    } catch (e) {
+      console.warn('Aftermath account state warning:', e);
+      return null;
+    } finally {
+      setIsSyncingAccount(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentAccountAddress) {
+      setAfAccount(null);
+      return;
+    }
+    refreshAftermathAccount(currentAccountAddress);
+    const timer = setInterval(() => {
+      refreshAftermathAccount(currentAccountAddress);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [currentAccountAddress]);
+
+  const availableCollateralBal =
+    collateralAsset === 'SUI'
+      ? suiBalance
+      : usdcBalance + (afAccount?.availableCollateralUsd || 0);
 
   // Active positions stored in localStorage
   const [positions, setPositions] = useState<BluefinPosition[]>(() => {
@@ -901,6 +980,55 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     };
   }, [selectedMarket.symbol, selectedMarket.binanceSymbol]);
 
+  // Sync real on-chain Aftermath Perpetuals positions into positions list
+  useEffect(() => {
+    if (!afAccount) return;
+    const marketById = new Map<string, AfMarketInfo>();
+    Object.values(afMarkets).forEach((m) => marketById.set(m.marketId, m));
+
+    const onChainPositions: BluefinPosition[] = afAccount.positions.map((p) => {
+      const afMkt = marketById.get(p.marketId);
+      const base = afMkt?.symbol || 'SUI';
+      const uiMkt = liveMarkets.find((m) => m.baseAsset === base);
+      const mark = uiMkt?.markPrice || afMkt?.indexPrice || p.entryPrice;
+      const side: 'long' | 'short' = p.baseAssetAmount >= 0 ? 'long' : 'short';
+      const sizeContracts = Math.abs(p.baseAssetAmount);
+      const sizeUsd = Math.abs(p.quoteAssetNotionalAmount) || sizeContracts * mark;
+      const marginUsd = Math.max(0.01, p.collateralUsd);
+      const roePct = (p.unrealizedPnlUsd / marginUsd) * 100;
+      return {
+        id: `af_${p.marketId}`,
+        marketSymbol: uiMkt?.symbol || `${base}-PERP`,
+        baseAsset: base,
+        side,
+        leverage: Math.round(p.leverage * 10) / 10,
+        marginMode: 'isolated',
+        entryPrice: p.entryPrice,
+        markPrice: mark,
+        sizeContracts,
+        sizeUsd,
+        marginCollateralUsd: p.collateralUsd,
+        liquidationPrice: p.liquidationPrice,
+        unrealizedPnlUsd: p.unrealizedPnlUsd,
+        roePct,
+        openedAt: Date.now(),
+        digest: '',
+        isOnChain: true,
+        afMarketId: p.marketId,
+      };
+    });
+
+    setPositions((prev) => {
+      const legacyLocal = prev.filter((pos) => !pos.isOnChain && !pos.id.startsWith('af_'));
+      // Preserve digest/openedAt for existing on-chain entries if already tracked
+      const mergedOnChain = onChainPositions.map((oc) => {
+        const existing = prev.find((p) => p.id === oc.id);
+        return existing ? { ...oc, digest: existing.digest, openedAt: existing.openedAt } : oc;
+      });
+      return [...mergedOnChain, ...legacyLocal];
+    });
+  }, [afAccount, afMarkets, liveMarkets]);
+
   // Update PnL of ALL active positions based on real live market prices
   useEffect(() => {
     setPositions((prev) => {
@@ -948,7 +1076,7 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
   // Fee calculation (0.05% taker fee, Volt Tier rebate)
   const tradingFeeUsd = positionSizeUsd * 0.0005;
 
-  // Execute Open Position
+  // Execute Open Position (Real On-Chain Aftermath Perpetuals)
   const handleOpenPosition = async () => {
     if (collateralAmount <= 0) {
       showNotification('warning', 'Invalid Margin', 'Please specify collateral amount to open position.');
@@ -964,52 +1092,145 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       showNotification(
         'warning',
         'Insufficient Balance',
-        `You have ${availableCollateralBal.toFixed(4)} ${collateralAsset} available in your wallet.`
+        `You have ${availableCollateralBal.toFixed(4)} ${collateralAsset} available.`
       );
       return;
     }
 
-    const isFast = fastSession.isActive && Date.now() < fastSession.expiresAt && (fastSession.spentUsd + collateralValueUsd <= fastSession.maxSpendUsd);
+    const afMarket = afMarkets[selectedMarket.baseAsset.toUpperCase()];
+    if (!afMarket) {
+      showNotification(
+        'warning',
+        'Market Not Listed On-Chain',
+        `${selectedMarket.symbol} is not available on Aftermath Perpetuals yet. Please select SUI-PERP, BTC-PERP, ETH-PERP, SOL-PERP, HYPE-PERP, WAL-PERP, or DEEP-PERP.`
+      );
+      return;
+    }
+
+    const effectiveLeverage = Math.min(leverage, afMarket.maxLeverage);
+    const effectiveSizeUsd = collateralValueUsd * effectiveLeverage;
+    const effectiveContracts = selectedMarket.markPrice > 0 ? effectiveSizeUsd / selectedMarket.markPrice : 0;
+
+    if (effectiveSizeUsd < afMarket.minOrderUsdValue) {
+      showNotification(
+        'warning',
+        'Below Minimum Order Size',
+        `Aftermath Perpetuals requires at least $${afMarket.minOrderUsdValue.toFixed(2)} notional position size (current: $${effectiveSizeUsd.toFixed(2)}). Increase collateral or leverage.`
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      let digest = '';
-      if (isFast) {
-        // 1-Click Fast Trading: Instant session-key execution without popup
-        recordFastTrade(collateralValueUsd);
-        setFastSession(getFastTradingSession());
-      } else {
-        const tx = new Transaction();
-        tx.setSender(currentAccount.address);
+      const walletAddr = currentAccount.address;
 
-        // Route real 0.05% Perps protocol fee in SUI MIST to Volt Treasury
-        const feeSui = suiPriceUsd > 0 ? tradingFeeUsd / suiPriceUsd : 0.0001;
-        const feeMist = BigInt(Math.max(10000, Math.floor(feeSui * 1e9)));
-        const [refCoin] = tx.splitCoins(tx.gas, [feeMist]);
-        tx.transferObjects([refCoin], VOLT_TREASURY_ADDRESS);
-
-        const res = await signAndExecute({ transaction: tx });
-        digest = (res as any)?.digest || '';
-        if (!digest) {
-          throw new Error('Transaction was not confirmed on-chain (missing digest).');
+      // 1. Ensure user has an on-chain Aftermath Perpetuals AccountCap
+      let activeAccount = afAccount;
+      if (!activeAccount?.accountId) {
+        showNotification('info', 'Step 1/3: Creating Perps Account', 'Approve 1-time Aftermath Perpetuals account creation in your wallet...');
+        const createTx = await buildCreateAccountTx(walletAddr);
+        const createRes = await signAndExecute({ transaction: createTx });
+        if (!(createRes as any)?.digest) {
+          throw new Error('Failed to create Aftermath Perpetuals account.');
+        }
+        for (let i = 0; i < 6; i++) {
+          await new Promise((r) => setTimeout(r, 900));
+          const refreshed = await refreshAftermathAccount(walletAddr);
+          if (refreshed?.accountId) {
+            activeAccount = refreshed;
+            break;
+          }
+        }
+        if (!activeAccount?.accountId) {
+          throw new Error('Account created on-chain, but indexer is still syncing. Please click Open again in a few seconds.');
         }
       }
 
-      const entryPrice = orderType === 'limit' && parseFloat(limitPriceInput) > 0
-        ? parseFloat(limitPriceInput)
-        : selectedMarket.markPrice;
+      // 2. If collateral is SUI, swap SUI -> USDC via Cetus Aggregator first so Aftermath margin is funded in USDC
+      let usdcAvailableInWallet = usdcBalance;
+      const freeMarginUsdc = activeAccount.availableCollateralUsd || 0;
+      let neededDepositUsdc = Math.max(0, collateralValueUsd - freeMarginUsdc);
 
+      if (collateralAsset === 'SUI' && neededDepositUsdc > usdcAvailableInWallet + 0.01) {
+        showNotification('info', 'Swapping SUI → USDC Margin', `Converting ${collateralAmount.toFixed(4)} SUI into USDC collateral via Cetus...`);
+        const rawSuiIn = new BN(Math.floor(collateralAmount * 1e9).toString());
+        const router = await cetusClient.findRouters({
+          from: AF_SUI_COIN_TYPE,
+          target: AF_USDC_COIN_TYPE,
+          amount: rawSuiIn,
+          byAmountIn: true,
+        });
+        if (!router || !router.amountOut || Number(router.amountOut) <= 0) {
+          throw new Error('No Cetus swap route found for SUI -> USDC.');
+        }
+        const swapTx = new Transaction();
+        swapTx.setSender(walletAddr);
+        await cetusClient.fastRouterSwap({
+          router,
+          txb: swapTx,
+          slippage: 0.015,
+        });
+        const swapRes = await signAndExecute({ transaction: swapTx });
+        if (!(swapRes as any)?.digest) {
+          throw new Error('SUI -> USDC collateral swap failed.');
+        }
+        const swappedUsdc = Number(router.amountOut) / 1e6;
+        usdcAvailableInWallet += swappedUsdc;
+        neededDepositUsdc = Math.min(swappedUsdc, Math.max(0, collateralValueUsd - freeMarginUsdc));
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      // 3. Deposit USDC collateral into Aftermath Perps Account if needed
+      if (neededDepositUsdc > 0.01) {
+        const depositAmt = Math.min(neededDepositUsdc, usdcAvailableInWallet > 0 ? usdcAvailableInWallet : neededDepositUsdc);
+        showNotification('info', 'Depositing Margin On-Chain', `Depositing $${depositAmt.toFixed(2)} USDC into Aftermath Perps Account #${activeAccount.accountId}...`);
+        const depositTx = await buildDepositCollateralTx(walletAddr, activeAccount.accountId, depositAmt);
+        const depRes = await signAndExecute({ transaction: depositTx });
+        if (!(depRes as any)?.digest) {
+          throw new Error('Collateral deposit transaction was not confirmed.');
+        }
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      // 4. Place Real On-Chain Market Order (+ 0.05% Volt Treasury Fee)
+      const existingOnChainPos = activeAccount.positions.find((p) => p.marketId === afMarket.marketId);
+      const feeSui = suiPriceUsd > 0 ? (effectiveSizeUsd * 0.0005) / suiPriceUsd : 0.0001;
+      const feeMist = BigInt(Math.max(10000, Math.floor(feeSui * 1e9)));
+
+      const orderTx = await buildPlaceMarketOrderTx({
+        walletAddress: walletAddr,
+        accountId: activeAccount.accountId,
+        marketId: afMarket.marketId,
+        side: orderSide === 'long' ? 0 : 1,
+        sizeContracts: effectiveContracts,
+        lotSize: afMarket.lotSize,
+        leverage: effectiveLeverage,
+        reduceOnly: false,
+        collateralChange: collateralValueUsd,
+        hasPosition: Boolean(existingOnChainPos),
+        cancelSlTp: false,
+        slippage: 0.02,
+        feeMist,
+      });
+
+      const res = await signAndExecute({ transaction: orderTx });
+      const digest = (res as any)?.digest || '';
+      if (!digest) {
+        throw new Error('Order transaction was not confirmed on-chain (missing digest).');
+      }
+
+      const entryPrice = selectedMarket.markPrice;
       const newPos: BluefinPosition = {
-        id: 'bf_' + Date.now(),
+        id: `af_${afMarket.marketId}`,
         marketSymbol: selectedMarket.symbol,
         baseAsset: selectedMarket.baseAsset,
         side: orderSide,
-        leverage: leverage,
+        leverage: effectiveLeverage,
         marginMode: marginMode,
         entryPrice: entryPrice,
         markPrice: selectedMarket.markPrice,
-        sizeContracts: positionSizeContracts,
-        sizeUsd: positionSizeUsd,
+        sizeContracts: effectiveContracts,
+        sizeUsd: effectiveSizeUsd,
         marginCollateralUsd: collateralValueUsd,
         liquidationPrice: estimatedLiquidationPrice,
         takeProfitPrice: parseFloat(takeProfitInput) || undefined,
@@ -1017,54 +1238,55 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
         unrealizedPnlUsd: 0,
         roePct: 0,
         openedAt: Date.now(),
-        digest: digest
+        digest: digest,
+        isOnChain: true,
+        afMarketId: afMarket.marketId,
       };
 
-      setPositions((prev) => [newPos, ...prev]);
+      setPositions((prev) => [newPos, ...prev.filter((p) => p.id !== newPos.id)]);
       setCollateralInput('');
       setTakeProfitInput('');
       setStopLossInput('');
 
-      // Record Perps trade into Volt Treasury Ledger
-      if (digest) {
-        try {
-          fetch('/api/record-swap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Volt-Auth': 'volt_protocol_mainnet_proof_2026_sui' },
-            body: JSON.stringify({
-              address: currentAccount.address,
-              digest: digest,
-              fromToken: collateralAsset,
-              toToken: selectedMarket.symbol,
-              fromAmount: collateralAmount.toString(),
-              volumeUsd: positionSizeUsd,
-              feeRate: 0.0005,
-              swapMode: `Perps ${leverage}x ${orderSide.toUpperCase()}`,
-              timestamp: Date.now(),
-              voltAuth: 'volt_protocol_mainnet_proof_2026_sui'
-            })
-          }).catch(() => {});
-        } catch (recErr) {
-          console.warn('Failed to record Perps trade:', recErr);
-        }
+      setTimeout(() => {
+        refreshAftermathAccount(walletAddr);
+      }, 1200);
+
+      try {
+        fetch('/api/record-swap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Volt-Auth': 'volt_protocol_mainnet_proof_2026_sui' },
+          body: JSON.stringify({
+            address: walletAddr,
+            digest: digest,
+            fromToken: collateralAsset,
+            toToken: selectedMarket.symbol,
+            fromAmount: collateralAmount.toString(),
+            volumeUsd: effectiveSizeUsd,
+            feeRate: 0.0005,
+            swapMode: `Aftermath Perps ${effectiveLeverage}x ${orderSide.toUpperCase()}`,
+            timestamp: Date.now(),
+            voltAuth: 'volt_protocol_mainnet_proof_2026_sui'
+          })
+        }).catch(() => {});
+      } catch (recErr) {
+        console.warn('Failed to record Perps trade:', recErr);
       }
 
       playOrderSubmittedSound();
       showNotification(
         'success',
-        isFast ? `⚡ 1-Click: ${leverage}x ${orderSide.toUpperCase()} ${selectedMarket.symbol}` : `${leverage}x ${orderSide.toUpperCase()} ${selectedMarket.symbol} Opened`,
-        isFast
-          ? `Instant 1-Click trade executed in active session!\n• Size: ~$${positionSizeUsd.toFixed(2)} (${positionSizeContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Margin: ${collateralAmount.toFixed(2)} ${collateralAsset}\n• Entry Price: $${entryPrice.toFixed(4)}\n• Liquidation: $${estimatedLiquidationPrice.toFixed(4)}\n• Session Quota remaining: $${Math.max(0, fastSession.maxSpendUsd - fastSession.spentUsd - collateralValueUsd).toFixed(0)}`
-          : `Perpetual margin position opened!\n• Position Size: ~$${positionSizeUsd.toFixed(2)} (${positionSizeContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Collateral: ${collateralAmount.toFixed(2)} ${collateralAsset} (~$${collateralValueUsd.toFixed(2)})\n• Entry Price: $${entryPrice.toFixed(4)}\n• Liquidation Price: $${estimatedLiquidationPrice.toFixed(4)}\n• Protocol Fee (0.05%): $${tradingFeeUsd.toFixed(4)} routed to Volt Treasury\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
-        digest ? 'View on Suiscan' : undefined,
-        digest ? `https://suiscan.xyz/mainnet/tx/${digest}` : undefined,
+        `${effectiveLeverage}x ${orderSide.toUpperCase()} ${selectedMarket.symbol} Opened On-Chain`,
+        `Executed on Aftermath Perpetuals (Sui Mainnet)!\n• Position Size: ~$${effectiveSizeUsd.toFixed(2)} (${effectiveContracts.toFixed(3)} ${selectedMarket.baseAsset})\n• Collateral: ~$${collateralValueUsd.toFixed(2)} USDC\n• Entry Price: $${entryPrice.toFixed(4)}\n• Protocol Fee (0.05%): $${(effectiveSizeUsd * 0.0005).toFixed(4)} routed to Volt Treasury\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        'View on Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`,
         {
           fromToken: collateralAsset,
           toToken: selectedMarket.symbol,
           fromAmount: collateralAmount.toString(),
-          toAmount: positionSizeContracts.toFixed(3),
-          volumeUsd: positionSizeUsd,
-          feeSavedUsd: tradingFeeUsd,
+          toAmount: effectiveContracts.toFixed(3),
+          volumeUsd: effectiveSizeUsd,
+          feeSavedUsd: effectiveSizeUsd * 0.0005,
           digest: digest,
           timestamp: Date.now(),
           orderType: 'PERPS'
@@ -1079,23 +1301,47 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     }
   };
 
-  // Close Position
+  // Close Position (Real On-Chain Aftermath Perpetuals)
   const handleClosePosition = async (pos: BluefinPosition) => {
     if (!currentAccount?.address || !signAndExecute) {
       showNotification('warning', 'Connect Wallet', 'Please connect your Sui wallet to close this position.');
       return;
     }
 
-    const isFast = fastSession.isActive && Date.now() < fastSession.expiresAt;
-
     setIsSubmitting(true);
     try {
       let digest = '';
-      if (!isFast) {
+      const closeFeeSui = suiPriceUsd > 0 ? (pos.sizeUsd * 0.0005) / suiPriceUsd : 0.0001;
+      const feeMist = BigInt(Math.max(10000, Math.floor(closeFeeSui * 1e9)));
+
+      if (pos.isOnChain && pos.afMarketId && afAccount?.accountId) {
+        const afMarket = afMarkets[pos.baseAsset.toUpperCase()];
+        const closeTx = await buildPlaceMarketOrderTx({
+          walletAddress: currentAccount.address,
+          accountId: afAccount.accountId,
+          marketId: pos.afMarketId,
+          side: pos.side === 'long' ? 1 : 0,
+          sizeContracts: pos.sizeContracts,
+          lotSize: afMarket?.lotSize || 10000n,
+          leverage: pos.leverage,
+          reduceOnly: true,
+          collateralChange: 0,
+          hasPosition: true,
+          cancelSlTp: true,
+          slippage: 0.025,
+          feeMist,
+        });
+        const res = await signAndExecute({ transaction: closeTx });
+        digest = (res as any)?.digest || '';
+        if (!digest) {
+          throw new Error('Close transaction was not confirmed on-chain.');
+        }
+        setTimeout(() => {
+          refreshAftermathAccount(currentAccount.address);
+        }, 1200);
+      } else {
         const tx = new Transaction();
         tx.setSender(currentAccount.address);
-        const closeFeeSui = suiPriceUsd > 0 ? (pos.sizeUsd * 0.0005) / suiPriceUsd : 0.0001;
-        const feeMist = BigInt(Math.max(10000, Math.floor(closeFeeSui * 1e9)));
         const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
         tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
 
@@ -1119,16 +1365,16 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
 
       showNotification(
         'success',
-        isFast ? `⚡ 1-Click Closed: ${pos.leverage}x ${pos.side.toUpperCase()} ${pos.marketSymbol}` : `Closed ${pos.leverage}x ${pos.side.toUpperCase()} ${pos.marketSymbol}`,
-        `Position closed at Market price $${pos.markPrice.toFixed(4)}.\n• Realized PnL: ${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} (${pos.roePct.toFixed(2)}% ROE)\n• Returned Margin: ~$${returnedCollateral.toFixed(2)} USDC\n\n${isFast ? '⚡ 0ms Fast Session Execution' : `Digest: ${digest.slice(0, 10)}...${digest.slice(-8)}`}`,
-        digest ? 'View on Suiscan' : undefined,
-        digest ? `https://suiscan.xyz/mainnet/tx/${digest}` : undefined,
+        `Closed ${pos.leverage}x ${pos.side.toUpperCase()} ${pos.marketSymbol}`,
+        `Position closed on-chain at Market price $${pos.markPrice.toFixed(4)}.\n• Realized PnL: ${netPnl >= 0 ? '+' : ''}$${netPnl.toFixed(2)} (${pos.roePct.toFixed(2)}% ROE)\n• Freed Margin: ~$${returnedCollateral.toFixed(2)} USDC\n\nDigest: ${digest.slice(0, 10)}...${digest.slice(-8)}`,
+        'View on Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`,
         {
           fromToken: pos.side.toUpperCase() === 'LONG' ? pos.marketSymbol : 'USDC',
           toToken: pos.side.toUpperCase() === 'LONG' ? 'USDC' : pos.marketSymbol,
-          fromAmount: (pos.contracts || 1).toFixed(3),
+          fromAmount: (pos.sizeContracts || 1).toFixed(3),
           toAmount: returnedCollateral.toFixed(2),
-          volumeUsd: pos.positionSizeUsd,
+          volumeUsd: pos.sizeUsd,
           profitUsd: netPnl,
           profitPct: pos.roePct,
           digest: digest,
@@ -1140,6 +1386,42 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       console.error('Close error:', err);
       playAlertSound();
       showNotification('error', 'Close Failed', err.message || 'Transaction rejected.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Withdraw free USDC margin from Aftermath Perps Account back to Sui wallet
+  const handleWithdrawMargin = async () => {
+    if (!currentAccount?.address || !signAndExecute || !afAccount?.accountId) return;
+    const freeUsdc = afAccount.availableCollateralUsd;
+    if (freeUsdc <= 0.01) {
+      showNotification('info', 'No Free Margin', 'No withdrawable free USDC margin in your Perps account.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const withdrawTx = await buildWithdrawCollateralTx(
+        currentAccount.address,
+        afAccount.accountId,
+        Math.floor(freeUsdc * 1e6) / 1e6
+      );
+      const res = await signAndExecute({ transaction: withdrawTx });
+      const digest = (res as any)?.digest || '';
+      if (!digest) throw new Error('Withdraw transaction was not confirmed.');
+      await new Promise((r) => setTimeout(r, 1000));
+      await refreshAftermathAccount(currentAccount.address);
+      playCashProfitSound();
+      showNotification(
+        'success',
+        'Margin Withdrawn to Wallet',
+        `Withdrew $${freeUsdc.toFixed(2)} USDC from Aftermath Perps Account #${afAccount.accountId} to your Sui wallet.`,
+        'View on Suiscan',
+        `https://suiscan.xyz/mainnet/tx/${digest}`
+      );
+    } catch (err: any) {
+      playAlertSound();
+      showNotification('error', 'Withdraw Failed', err.message || 'Failed to withdraw margin.');
     } finally {
       setIsSubmitting(false);
     }
@@ -1164,9 +1446,27 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
                   : 'text-gray-400 hover:text-white'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span>50x Perps Leverage</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Aftermath On-Chain Perps</span>
             </button>
+
+            {afAccount?.accountId && (
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-[11px] font-mono text-cyan-300">
+                <span>Acct #{afAccount.accountId.replace(/n$/, '')}</span>
+                <span className="text-white/30">•</span>
+                <span>Margin: ${afAccount.availableCollateralUsd.toFixed(2)}</span>
+                {afAccount.availableCollateralUsd > 0.01 && (
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleWithdrawMargin}
+                    className="ml-1 px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-200 font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Withdraw
+                  </button>
+                )}
+              </div>
+            )}
 
             <button
               type="button"
