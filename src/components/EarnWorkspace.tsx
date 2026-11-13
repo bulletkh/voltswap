@@ -488,42 +488,42 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
     <div className="w-full space-y-4">
       {/* Top 4 High-Contrast KPI Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="panel-carbon rounded-xl p-4">
-          <div className="text-[11px] font-medium text-slate-300">DeepBook On-Site Vault TVL</div>
+        <div className="panel-carbon rounded-2xl p-4">
+          <div className="text-xs font-medium text-slate-300">DeepBook On-Site Vault TVL</div>
           <div className="text-xl font-mono tabular-nums font-bold text-white mt-1">
             ${summaryMetrics.marginTvl >= 1e6
               ? `${(summaryMetrics.marginTvl / 1e6).toFixed(2)}M`
               : `${(summaryMetrics.marginTvl / 1e3).toFixed(1)}K`}
           </div>
-          <div className="text-[10px] font-mono text-[#4BA3FF] mt-0.5">
+          <div className="text-xs font-mono text-[#2AF5D2] mt-0.5">
             {marginVaults.length} Native On-Chain Vaults
           </div>
         </div>
 
-        <div className="panel-carbon rounded-xl p-4">
-          <div className="text-[11px] font-medium text-slate-300">Top Lending Supply APR</div>
+        <div className="panel-carbon rounded-2xl p-4">
+          <div className="text-xs font-medium text-slate-300">Top Lending Supply APR</div>
           <div className="text-xl font-mono tabular-nums font-bold text-[#00E599] mt-1">
             {summaryMetrics.topMarginApr > 0 ? `${summaryMetrics.topMarginApr.toFixed(2)}%` : '—'}
           </div>
-          <div className="text-[10px] font-mono text-slate-300 mt-0.5">Real Borrower Interest</div>
+          <div className="text-xs font-mono text-slate-300 mt-0.5">Real Borrower Interest</div>
         </div>
 
-        <div className="panel-carbon rounded-xl p-4">
-          <div className="text-[11px] font-medium text-slate-300">Top Staking &amp; RWA Yield</div>
+        <div className="panel-carbon rounded-2xl p-4">
+          <div className="text-xs font-medium text-slate-300">Top Staking &amp; RWA Yield</div>
           <div className="text-xl font-mono tabular-nums font-bold text-[#00E599] mt-1">
             {summaryMetrics.topLstApy > 0 ? `${summaryMetrics.topLstApy.toFixed(2)}%` : '—'}
           </div>
-          <div className="text-[10px] font-mono text-slate-300 mt-0.5">
+          <div className="text-xs font-mono text-slate-300 mt-0.5">
             haSUI · afSUI · vSUI · sSUI · USDY
           </div>
         </div>
 
-        <div className="panel-carbon rounded-xl p-4">
-          <div className="text-[11px] font-medium text-slate-300">Your On-Site Deposits</div>
+        <div className="panel-carbon rounded-2xl p-4">
+          <div className="text-xs font-medium text-slate-300">Your On-Site Deposits</div>
           <div className="text-xl font-mono tabular-nums font-bold text-white mt-1">
             ${summaryMetrics.userTotalUsd.toFixed(2)}
           </div>
-          <div className="text-[10px] font-mono text-[#4BA3FF] mt-0.5">
+          <div className="text-xs font-mono text-[#2AF5D2] mt-0.5">
             {supplierCapIds.length > 0
               ? `SupplierCap Active (${supplierCapIds.length})`
               : account
@@ -537,7 +537,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         <div className="lg:col-span-8 space-y-4">
           {/* Sub-Tabs & Filter Bar */}
-          <div className="panel-carbon rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="panel-carbon rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-1.5">
               {(
                 [
@@ -553,7 +553,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                   onClick={() => setTab(item.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     tab === item.id
-                      ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)]'
+                      ? 'bg-[#00E0B8] text-[#041214] shadow-[0_0_16px_rgba(0,224,184,0.3)] font-bold'
                       : 'text-slate-300 hover:text-white hover:bg-white/[0.06]'
                   }`}
                 >
@@ -570,13 +570,13 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search asset..."
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[#05080F] border border-white/[0.12] text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#2970FF] w-36 sm:w-44"
+                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[#070B10] border border-white/[0.12] text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#00E0B8] w-36 sm:w-44"
                 />
               </div>
               <button
                 type="button"
                 onClick={loadAllYieldData}
-                className="p-2 rounded-lg bg-[#05080F] border border-white/[0.12] text-slate-300 hover:text-white hover:border-[#2970FF]"
+                className="p-2 rounded-lg bg-[#070B10] border border-white/[0.12] text-slate-300 hover:text-white hover:border-[#00E0B8]"
                 title="Refresh live rates"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -586,18 +586,18 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
 
           {/* SECTION 1: DeepBook v3 Margin Lending Vaults (On-Site Supply & Withdraw) */}
           {(tab === 'onsite' || tab === 'margin') && (
-            <div className="panel-carbon rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/[0.1] flex flex-wrap items-center justify-between gap-2 bg-[#070B14]">
+            <div className="panel-carbon rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/[0.1] flex flex-wrap items-center justify-between gap-2 bg-[#0B1017]">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#4BA3FF]" />
+                  <Sparkles className="w-4 h-4 text-[#2AF5D2]" />
                   <span className="text-sm font-bold text-white">
                     DeepBook v3 Margin Lending Vaults
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-[#00D98B]/15 text-[#00E599] border border-[#00D98B]/30 text-[10px] font-mono font-semibold">
+                  <span className="px-2 py-0.5 rounded bg-[#00D98B]/15 text-[#00E599] border border-[#00D98B]/30 text-xs font-mono font-semibold">
                     ON-SITE EXECUTION
                   </span>
                 </div>
-                <span className="text-[11px] font-mono text-slate-300">
+                <span className="text-xs font-mono text-slate-300">
                   Direct Supply &amp; Withdraw on VoltSwap
                 </span>
               </div>
@@ -605,13 +605,13 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-slate-300 border-b border-white/[0.08] bg-[#05080F]">
+                    <tr className="text-slate-300 border-b border-white/[0.08] bg-[#070B10]">
                       <th className="text-left px-4 py-2.5 font-semibold">Vault Asset</th>
                       <th className="text-right px-3 py-2.5 font-semibold">
                         <button
                           type="button"
                           onClick={() => setSortBy('tvl')}
-                          className={sortBy === 'tvl' ? 'text-[#4BA3FF]' : 'hover:text-white'}
+                          className={sortBy === 'tvl' ? 'text-[#2AF5D2]' : 'hover:text-white'}
                         >
                           Supplied TVL
                         </button>
@@ -623,7 +623,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                         <button
                           type="button"
                           onClick={() => setSortBy('apy')}
-                          className={sortBy === 'apy' ? 'text-[#4BA3FF]' : 'hover:text-white'}
+                          className={sortBy === 'apy' ? 'text-[#2AF5D2]' : 'hover:text-white'}
                         >
                           Supply APR
                         </button>
@@ -644,7 +644,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                         <tr
                           key={v.coinKey}
                           className={`transition-colors ${
-                            isRowFocused ? 'bg-[#1D63FF]/10' : 'hover:bg-white/[0.03]'
+                            isRowFocused ? 'bg-[#00E0B8]/10' : 'hover:bg-white/[0.03]'
                           }`}
                         >
                           <td className="px-4 py-3 font-sans">
@@ -652,7 +652,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                               <img src={v.logo} alt={v.symbol} className="w-6 h-6 rounded-full" />
                               <div>
                                 <div className="font-bold text-white">{v.symbol}</div>
-                                <div className="text-[10px] text-slate-300">
+                                <div className="text-xs text-slate-300">
                                   Borrow {v.borrowAprPct.toFixed(2)}%
                                 </div>
                               </div>
@@ -666,7 +666,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                                   ? `${(v.tvlUsd / 1e3).toFixed(1)}K`
                                   : v.tvlUsd.toFixed(0)}
                             </div>
-                            <div className="text-[10px] text-slate-300">
+                            <div className="text-xs text-slate-300">
                               {v.totalSupply >= 1e6
                                 ? `${(v.totalSupply / 1e6).toFixed(2)}M`
                                 : v.totalSupply >= 1000
@@ -679,7 +679,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                             <div className="text-white">{v.utilizationPct.toFixed(1)}%</div>
                             <div className="w-16 h-1.5 rounded-full bg-white/[0.1] ml-auto mt-1 overflow-hidden">
                               <div
-                                className="h-full bg-[#2970FF]"
+                                className="h-full bg-[#00E0B8]"
                                 style={{ width: `${Math.min(100, v.utilizationPct)}%` }}
                               />
                             </div>
@@ -707,7 +707,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                                     coinKey: v.coinKey,
                                   })
                                 }
-                                className="px-3 py-1.5 rounded-lg bg-[#1D63FF] hover:bg-[#2E74FF] text-white font-semibold text-xs transition-colors"
+                                className="px-3 py-1.5 rounded-lg bg-[#00E0B8] hover:bg-[#2AF5D2] text-[#041214] font-bold text-xs transition-colors"
                               >
                                 Supply
                               </button>
@@ -741,18 +741,18 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
 
           {/* SECTION 2: Liquid Staking & RWA Yield Vaults (On-Site Stake & Unstake) */}
           {(tab === 'onsite' || tab === 'lst') && (
-            <div className="panel-carbon rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/[0.1] flex flex-wrap items-center justify-between gap-2 bg-[#070B14]">
+            <div className="panel-carbon rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/[0.1] flex flex-wrap items-center justify-between gap-2 bg-[#0B1017]">
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-[#00E599]" />
                   <span className="text-sm font-bold text-white">
                     Sui Liquid Staking &amp; Treasury Yield
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-[#00D98B]/15 text-[#00E599] border border-[#00D98B]/30 text-[10px] font-mono font-semibold">
+                  <span className="px-2 py-0.5 rounded bg-[#00D98B]/15 text-[#00E599] border border-[#00D98B]/30 text-xs font-mono font-semibold">
                     1-CLICK STAKE &amp; REDEEM
                   </span>
                 </div>
-                <span className="text-[11px] font-mono text-slate-300">
+                <span className="text-xs font-mono text-slate-300">
                   Cetus Aggregator PTB
                 </span>
               </div>
@@ -760,7 +760,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-slate-300 border-b border-white/[0.08] bg-[#05080F]">
+                    <tr className="text-slate-300 border-b border-white/[0.08] bg-[#070B10]">
                       <th className="text-left px-4 py-2.5 font-semibold">Yield Token</th>
                       <th className="text-left px-3 py-2.5 font-semibold hidden sm:table-cell">
                         Protocol
@@ -784,7 +784,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                         <tr
                           key={item.symbol}
                           className={`transition-colors ${
-                            isRowFocused ? 'bg-[#1D63FF]/10' : 'hover:bg-white/[0.03]'
+                            isRowFocused ? 'bg-[#00E0B8]/10' : 'hover:bg-white/[0.03]'
                           }`}
                         >
                           <td className="px-4 py-3 font-sans">
@@ -792,7 +792,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                               <img src={item.logo} alt={item.symbol} className="w-6 h-6 rounded-full" />
                               <div>
                                 <div className="font-bold text-white">{item.symbol}</div>
-                                <div className="text-[10px] text-slate-300 sm:hidden">
+                                <div className="text-xs text-slate-300 sm:hidden">
                                   {item.protocol}
                                 </div>
                               </div>
@@ -825,7 +825,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                                     symbol: item.symbol,
                                   })
                                 }
-                                className="px-3 py-1.5 rounded-lg bg-[#1D63FF] hover:bg-[#2E74FF] text-white font-semibold text-xs transition-colors"
+                                className="px-3 py-1.5 rounded-lg bg-[#00E0B8] hover:bg-[#2AF5D2] text-[#041214] font-bold text-xs transition-colors"
                               >
                                 {item.category === 'rwa' ? 'Deposit' : 'Stake'}
                               </button>
@@ -859,25 +859,25 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
 
           {/* SECTION 3: External Ecosystem CLMM DEX Pools (Explicitly labeled External) */}
           {tab === 'external' && (
-            <div className="panel-carbon rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/[0.1] bg-[#070B14] space-y-1">
+            <div className="panel-carbon rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/[0.1] bg-[#0B1017] space-y-1">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-[#4BA3FF]" />
+                    <Layers className="w-4 h-4 text-[#2AF5D2]" />
                     <span className="text-sm font-bold text-white">
                       External Sui CLMM &amp; Lending Scanner
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.08] text-slate-200">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-white/[0.08] text-slate-200">
                     EXTERNAL REDIRECT
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-300">
+                <p className="text-xs text-slate-300">
                   Concentrated-range CLMM LP positions &amp; external markets shown for live yield comparison. Switch to{' '}
                   <button
                     type="button"
                     onClick={() => setTab('onsite')}
-                    className="text-[#4BA3FF] underline font-semibold"
+                    className="text-[#2AF5D2] underline font-semibold"
                   >
                     All On-Site Vaults
                   </button>{' '}
@@ -888,7 +888,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-slate-300 border-b border-white/[0.08] bg-[#05080F]">
+                    <tr className="text-slate-300 border-b border-white/[0.08] bg-[#070B10]">
                       <th className="text-left px-4 py-2.5 font-semibold">Pool / Asset</th>
                       <th className="text-left px-3 py-2.5 font-semibold">Protocol</th>
                       <th className="text-right px-3 py-2.5 font-semibold">TVL</th>
@@ -901,7 +901,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                       <tr key={pool.id} className="hover:bg-white/[0.03] transition-colors">
                         <td className="px-4 py-2.5 font-sans">
                           <div className="font-semibold text-white">{pool.symbol}</div>
-                          <div className="text-[10px] uppercase text-slate-400">{pool.category}</div>
+                          <div className="text-xs uppercase text-slate-400">{pool.category}</div>
                         </td>
                         <td className="px-3 py-2.5 font-sans text-slate-200">{pool.protocol}</td>
                         <td className="px-3 py-2.5 text-right text-white">
@@ -917,7 +917,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                             href={pool.externalUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.08] hover:bg-[#1D63FF] text-slate-100 text-xs font-medium transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.08] hover:bg-[#00E0B8] hover:text-[#041214] text-slate-100 text-xs font-medium transition-colors"
                           >
                             <span>Open DEX</span>
                             <ExternalLink className="w-3 h-3" />
@@ -935,7 +935,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
         {/* Right Sticky Execution Ticket (Always Interactive On-Site) */}
         <div
           ref={ticketRef}
-          className="lg:col-span-4 panel-carbon rounded-xl p-4 space-y-4 lg:sticky lg:top-20"
+          className="lg:col-span-4 panel-carbon rounded-2xl p-4 space-y-4 lg:sticky lg:top-20"
         >
           {/* Mode Switcher */}
           {selected.kind === 'margin' && activeMarginVault ? (
@@ -949,17 +949,17 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                   />
                   <div>
                     <div className="text-sm font-bold text-white">{activeMarginVault.name}</div>
-                    <div className="text-[11px] font-mono text-[#00E599]">
+                    <div className="text-xs font-mono text-[#00E599]">
                       {activeMarginVault.supplyAprPct.toFixed(2)}% Live Supply APR
                     </div>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#1D63FF]/20 text-[#4BA3FF] border border-[#1D63FF]/40">
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#00E0B8]/15 text-[#2AF5D2] border border-[#00E0B8]/40">
                   DeepBook v3
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#05080F] border border-white/[0.08]">
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#070B10] border border-white/[0.08]">
                 <button
                   type="button"
                   onClick={() =>
@@ -971,7 +971,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                   }
                   className={`py-2 rounded-md text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                     selected.op === 'supply'
-                      ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)]'
+                      ? 'bg-[#00E0B8] text-[#041214] shadow-[0_0_16px_rgba(0,224,184,0.3)] font-bold'
                       : 'text-slate-300 hover:text-white'
                   }`}
                 >
@@ -1010,17 +1010,17 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                     />
                     <div>
                       <div className="text-sm font-bold text-white">{activeLstVault.name}</div>
-                      <div className="text-[11px] font-mono text-[#00E599]">
+                      <div className="text-xs font-mono text-[#00E599]">
                         {activeLstVault.apyPct.toFixed(2)}% Est. APY
                       </div>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#00D98B]/15 text-[#00E599] border border-[#00D98B]/30">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-[#00D98B]/15 text-[#00E599] border border-[#00D98B]/30">
                     On-Site PTB
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#05080F] border border-white/[0.08]">
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#070B10] border border-white/[0.08]">
                   <button
                     type="button"
                     onClick={() =>
@@ -1032,7 +1032,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                     }
                     className={`py-2 rounded-md text-xs font-bold transition-all ${
                       selected.op === 'stake'
-                        ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)]'
+                        ? 'bg-[#00E0B8] text-[#041214] shadow-[0_0_16px_rgba(0,224,184,0.3)] font-bold'
                         : 'text-slate-300 hover:text-white'
                     }`}
                   >
@@ -1069,8 +1069,8 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                         onClick={() => setLstSettlementCoin(sym)}
                         className={`px-2.5 py-1 rounded font-mono text-xs font-semibold ${
                           lstSettlementCoin === sym
-                            ? 'bg-[#1D63FF] text-white'
-                            : 'bg-[#05080F] text-slate-300 border border-white/[0.1]'
+                            ? 'bg-[#00E0B8] text-[#041214]'
+                            : 'bg-[#070B10] text-slate-300 border border-white/[0.1]'
                         }`}
                       >
                         {sym}
@@ -1084,7 +1084,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
 
           {/* Amount Input Card */}
           <div className="panel-carbon-sub rounded-xl p-3.5 space-y-2">
-            <div className="flex items-center justify-between text-[11px] font-mono">
+            <div className="flex items-center justify-between text-xs font-mono">
               <span className="text-slate-300">
                 {selected.kind === 'margin' && selected.op === 'withdraw'
                   ? 'Deposited Balance'
@@ -1120,7 +1120,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                   key={p}
                   type="button"
                   onClick={() => handleSetPct(p)}
-                  className="py-1 rounded bg-white/[0.07] hover:bg-[#1D63FF]/30 text-[11px] font-mono font-semibold text-slate-200 hover:text-white transition-colors"
+                  className="py-1 rounded bg-white/[0.07] hover:bg-[#00E0B8]/25 text-xs font-mono font-semibold text-slate-200 hover:text-white transition-colors"
                 >
                   {p === 1 ? 'MAX' : `${p * 100}%`}
                 </button>
@@ -1129,7 +1129,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
           </div>
 
           {/* Transparent Estimates & Volt Fee Breakdown */}
-          <div className="panel-carbon-sub rounded-xl p-3 space-y-2 text-[11px] font-mono">
+          <div className="panel-carbon-sub rounded-xl p-3 space-y-2 text-xs font-mono">
             {estYieldPerYear && (
               <div className="flex items-center justify-between">
                 <span className="text-slate-300">Est. Yield / Year</span>
@@ -1140,7 +1140,7 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
             )}
             <div className="flex items-center justify-between">
               <span className="text-slate-300">Volt Tier Fee ({traderTier.name})</span>
-              <span className="text-[#4BA3FF] font-semibold">
+              <span className="text-[#2AF5D2] font-semibold">
                 {(selected.kind === 'margin' && selected.op === 'withdraw')
                   ? '0.00% (Free Withdraw)'
                   : `${(traderTier.feeRate * 100).toFixed(2)}%`}

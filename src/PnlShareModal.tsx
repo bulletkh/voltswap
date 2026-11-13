@@ -102,18 +102,18 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
       ctx.fillRect(0, 0, 1200, 675);
 
       const glow2 = ctx.createRadialGradient(1000, 450, 10, 1000, 450, 400);
-      glow2.addColorStop(0, 'rgba(16, 185, 129, 0.15)');
-      glow2.addColorStop(1, 'rgba(16, 185, 129, 0)');
+      glow2.addColorStop(0, 'rgba(0, 224, 184, 0.2)');
+      glow2.addColorStop(1, 'rgba(0, 224, 184, 0)');
       ctx.fillStyle = glow2;
       ctx.fillRect(0, 0, 1200, 675);
 
       // Outer Neon Border
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+      ctx.strokeStyle = 'rgba(0, 224, 184, 0.45)';
       ctx.lineWidth = 3;
       ctx.strokeRect(30, 30, 1140, 615);
 
       // 2. Header: Logo & Badge
-      ctx.fillStyle = '#38bdf8';
+      ctx.fillStyle = '#00E0B8';
       ctx.font = 'bold 38px monospace';
       ctx.fillText('⚡ VOLT PROTOCOL', 70, 100);
 
@@ -122,12 +122,12 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
       ctx.fillText('SUI APEX EXECUTION ENGINE • MOVE PTB', 70, 135);
 
       // Badge top right
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+      ctx.fillStyle = 'rgba(0, 224, 184, 0.16)';
       ctx.fillRect(860, 65, 270, 48);
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+      ctx.strokeStyle = 'rgba(0, 224, 184, 0.5)';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(860, 65, 270, 48);
-      ctx.fillStyle = '#34d399';
+      ctx.fillStyle = '#2AF5D2';
       ctx.font = 'bold 18px monospace';
       ctx.fillText('✓ VERIFIED ON SUI', 900, 96);
 
@@ -236,44 +236,44 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-      <div className="relative w-full max-w-xl bg-[#0c0f17] border border-white/15 rounded-3xl p-6 shadow-[0_0_50px_rgba(215,246,38,0.15)] space-y-5 text-white max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-[#121821] border border-white/[0.12] rounded-3xl p-6 shadow-[0_0_50px_rgba(0,224,184,0.12)] space-y-5 text-white max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-gray-400 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+          className="absolute top-5 right-5 text-slate-400 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-volt flex items-center justify-center shadow-volt-glow">
-            <Zap className="w-5 h-5 text-black fill-black" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00E0B8] to-[#00C2FF] flex items-center justify-center shadow-[0_0_20px_rgba(0,224,184,0.3)]">
+            <Zap className="w-5 h-5 text-[#041214] fill-[#041214]" />
           </div>
           <div>
-            <h3 className="text-lg font-black tracking-wide flex items-center gap-2">
+            <h3 className="text-lg font-extrabold tracking-wide flex items-center gap-2">
               Share Viral PnL Card
-              <span className="text-[10px] font-mono uppercase bg-volt/15 text-volt px-2 py-0.5 rounded-full border border-volt/30">
-                Twitter & TG Ready
+              <span className="text-xs font-mono uppercase bg-[#00E0B8]/15 text-[#2AF5D2] px-2.5 py-0.5 rounded-full border border-[#00E0B8]/30">
+                X &amp; TG Ready
               </span>
             </h3>
-            <p className="text-xs text-gray-400">Branded execution card with your embedded referral code</p>
+            <p className="text-xs text-slate-400">Branded execution card with your embedded referral code</p>
           </div>
         </div>
 
         {/* Preview Card (Visual Replica) */}
-        <div className="relative rounded-2xl bg-gradient-to-b from-[#121622] to-[#080a10] border border-volt/30 p-5 shadow-2xl space-y-4 overflow-hidden">
+        <div className="relative rounded-2xl bg-gradient-to-b from-[#161E29] to-[#0B1017] border border-[#00E0B8]/30 p-5 shadow-2xl space-y-4 overflow-hidden">
           {/* Neon Glow Accent in card */}
-          <div className="absolute top-0 right-0 w-48 h-48 bg-volt/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-0 right-0 w-48 h-48 bg-[#00E0B8]/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#00C2FF]/10 rounded-full blur-3xl pointer-events-none" />
 
           {/* Card Top Row */}
-          <div className="flex items-center justify-between border-b border-white/5 pb-3">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-volt fill-volt" />
+              <Zap className="w-4 h-4 text-[#00E0B8] fill-[#00E0B8]" />
               <span className="font-extrabold text-sm tracking-wider font-mono text-white">VOLT PROTOCOL</span>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-mono font-bold">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#00E0B8]/15 border border-[#00E0B8]/30 text-[#2AF5D2] text-xs font-mono font-bold">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Sui Move PTB</span>
             </div>
@@ -281,53 +281,53 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
 
           {/* Trade Details */}
           <div>
-            <span className="text-[10px] font-mono uppercase text-gray-400 block mb-1">{orderTypeLabel} Execution</span>
+            <span className="text-xs font-mono uppercase text-slate-400 block mb-1">{orderTypeLabel} Execution</span>
             <div className="flex items-center gap-3 text-lg font-mono font-black text-white">
               <span>{trade.fromAmount} {trade.fromToken}</span>
-              <span className="text-volt">➔</span>
-              <span className="text-emerald-400">{trade.toAmount} {trade.toToken}</span>
+              <span className="text-[#00E0B8]">➔</span>
+              <span className="text-[#2AF5D2]">{trade.toAmount} {trade.toToken}</span>
             </div>
           </div>
 
           {/* Profit & Fee Savings Banner */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/15 via-volt/10 to-emerald-500/15 border border-emerald-500/35 flex items-center justify-between">
+          <div className="p-4 rounded-xl bg-gradient-to-r from-[#00E0B8]/15 via-[#00C2FF]/10 to-[#00E0B8]/15 border border-[#00E0B8]/35 flex items-center justify-between">
             <div>
-              <span className="text-[10px] font-mono uppercase text-emerald-300 block mb-0.5">
-                Savings & Trade Profit
+              <span className="text-xs font-mono uppercase text-[#2AF5D2] block mb-0.5">
+                Savings &amp; Trade Profit
               </span>
-              <span className="text-2xl font-black font-mono text-emerald-400">
+              <span className="text-2xl font-black font-mono text-[#00E0B8]">
                 +${profitAmount.toFixed(2)} USD
               </span>
             </div>
             <div className="text-right">
-              <span className="text-xs font-bold font-mono text-emerald-300 bg-emerald-500/20 px-2 py-1 rounded-lg border border-emerald-500/30">
+              <span className="text-xs font-bold font-mono text-[#2AF5D2] bg-[#00E0B8]/20 px-2.5 py-1 rounded-lg border border-[#00E0B8]/30">
                 +{profitPercentage.toFixed(2)}% ROI
               </span>
-              <span className="text-[10px] text-gray-400 block mt-1 font-mono">
+              <span className="text-xs text-slate-400 block mt-1 font-mono">
                 ~${trade.volumeUsd.toFixed(2)} Volume
               </span>
             </div>
           </div>
 
           {/* Route Engine & Finality */}
-          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono pt-1 text-gray-300">
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
-              <span className="text-gray-500 block text-[10px]">Routing Engine</span>
-              <span className="text-volt font-bold">{engineName}</span>
+          <div className="grid grid-cols-2 gap-2.5 text-xs font-mono pt-1 text-slate-300">
+            <div className="p-3 rounded-xl bg-[#0B1017] border border-white/[0.08]">
+              <span className="text-slate-400 block text-xs">Routing Engine</span>
+              <span className="text-[#2AF5D2] font-bold">{engineName}</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-black/40 border border-white/5">
-              <span className="text-gray-500 block text-[10px]">Execution Speed</span>
-              <span className="text-emerald-400 font-bold">~390ms Single PTB</span>
+            <div className="p-3 rounded-xl bg-[#0B1017] border border-white/[0.08]">
+              <span className="text-slate-400 block text-xs">Execution Speed</span>
+              <span className="text-[#00E0B8] font-bold">~390ms Single PTB</span>
             </div>
           </div>
 
           {/* Card Footer with Ref Link */}
-          <div className="p-3 rounded-xl bg-black/50 border border-volt/20 flex items-center justify-between text-xs font-mono">
+          <div className="p-3 rounded-xl bg-[#0B1017] border border-[#00E0B8]/25 flex items-center justify-between text-xs font-mono">
             <div className="truncate pr-2">
-              <span className="text-[10px] text-gray-400 block">Invited Trader Ref Link</span>
-              <span className="text-volt font-bold truncate block">voltswap.org/?ref={activeRef}</span>
+              <span className="text-xs text-slate-400 block">Invited Trader Ref Link</span>
+              <span className="text-[#2AF5D2] font-bold truncate block">voltswap.org/?ref={activeRef}</span>
             </div>
-            <span className="text-[10px] font-bold text-black bg-volt px-2 py-1 rounded-lg shrink-0">
+            <span className="text-xs font-bold text-[#041214] bg-[#00E0B8] px-2.5 py-1 rounded-lg shrink-0">
               -20% Fee Active
             </span>
           </div>
@@ -357,7 +357,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
           <button
             onClick={handleDownloadImage}
             disabled={isGeneratingImg}
-            className="py-3 px-3 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_0_20px_rgba(56,189,248,0.25)] active:scale-95 disabled:opacity-50"
+            className="py-3 px-3 rounded-xl btn-deepbook text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
           >
             <Download className="w-4 h-4 shrink-0" />
             <span>{isGeneratingImg ? 'Rendering...' : 'Download Card'}</span>
@@ -388,7 +388,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
               href={`https://suiscan.xyz/mainnet/tx/${trade.digest}`}
               target="_blank"
               rel="noreferrer"
-              className="text-[11px] font-mono text-gray-500 hover:text-cyan-400 inline-flex items-center gap-1 transition-colors"
+              className="text-xs font-mono text-slate-400 hover:text-[#2AF5D2] inline-flex items-center gap-1 transition-colors"
             >
               Verify On-Chain Tx on Suiscan <ExternalLink className="w-3 h-3" />
             </a>

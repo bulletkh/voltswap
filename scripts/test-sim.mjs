@@ -1,6 +1,15 @@
 import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
 import { SuiGrpcClient } from '@mysten/sui/grpc';
-import { DeepBookClient, deepbook, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
+import {
+  DeepBookClient,
+  deepbook,
+  OrderType,
+  SelfMatchingOptions,
+  mainnetCoins,
+  mainnetMarginPools,
+  mainnetPackageIds,
+  mainnetPools,
+} from '@mysten/deepbook-v3';
 import { fromBase64, toBase64 } from '@mysten/sui/utils';
 import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
 
@@ -567,6 +576,165 @@ try {
   }
 } catch (e) {
   fail('Aftermath Perps Extended Pro Checks', e?.stack || e?.message || String(e));
+}
+
+// 8. DeepBook v3 Margin Trading Mainnet Checks
+try {
+  const dbExt = grpcClient.$extend(deepbook({ network: 'mainnet', address: WALLET }));
+  const dbClient = dbExt.deepbook;
+  const poolKeys = ['SUI_USDC', 'DEEP_USDC', 'WAL_USDC', 'XBTC_USDC'];
+  let enabledCount = 0;
+  for (const pk of poolKeys) {
+    const enabled = await dbClient.isPoolEnabledForMargin(pk);
+    if (enabled) enabledCount++;
+  }
+  if (enabledCount >= 4) {
+    pass('DeepBook v3 Margin Enabled Pools', `${enabledCount}/4 active on Mainnet`);
+  } else {
+    fail('DeepBook v3 Margin Enabled Pools', `Only ${enabledCount}/4 enabled`);
+  }
+
+  const suiPool = mainnetPools.SUI_USDC;
+  const suiCoin = mainnetCoins.SUI;
+  const usdcCoin = mainnetCoins.USDC;
+  const suiMarginPool = mainnetMarginPools.SUI;
+  const usdcMarginPool = mainnetMarginPools.USDC;
+
+  // Test 8A: 1-TX Margin Long Limit (Deposit SUI -> Borrow USDC -> Place Limit Order -> Share)
+  {
+    const tx = new Transaction();
+    const { manager, initializer } = dbClient.marginManager.newMarginManagerWithInitializer('SUI_USDC')(tx);
+    tx.add(
+      dbClient.marginManager.depositDuringInitialization({
+        manager,
+        poolKey: 'SUI_USDC',
+        coinType: suiPool.baseCoin,
+        amount: 1.5,
+      })
+    );
+    tx.moveCall({
+      target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::margin_manager_upgraded::borrow_quote`,
+      arguments: [
+        manager,
+        tx.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+        tx.object(usdcMarginPool.address),
+        tx.object(suiCoin.priceInfoObjectId),
+        tx.object(usdcCoin.priceInfoObjectId),
+        tx.object(suiPool.address),
+        tx.pure.u64(1_000_000n),
+        tx.object('0x6'),
+      ],
+      typeArguments: [suiCoin.type, usdcCoin.type],
+    });
+    const safePrice = BigInt(Math.round((0.5 * 1e9 * usdcCoin.scalar) / suiCoin.scalar));
+    tx.moveCall({
+      target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::pool_proxy_upgraded::place_limit_order_v2`,
+      arguments: [
+        tx.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+        manager,
+        tx.object(suiPool.address),
+        tx.object(suiMarginPool.address),
+        tx.object(usdcMarginPool.address),
+        tx.object(suiCoin.priceInfoObjectId),
+        tx.object(usdcCoin.priceInfoObjectId),
+        tx.pure.u64(BigInt(Date.now())),
+        tx.pure.u8(OrderType.NO_RESTRICTION),
+        tx.pure.u8(SelfMatchingOptions.SELF_MATCHING_ALLOWED),
+        tx.pure.u64(safePrice),
+        tx.pure.u64(1_000_000_000n),
+        tx.pure.bool(true),
+        tx.pure.bool(false),
+        tx.pure.u64(1844674407370955161n),
+        tx.object('0x6'),
+      ],
+      typeArguments: [suiCoin.type, usdcCoin.type],
+    });
+    tx.add(dbClient.marginManager.shareMarginManager('SUI_USDC', manager, initializer));
+    const longEff = await simulateGrpcOrGql(tx);
+    if (longEff?.status === 'SUCCESS') {
+      pass('DeepBook Margin 1-TX Long Limit (SUI/USDC)', 'Init + Deposit + Borrow + Limit + Share');
+    } else {
+      fail('DeepBook Margin 1-TX Long Limit (SUI/USDC)', JSON.stringify(longEff));
+    }
+  }
+
+  // Test 8B: 1-TX Margin Short Market + Conditional TP/SL
+  {
+    const tx = new Transaction();
+    const { manager, initializer } = dbClient.marginManager.newMarginManagerWithInitializer('SUI_USDC')(tx);
+    tx.add(
+      dbClient.marginManager.depositDuringInitialization({
+        manager,
+        poolKey: 'SUI_USDC',
+        coinType: suiPool.quoteCoin,
+        amount: 1.2,
+      })
+    );
+    tx.moveCall({
+      target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::margin_manager_upgraded::borrow_base`,
+      arguments: [
+        manager,
+        tx.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+        tx.object(suiMarginPool.address),
+        tx.object(suiCoin.priceInfoObjectId),
+        tx.object(usdcCoin.priceInfoObjectId),
+        tx.object(suiPool.address),
+        tx.pure.u64(1_010_000_000n),
+        tx.object('0x6'),
+      ],
+      typeArguments: [suiCoin.type, usdcCoin.type],
+    });
+    tx.moveCall({
+      target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::pool_proxy_upgraded::place_market_order_v2`,
+      arguments: [
+        tx.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+        manager,
+        tx.object(suiPool.address),
+        tx.object(suiMarginPool.address),
+        tx.object(usdcMarginPool.address),
+        tx.object(suiCoin.priceInfoObjectId),
+        tx.object(usdcCoin.priceInfoObjectId),
+        tx.pure.u64(BigInt(Date.now() + 1)),
+        tx.pure.u8(SelfMatchingOptions.SELF_MATCHING_ALLOWED),
+        tx.pure.u64(1_000_000_000n),
+        tx.pure.bool(false),
+        tx.pure.bool(false),
+        tx.object('0x6'),
+      ],
+      typeArguments: [suiCoin.type, usdcCoin.type],
+    });
+    const cond = dbClient.marginTPSL.newCondition('SUI_USDC', false, 1.8)(tx);
+    const pending = dbClient.marginTPSL.newPendingMarketOrder('SUI_USDC', {
+      clientOrderId: String(Date.now() + 99),
+      quantity: 1,
+      isBid: true,
+      payWithDeep: false,
+    })(tx);
+    tx.moveCall({
+      target: `${mainnetPackageIds.MARGIN_PACKAGE_ID}::margin_manager_upgraded::add_conditional_order`,
+      arguments: [
+        manager,
+        tx.object(suiPool.address),
+        tx.object(suiCoin.priceInfoObjectId),
+        tx.object(usdcCoin.priceInfoObjectId),
+        tx.object(mainnetPackageIds.MARGIN_REGISTRY_ID),
+        tx.pure.u64(BigInt(Date.now() + 2)),
+        cond,
+        pending,
+        tx.object('0x6'),
+      ],
+      typeArguments: [suiCoin.type, usdcCoin.type],
+    });
+    tx.add(dbClient.marginManager.shareMarginManager('SUI_USDC', manager, initializer));
+    const shortEff = await simulateGrpcOrGql(tx);
+    if (shortEff?.status === 'SUCCESS') {
+      pass('DeepBook Margin 1-TX Short + SL (SUI/USDC)', 'Init + BorrowBase + Market + CondSL + Share');
+    } else {
+      fail('DeepBook Margin 1-TX Short + SL (SUI/USDC)', JSON.stringify(shortEff));
+    }
+  }
+} catch (e) {
+  fail('DeepBook v3 Margin Mainnet Simulation', e?.stack || e?.message || String(e));
 }
 
 if (failures > 0) {

@@ -90,39 +90,39 @@ export function App() {
     label: string;
     icon: React.ReactNode;
   }> = [
-    { id: 'swap', label: 'Swap', icon: <Zap className="w-3.5 h-3.5" /> },
-    { id: 'perps', label: 'Perps', icon: <Activity className="w-3.5 h-3.5" /> },
-    { id: 'earn', label: 'Earn', icon: <Layers className="w-3.5 h-3.5" /> },
-    { id: 'tiers', label: 'Tiers & Referrals', icon: <Award className="w-3.5 h-3.5" /> },
+    { id: 'swap', label: 'Swap', icon: <Zap className="w-4 h-4" /> },
+    { id: 'perps', label: 'Perps', icon: <Activity className="w-4 h-4" /> },
+    { id: 'earn', label: 'Earn', icon: <Layers className="w-4 h-4" /> },
+    { id: 'tiers', label: 'Tiers & Referrals', icon: <Award className="w-4 h-4" /> },
   ];
 
   if (isCreatorWallet) {
     navItems.push({
       id: 'treasury',
       label: 'Treasury',
-      icon: <Shield className="w-3.5 h-3.5 text-amber-400" />,
+      icon: <Shield className="w-4 h-4 text-amber-400" />,
     });
   }
 
   return (
-    <div className="min-h-screen text-white flex flex-col">
-      {/* Top DeepBook-Inspired Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.1] bg-[#030509]/92 backdrop-blur-md">
-        <div className="max-w-[1440px] mx-auto px-3 sm:px-5 h-14 flex items-center justify-between gap-3">
+    <div className="min-h-screen text-slate-100 flex flex-col">
+      {/* Top Cetus-Inspired Navigation Bar */}
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#0A0E13]/92 backdrop-blur-md">
+        <div className="w-full mx-auto px-3 sm:px-5 lg:px-6 h-16 flex items-center justify-between gap-4">
           {/* Brand */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-7">
             <button
               type="button"
               onClick={() => setActiveTab('swap')}
-              className="flex items-center gap-2 text-left"
+              className="flex items-center gap-2.5 text-left"
             >
-              <div className="w-7 h-7 rounded-lg btn-deepbook flex items-center justify-center font-black text-sm">
+              <div className="w-8 h-8 rounded-xl btn-deepbook flex items-center justify-center font-black text-base">
                 ⚡
               </div>
               <div className="leading-none">
-                <span className="text-sm font-bold tracking-tight text-white">VOLT</span>
-                <span className="hidden sm:inline text-[10px] font-mono text-[#4BA3FF] ml-1.5">
-                  SUI CLOB
+                <span className="text-base font-extrabold tracking-tight text-white">VOLT</span>
+                <span className="hidden sm:inline text-xs font-mono text-[#2AF5D2] ml-2">
+                  SUI PRO
                 </span>
               </div>
             </button>
@@ -136,9 +136,9 @@ export function App() {
                     key={item.id}
                     type="button"
                     onClick={() => setActiveTab(item.id)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
                       active
-                        ? 'bg-[#1D63FF] text-white shadow-[0_0_20px_rgba(29,99,255,0.45)] border border-[#3B82F6]/60'
+                        ? 'bg-[#00E0B8]/15 text-[#2AF5D2] border border-[#00E0B8]/40 shadow-[0_0_20px_rgba(0,224,184,0.16)]'
                         : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
                     }`}
                   >
@@ -151,14 +151,14 @@ export function App() {
           </div>
 
           {/* Right Wallet & Portfolio Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             {account && (
               <button
                 type="button"
                 onClick={() => setPortfolioOpen(true)}
-                className="px-3 py-1.5 rounded-lg bg-[#0A0F1A] hover:bg-[#131C30] border border-white/[0.14] text-xs font-semibold text-white inline-flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-[#121821] hover:bg-[#19222E] border border-white/[0.12] text-sm font-semibold text-white inline-flex items-center gap-2 transition-colors"
               >
-                <Wallet className="w-3.5 h-3.5 text-[#4BA3FF]" />
+                <Wallet className="w-4 h-4 text-[#2AF5D2]" />
                 <span className="hidden sm:inline">Portfolio</span>
               </button>
             )}
@@ -167,7 +167,7 @@ export function App() {
         </div>
 
         {/* Mobile Tab Strip */}
-        <div className="md:hidden border-t border-white/[0.08] px-2 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div className="md:hidden border-t border-white/[0.08] px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {navItems.map((item) => {
             const active = activeTab === item.id;
             return (
@@ -175,9 +175,9 @@ export function App() {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 ${
                   active
-                    ? 'bg-[#1D63FF] text-white shadow-[0_0_16px_rgba(29,99,255,0.45)]'
+                    ? 'bg-[#00E0B8]/20 text-[#2AF5D2] border border-[#00E0B8]/40'
                     : 'text-slate-300 border border-transparent'
                 }`}
               >
@@ -189,8 +189,8 @@ export function App() {
         </div>
       </header>
 
-      {/* Main Workspace */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-3 sm:px-5 py-4">
+      {/* Main Widescreen Workspace */}
+      <main className="flex-1 w-full mx-auto px-3 sm:px-5 lg:px-6 py-4">
         {activeTab === 'swap' && (
           <SwapWorkspace
             onNotify={notify}
@@ -224,15 +224,15 @@ export function App() {
         )}
       </main>
 
-      {/* Minimal Footer */}
-      <footer className="border-t border-white/[0.08] py-3 px-4 text-[11px] font-mono text-slate-400">
-        <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-2">
+      {/* Minimal Cetus Footer */}
+      <footer className="border-t border-white/[0.08] py-3.5 px-4 sm:px-6 text-xs font-mono text-slate-400">
+        <div className="w-full mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <span className="text-white font-semibold">Volt Protocol</span>
-            <span>Cetus Aggregator · DeepBook v3 CLOB · Aftermath Perps</span>
+            <span>Cetus Aggregator · DeepBook v3 CLOB &amp; Margin · Aftermath Perps</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-[#4BA3FF]" />
+            <Sparkles className="w-3.5 h-3.5 text-[#2AF5D2]" />
             <span className="text-slate-200">Non-custodial Sui Move Execution</span>
           </div>
         </div>
@@ -240,27 +240,27 @@ export function App() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] panel-carbon rounded-xl p-3.5 shadow-2xl border border-white/[0.16] animate-slide-up">
-          <div className="flex items-start gap-2.5">
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] panel-carbon rounded-2xl p-4 shadow-2xl border border-[#00E0B8]/25 animate-slide-up">
+          <div className="flex items-start gap-3">
             {toast.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-[#00E599] shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-[#00E599] shrink-0 mt-0.5" />
             ) : toast.type === 'error' ? (
-              <AlertCircle className="w-4 h-4 text-[#FF4D6A] shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[#FF4D6A] shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-[#4BA3FF] shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[#2AF5D2] shrink-0 mt-0.5" />
             )}
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white">{toast.title}</div>
+              <div className="text-sm font-bold text-white">{toast.title}</div>
               <div className="text-xs text-slate-300 mt-0.5 break-words">{toast.message}</div>
               {toast.actionUrl && toast.actionLabel && (
                 <a
                   href={toast.actionUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-mono text-[#4BA3FF] hover:underline mt-1.5"
+                  className="inline-flex items-center gap-1 text-xs font-mono text-[#2AF5D2] hover:underline mt-1.5"
                 >
                   <span>{toast.actionLabel}</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               )}
             </div>
@@ -269,7 +269,7 @@ export function App() {
               onClick={() => setToast(null)}
               className="text-slate-500 hover:text-white"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --dapp-kit-background: #070b14;
-  --dapp-kit-foreground: #ffffff;
-  --dapp-kit-primary: #1d63ff;
-  --dapp-kit-primary-foreground: #ffffff;
-  --dapp-kit-secondary: #0f1628;
+  --dapp-kit-background: #0d1219;
+  --dapp-kit-foreground: #f8fafc;
+  --dapp-kit-primary: #00e0b8;
+  --dapp-kit-primary-foreground: #051316;
+  --dapp-kit-secondary: #151c26;
   --dapp-kit-secondary-foreground: #f8fafc;
-  --dapp-kit-border: rgba(255, 255, 255, 0.14);
-  --dapp-kit-accent: rgba(29, 99, 255, 0.2);
-  --dapp-kit-accent-foreground: #ffffff;
-  --dapp-kit-muted: #0f1628;
+  --dapp-kit-border: rgba(255, 255, 255, 0.12);
+  --dapp-kit-accent: rgba(0, 224, 184, 0.16);
+  --dapp-kit-accent-foreground: #2af5d2;
+  --dapp-kit-muted: #151c26;
   --dapp-kit-muted-foreground: #cbd5e1;
-  --dapp-kit-popover: #0b101d;
-  --dapp-kit-popover-foreground: #ffffff;
+  --dapp-kit-popover: #111720;
+  --dapp-kit-popover-foreground: #f8fafc;
   --dapp-kit-positive: #00d98b;
   --dapp-kit-destructive: #f6465d;
-  --dapp-kit-ring: #3b82f6;
-  --dapp-kit-radius: 10px;
+  --dapp-kit-ring: #00e0b8;
+  --dapp-kit-radius: 14px;
 }
 
 @layer base {
@@ -27,13 +27,18 @@
     -webkit-tap-highlight-color: transparent !important;
   }
 
+  html {
+    font-size: 16px;
+  }
+
   html, body {
-    background-color: #030509;
+    background-color: #0a0e13;
     background-image:
-      radial-gradient(ellipse 75% 42% at 50% -12%, rgba(29, 99, 255, 0.18), transparent 72%),
-      radial-gradient(circle at 85% 15%, rgba(0, 217, 139, 0.05), transparent 45%);
+      radial-gradient(ellipse 68% 44% at 48% 12%, rgba(0, 224, 184, 0.11), transparent 68%),
+      radial-gradient(circle at 72% 24%, rgba(0, 184, 255, 0.075), transparent 52%),
+      radial-gradient(ellipse 90% 30% at 50% 100%, rgba(0, 224, 184, 0.06), transparent 60%);
     background-attachment: fixed;
-    @apply text-white font-sans antialiased selection:bg-[#1D63FF] selection:text-white;
+    @apply text-slate-100 font-sans antialiased selection:bg-[#00E0B8] selection:text-[#041214];
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden !important;
@@ -41,25 +46,26 @@
 }
 
 .panel-carbon {
-  background: #0a0f1a;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.75);
+  background: #121821;
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  box-shadow: 0 12px 36px -14px rgba(0, 0, 0, 0.8);
 }
 
 .panel-carbon-sub {
-  background: #05080f;
-  border: 1px solid rgba(255, 255, 255, 0.085);
+  background: #0b1017;
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .btn-deepbook {
-  background: linear-gradient(135deg, #1d63ff 0%, #0094ff 100%);
-  color: #ffffff;
-  box-shadow: 0 0 22px rgba(29, 99, 255, 0.35);
+  background: linear-gradient(135deg, #00e0b8 0%, #00c2ff 100%);
+  color: #041214;
+  font-weight: 700;
+  box-shadow: 0 0 24px rgba(0, 224, 184, 0.28);
 }
 
 .btn-deepbook:hover {
-  background: linear-gradient(135deg, #2d73ff 0%, #1ca3ff 100%);
-  box-shadow: 0 0 28px rgba(45, 115, 255, 0.5);
+  background: linear-gradient(135deg, #1ef0ca 0%, #24ccff 100%);
+  box-shadow: 0 0 30px rgba(0, 224, 184, 0.45);
 }
 
 input[type='number']::-webkit-inner-spin-button,
@@ -71,7 +77,7 @@ input[type='number']::-webkit-outer-spin-button {
 input[type='range'].carbon-slider {
   -webkit-appearance: none;
   appearance: none;
-  height: 5px;
+  height: 6px;
   background: rgba(255, 255, 255, 0.14);
   border-radius: 9999px;
   outline: none;
@@ -80,12 +86,12 @@ input[type='range'].carbon-slider {
 input[type='range'].carbon-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
-  background: #2970ff;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 10px rgba(41, 112, 255, 0.75);
+  background: #00e0b8;
+  border: 2px solid #041214;
+  box-shadow: 0 0 12px rgba(0, 224, 184, 0.75);
   cursor: pointer;
 }
 
@@ -108,7 +114,7 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar-track {
-  background: #030509;
+  background: #0a0e13;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -117,7 +123,7 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(29, 99, 255, 0.6);
+  background: rgba(0, 224, 184, 0.55);
 }
 
 @keyframes slideUpSheet {
