@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wallet,
   TrendingUp,
-  DollarSign,
-  ArrowUpRight,
   ShieldCheck,
   Zap,
   ExternalLink,
@@ -13,17 +11,13 @@ import {
   Coins,
   Layers,
   Activity,
-  Award,
   Lock,
-  ArrowDownToLine,
-  Sliders,
-  Check,
   Clock,
   Target,
-  Sparkles
 } from 'lucide-react';
-import { VOLT_TREASURY_ADDRESS } from './EarnVaultsHub';
-import { playClickSound, playCashProfitSound } from './audioFx';
+import { VOLT_TREASURY_ADDRESS } from './constants';
+import { fetchWalletBalances, readBalanceFromMap, SUI_COIN_TYPE } from './suiClient';
+import { playClickSound } from './audioFx';
 
 interface TreasuryDashboardProps {
   suiClient?: any;
@@ -49,7 +43,7 @@ interface RealSwapItem {
 export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
   suiClient,
   currentAccount,
-  showNotification
+  showNotification: _showNotification
 }) => {
   const [suiPriceUsd, setSuiPriceUsd] = useState<number>(0.8318);
   const [treasurySuiBalance, setTreasurySuiBalance] = useState<number>(0);
@@ -110,17 +104,10 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         }
       } catch (e) {
         console.error('GraphQL balance error:', e);
-        if (suiClient) {
-          try {
-            const coinBal = await suiClient.getBalance({
-              owner: VOLT_TREASURY_ADDRESS,
-              coinType: '0x2::sui::SUI'
-            });
-            if (coinBal && coinBal.totalBalance) {
-              setTreasurySuiBalance(Number(BigInt(coinBal.totalBalance)) / 1e9);
-            }
-          } catch (_) {}
-        }
+        try {
+          const map = await fetchWalletBalances(VOLT_TREASURY_ADDRESS);
+          setTreasurySuiBalance(readBalanceFromMap(map, SUI_COIN_TYPE, 9));
+        } catch (_) {}
       }
 
       // 2. Fetch live SUI price from Binance
@@ -189,10 +176,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const treasuryBalanceUsd = treasurySuiBalance * suiPriceUsd;
-
   // Multi-coin asset breakdown extracted from real on-chain balances
-  const { usdcBalance, voltBalance, haedalBalance, netWorthUsd, netWorthSui } = useMemo(() => {
+  const { usdcBalance, haedalBalance, netWorthUsd, netWorthSui } = useMemo(() => {
     let usdc = 0;
     let volt = 0;
     let haedal = 0;
@@ -231,11 +216,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
     totalVolumeUsd,
     totalFeesEarnedUsd,
     marketSwapsCount,
-    plusSwapsCount,
     limitSwapsCount,
     perpsCount,
-    perpsVolumeUsd,
-    perpsFeesUsd
   } = useMemo(() => {
     let vol = 0;
     let fees = 0;

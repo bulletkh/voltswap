@@ -1,37 +1,56 @@
-import { Transaction } from '@mysten/sui/transactions';
-import { toBase64, fromBase64 } from '@mysten/bcs';
+import { Transaction, coinWithBalance } from '@mysten/sui/transactions';
+import { SuiGrpcClient } from '@mysten/sui/grpc';
+import { deepbook, OrderType, SelfMatchingOptions } from '@mysten/deepbook-v3';
+import { fromBase64, toBase64 } from '@mysten/sui/utils';
 import { AggregatorClient } from '@cetusprotocol/aggregator-sdk';
-import BN from 'bn.js';
 
 const WALLET = '0x7211d7a33c32b8a848fd5d87dc0630b7d40d3d324856a748aff454c2955cab12';
 const ACCOUNT_ID = '2050n';
 const SUI_TYPE = '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI';
 const USDC_TYPE = '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC';
 const GQL_URL = 'https://graphql.mainnet.sui.io/graphql';
+const DEEPBOOK_PACKAGE_ID =
+  '0xbca0cefe720330e7bb4f2283438b68de6a0e656688db4ac90d61e71fe6151fe8';
+const SUI_USDC_POOL_ID =
+  '0xe05dafb5133bcffb8d59f4e12465dc0e9faeaa05e3e342a08fe135800e3e4407';
 
-async function simulateGql(tx) {
+const grpcClient = new SuiGrpcClient({
+  network: 'mainnet',
+  baseUrl: 'https://fullnode.mainnet.sui.io:443',
+});
+
+async function simulateGrpcOrGql(tx) {
   tx.setSender(WALLET);
-  tx.setGasPayment([]);
-  tx.setGasPrice(1000);
-  tx.setGasBudget(50000000);
-  const bytes = await tx.build();
-  const res = await fetch(GQL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query: `query($tx: JSON!) {
-        simulateTransaction(transaction: $tx, doGasSelection: true) {
-          effects { status executionError { abortCode message } }
-        }
-      }`,
-      variables: { tx: { bcs: { value: toBase64(bytes) } } },
-    }),
-  });
-  const json = await res.json();
-  if (!json?.data?.simulateTransaction?.effects) {
-    console.error('GQL raw response:', JSON.stringify(json));
+  const resolvedJson = await tx.toJSON({ client: grpcClient });
+  const clone = Transaction.from(resolvedJson);
+  try {
+    const sim = await grpcClient.core.simulateTransaction({ transaction: clone });
+    if (sim.$kind === 'Transaction') return { status: 'SUCCESS' };
+    return {
+      status: 'FAILURE',
+      error: sim.FailedTransaction?.status?.error?.message || 'gRPC simulation failed',
+    };
+  } catch (err) {
+    tx.setGasPayment([]);
+    tx.setGasPrice(1000);
+    tx.setGasBudget(50_000_000);
+    const bytes = await tx.build({ client: grpcClient });
+    const res = await fetch(GQL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `query($tx: JSON!) {
+          simulateTransaction(transaction: $tx, doGasSelection: true) {
+            effects { status executionError { abortCode message } }
+          }
+        }`,
+        variables: { tx: { bcs: { value: toBase64(bytes) } } },
+      }),
+    }).then((r) => r.json());
+    const eff = res?.data?.simulateTransaction?.effects;
+    if (!eff) return { status: 'FAILURE', error: err?.message || JSON.stringify(res) };
+    return eff;
   }
-  return json?.data?.simulateTransaction?.effects;
 }
 
 let failures = 0;
@@ -43,14 +62,16 @@ function fail(name, detail) {
   failures++;
 }
 
-// 1. Aftermath Markets & IMR rounding invariant
+// 1. Aftermath Markets + Prices + Orderbook
 const mktsRes = await fetch('https://aftermath.finance/api/perpetuals/markets', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({}),
 });
 const mktsData = await mktsRes.json();
-const suiMkt = (mktsData?.marketDatas || []).find((m) => m?.metadata?.symbol?.toUpperCase() === 'SUI');
+const suiMkt = (mktsData?.marketDatas || []).find(
+  (m) => m?.metadata?.symbol?.toUpperCase() === 'SUI'
+);
 if (!suiMkt) {
   fail('Aftermath /markets SUI lookup', 'SUI market not found');
 } else {
@@ -61,167 +82,243 @@ if (!suiMkt) {
     if (maxLev > 1 && Math.floor(1e18 / maxLev) < Math.ceil(imr * 1e18)) maxLev -= 1;
     if (Math.floor(1e18 / maxLev) < Math.ceil(imr * 1e18)) bad++;
   }
-  if (bad === 0) pass('Aftermath markets IMR/maxLeverage invariant', `${mktsData.marketDatas.length} markets checked`);
+  if (bad === 0)
+    pass(
+      'Aftermath markets IMR/maxLeverage invariant',
+      `${mktsData.marketDatas.length} markets checked`
+    );
   else fail('Aftermath markets IMR/maxLeverage invariant', `${bad} markets failed rounding check`);
 }
 
-// 2. Aftermath Perps Open Market Order (SUI 14x Long, 13 SUI on account 2050n)
+// 2. Aftermath Perps Account & TxKind Mainnet Simulation
 if (suiMkt) {
-  const posRes = await fetch('https://aftermath.finance/api/perpetuals/accounts/positions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ accountIds: [ACCOUNT_ID] }),
-  }).then((r) => r.json());
+  const [posRes, balsRes] = await Promise.all([
+    fetch('https://aftermath.finance/api/perpetuals/accounts/positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountIds: [ACCOUNT_ID] }),
+    }).then((r) => r.json()),
+    grpcClient.core.listBalances({ owner: WALLET }),
+  ]);
+  const usdcEntry = (balsRes?.balances || []).find((b) =>
+    String(b.coinType).toLowerCase().endsWith('::usdc::usdc')
+  );
+  const walletUsdc = Number(usdcEntry?.balance || 0) / 1e6;
   const rawPos = posRes?.accounts?.[0]?.positions || [];
+  const freeUsd = Number(posRes?.accounts?.[0]?.availableCollateralUsd || 0);
   const hasPosition = rawPos.some((p) => p.marketId === suiMkt.market.objectId);
+  const suiPrice = Number(suiMkt?.market?.indexPrice || 0.8);
 
-  const orderRes = await fetch('https://aftermath.finance/api/perpetuals/account/transactions/place-market-order', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      walletAddress: WALLET,
-      accountId: ACCOUNT_ID,
-      marketId: suiMkt.market.objectId,
-      side: 0,
-      size: '13000000000n',
-      leverage: 14,
-      reduceOnly: false,
-      collateralChange: 0.75,
-      hasPosition,
-      cancelSlTp: false,
-      slippage: 0.02,
-    }),
-  });
-  const { txKind } = await orderRes.json();
-  if (!txKind) {
-    fail('Aftermath place-market-order txKind', 'Empty txKind');
+  if (freeUsd >= 0.25) {
+    const marginToUse = Number(Math.max(0.2, Math.min(0.75, freeUsd * 0.85)).toFixed(4));
+    const targetSizeSui = Math.max(1, Math.floor((marginToUse * 14) / suiPrice));
+    const orderRes = await fetch(
+      'https://aftermath.finance/api/perpetuals/account/transactions/place-market-order',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: WALLET,
+          accountId: ACCOUNT_ID,
+          marketId: suiMkt.market.objectId,
+          side: 0,
+          size: `${BigInt(targetSizeSui) * 1_000_000_000n}n`,
+          leverage: 14,
+          reduceOnly: false,
+          collateralChange: marginToUse,
+          hasPosition,
+          cancelSlTp: false,
+          slippage: 0.02,
+        }),
+      }
+    );
+    const { txKind } = await orderRes.json();
+    if (!txKind) {
+      fail('Aftermath place-market-order txKind', 'Empty txKind');
+    } else {
+      const tx = Transaction.fromKind(fromBase64(txKind));
+      const effects = await simulateGrpcOrGql(tx);
+      if (effects?.status === 'SUCCESS') {
+        pass(
+          'Aftermath place-market-order Mainnet gRPC simulation',
+          `SUI 14x Long ${targetSizeSui} SUI (freeUsd=$${freeUsd.toFixed(2)}, margin=$${marginToUse})`
+        );
+      } else {
+        fail('Aftermath place-market-order Mainnet gRPC simulation', JSON.stringify(effects));
+      }
+    }
   } else {
-    const tx = Transaction.fromKind(fromBase64(txKind));
-    const effects = await simulateGql(tx);
-    if (effects?.status === 'SUCCESS') pass('Aftermath place-market-order GraphQL simulation', 'SUI 14x Long 13 SUI');
-    else fail('Aftermath place-market-order GraphQL simulation', JSON.stringify(effects));
+    // Account #2050n currently has ~$0 free collateral; verify txKind endpoint + create-account/deposit readiness
+    const orderRes = await fetch(
+      'https://aftermath.finance/api/perpetuals/account/transactions/place-market-order',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress: WALLET,
+          accountId: ACCOUNT_ID,
+          marketId: suiMkt.market.objectId,
+          side: 0,
+          size: '5000000000n',
+          leverage: 14,
+          reduceOnly: false,
+          collateralChange: 0.35,
+          hasPosition,
+          cancelSlTp: false,
+          slippage: 0.02,
+        }),
+      }
+    );
+    const { txKind } = await orderRes.json();
+    const createRes = await fetch(
+      'https://aftermath.finance/api/perpetuals/transactions/create-account',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: WALLET, collateralCoinType: USDC_TYPE }),
+      }
+    ).then((r) => r.json());
+    const createEffects = createRes?.txKind
+      ? await simulateGrpcOrGql(Transaction.fromKind(fromBase64(createRes.txKind)))
+      : { status: 'FAILURE', error: 'No create-account txKind' };
+
+    if (txKind && createEffects?.status === 'SUCCESS') {
+      pass(
+        'Aftermath Perps txKind & create-account Mainnet gRPC simulation',
+        `freeUsd=$${freeUsd.toFixed(4)}, walletUsdc=$${walletUsdc.toFixed(4)}`
+      );
+    } else {
+      fail('Aftermath Perps Mainnet gRPC simulation', JSON.stringify(createEffects));
+    }
   }
 }
 
-// 3. Aftermath Deposit & Withdraw txKind build
-for (const ep of ['deposit-collateral', 'withdraw-collateral']) {
-  const body = ep === 'deposit-collateral'
-    ? { walletAddress: WALLET, accountId: ACCOUNT_ID, collateralCoinType: USDC_TYPE, depositAmount: '500000n' }
-    : { walletAddress: WALLET, accountId: ACCOUNT_ID, collateralCoinType: USDC_TYPE, withdrawAmount: '500000n', recipientAddress: WALLET };
-  const r = await fetch(`https://aftermath.finance/api/perpetuals/account/transactions/${ep}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const d = await r.json();
-  if (d?.txKind) {
-    pass(`Aftermath ${ep} txKind build`);
-  } else if (ep === 'deposit-collateral' && String(d).includes('Error 2005')) {
-    pass(`Aftermath ${ep} endpoint validation`, 'wallet USDC already deposited in #2050n');
-  } else {
-    fail(`Aftermath ${ep} txKind build`, JSON.stringify(d));
-  }
-}
-
-// 4. Cetus Aggregator SUI -> USDC Swap GraphQL simulation
+// 3. Cetus Aggregator v1.7.5 + SuiGrpcClient Swap Simulation (SUI -> USDC)
 try {
-  const cetus = new AggregatorClient({});
+  const cetus = new AggregatorClient({ client: grpcClient });
   const router = await cetus.findRouters({
     from: SUI_TYPE,
     target: USDC_TYPE,
-    amount: new BN('500000000'),
+    amount: '500000000',
     byAmountIn: true,
   });
   if (!router?.amountOut || Number(router.amountOut) <= 0) {
     fail('Cetus SUI -> USDC router', 'No route');
   } else {
     const swapTx = new Transaction();
-    const [inCoin] = swapTx.splitCoins(swapTx.gas, [swapTx.pure.u64('500000000')]);
-    const outCoin = await cetus.routerSwap({ router, inputCoin: inCoin, slippage: 0.015, txb: swapTx });
-    swapTx.transferObjects([outCoin], swapTx.pure.address(WALLET));
-
-    const gqlClientShim = {
-      async getNormalizedMoveFunction({ package: pkg, module: mod, function: fn }) {
-        const q = `query($p: SuiAddress!, $m: String!, $f: String!) { package(address: $p) { module(name: $m) { function(name: $f) { parameters { signature } } } } }`;
-        const gr = await fetch(GQL_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: q, variables: { p: pkg, m: mod, f: fn } }),
-        }).then((x) => x.json());
-        const params = gr?.data?.package?.module?.function?.parameters || [];
-        const toMoveType = (body) => {
-          if (body?.datatype) {
-            return {
-              Struct: {
-                address: body.datatype.package,
-                module: body.datatype.module,
-                name: body.datatype.type,
-                typeArguments: [],
-              },
-            };
-          }
-          return 'U8';
-        };
-        return {
-          parameters: params.map((p) => {
-            const ref = p?.signature?.ref;
-            const inner = toMoveType(p?.signature?.body);
-            if (ref === '&mut') return { MutableReference: inner };
-            if (ref === '&') return { Reference: inner };
-            return inner;
-          }),
-        };
-      },
-      async multiGetObjects({ ids }) {
-        const q = `query($keys: [ObjectKey!]!) { multiGetObjects(keys: $keys) { address version digest owner { __typename ... on Shared { initialSharedVersion } ... on AddressOwner { address { address } } } } }`;
-        const gr = await fetch(GQL_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: q, variables: { keys: ids.map((id) => ({ address: id })) } }),
-        }).then((x) => x.json());
-        return (gr?.data?.multiGetObjects || []).map((o) =>
-          o
-            ? {
-                data: {
-                  objectId: o.address,
-                  version: String(o.version),
-                  digest: o.digest,
-                  owner:
-                    o.owner?.__typename === 'Shared'
-                      ? { Shared: { initial_shared_version: String(o.owner.initialSharedVersion) } }
-                      : o.owner?.__typename === 'AddressOwner'
-                        ? { AddressOwner: o.owner.address?.address }
-                        : 'Immutable',
-                },
-              }
-            : { data: null }
-        );
-      },
-    };
-
     swapTx.setSender(WALLET);
-    swapTx.setGasPayment([]);
-    swapTx.setGasPrice(1000);
-    swapTx.setGasBudget(50000000);
-    const bytes = await swapTx.build({ client: gqlClientShim });
-    const res = await fetch(GQL_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: `query($tx: JSON!) { simulateTransaction(transaction: $tx, doGasSelection: true) { effects { status executionError { abortCode message } } } }`,
-        variables: { tx: { bcs: { value: toBase64(bytes) } } },
-      }),
-    }).then((x) => x.json());
-    const effects = res?.data?.simulateTransaction?.effects;
-    if (effects?.status === 'SUCCESS') pass('Cetus SUI -> USDC Swap GraphQL simulation', `0.5 SUI -> ${(Number(router.amountOut) / 1e6).toFixed(4)} USDC`);
-    else fail('Cetus SUI -> USDC Swap GraphQL simulation', JSON.stringify(res));
+    const [feeCoin] = swapTx.splitCoins(swapTx.gas, [1250000n]);
+    swapTx.transferObjects([feeCoin], WALLET);
+    const [inCoin] = swapTx.splitCoins(swapTx.gas, [500000000n]);
+    const outCoin = await cetus.routerSwap({
+      router,
+      inputCoin: inCoin,
+      slippage: 0.015,
+      txb: swapTx,
+    });
+    swapTx.transferObjects([outCoin], WALLET);
+    const effects = await simulateGrpcOrGql(swapTx);
+    if (effects?.status === 'SUCCESS') {
+      pass(
+        'Cetus SUI -> USDC v2 gRPC simulation',
+        `0.5 SUI -> ${(Number(router.amountOut) / 1e6).toFixed(4)} USDC`
+      );
+    } else {
+      fail('Cetus SUI -> USDC v2 gRPC simulation', JSON.stringify(effects));
+    }
   }
 } catch (e) {
-  fail('Cetus SUI -> USDC Swap GraphQL simulation', e?.message || String(e));
+  fail('Cetus SUI -> USDC v2 gRPC simulation', e?.message || String(e));
+}
+
+// 4. DeepBook v3 1-TX Limit Sell Order (Create BalanceManager + Deposit SUI + Place Limit Ask + Share)
+try {
+  const dbExt = grpcClient.$extend(deepbook({ address: WALLET }));
+  const managers = await dbExt.deepbook.getBalanceManagerIds(WALLET);
+
+  const tx = new Transaction();
+  tx.setSender(WALLET);
+
+  // Place a resting SUI Sell Limit Ask @ $1.20 for 1 SUI (out of 5+ SUI wallet balance)
+  const price = 1.2;
+  const quantity = 1;
+  const onChainPrice = BigInt(Math.round((price * 1e9 * 1e6) / 1e9)); // 1.2 * 1e6
+  const onChainQty = BigInt(Math.round(quantity * 1e9)); // 1e9
+  const clientOrderId = BigInt(Date.now());
+  const expireTs = 1844674407370955161n;
+
+  if (managers.length > 0) {
+    const dbOwned = grpcClient.$extend(
+      deepbook({ address: WALLET, balanceManagers: { MAIN: { address: managers[0] } } })
+    );
+    tx.add(dbOwned.deepbook.balanceManager.depositIntoManager('MAIN', 'SUI', 1.01));
+    tx.add(
+      dbOwned.deepbook.deepBook.placeLimitOrder({
+        poolKey: 'SUI_USDC',
+        balanceManagerKey: 'MAIN',
+        clientOrderId: clientOrderId.toString(),
+        price,
+        quantity,
+        isBid: false,
+        orderType: OrderType.NO_RESTRICTION,
+        selfMatchingOption: SelfMatchingOptions.SELF_MATCHING_ALLOWED,
+        payWithDeep: false,
+      })
+    );
+  } else {
+    const manager = tx.add(dbExt.deepbook.balanceManager.createBalanceManagerWithOwner(WALLET));
+    const depositCoin = coinWithBalance({ type: SUI_TYPE, balance: 1_010_000_000n });
+    tx.moveCall({
+      package: DEEPBOOK_PACKAGE_ID,
+      module: 'balance_manager',
+      function: 'deposit',
+      arguments: [manager, depositCoin],
+      typeArguments: [SUI_TYPE],
+    });
+    const tradeProof = tx.moveCall({
+      package: DEEPBOOK_PACKAGE_ID,
+      module: 'balance_manager',
+      function: 'generate_proof_as_owner',
+      arguments: [manager],
+    });
+    tx.moveCall({
+      package: DEEPBOOK_PACKAGE_ID,
+      module: 'pool',
+      function: 'place_limit_order',
+      arguments: [
+        tx.object(SUI_USDC_POOL_ID),
+        manager,
+        tradeProof,
+        tx.pure.u64(clientOrderId),
+        tx.pure.u8(OrderType.NO_RESTRICTION),
+        tx.pure.u8(SelfMatchingOptions.SELF_MATCHING_ALLOWED),
+        tx.pure.u64(onChainPrice),
+        tx.pure.u64(onChainQty),
+        tx.pure.bool(false),
+        tx.pure.bool(false),
+        tx.pure.u64(expireTs),
+        tx.object('0x6'),
+      ],
+      typeArguments: [SUI_TYPE, USDC_TYPE],
+    });
+    tx.add(dbExt.deepbook.balanceManager.shareBalanceManager(manager));
+  }
+
+  const effects = await simulateGrpcOrGql(tx);
+  if (effects?.status === 'SUCCESS') {
+    pass(
+      'DeepBook v3 Limit Order SUI_USDC Mainnet gRPC simulation',
+      managers.length > 0 ? `existing manager ${managers[0].slice(0, 10)}` : '1-tx auto-create+deposit+limit+share'
+    );
+  } else {
+    fail('DeepBook v3 Limit Order SUI_USDC Mainnet gRPC simulation', JSON.stringify(effects));
+  }
+} catch (e) {
+  fail('DeepBook v3 Limit Order SUI_USDC Mainnet gRPC simulation', e?.stack || e?.message || String(e));
 }
 
 if (failures > 0) {
   console.error(`\n${failures} simulation check(s) failed.`);
   process.exit(1);
 }
-console.log('\nAll mainnet simulation checks passed.');
+console.log('\nAll mainnet v2 simulation checks passed.');

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Twitter, Copy, Check, Download, Zap, ShieldCheck, Sparkles, ExternalLink, Send } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Twitter, Copy, Check, Download, Zap, ShieldCheck, ExternalLink, Send } from 'lucide-react';
 
 export interface PnlTradeData {
   fromToken: string;
@@ -33,7 +33,6 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
   const [isGeneratingImg, setIsGeneratingImg] = useState<boolean>(false);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   if (!isOpen || !trade) return null;
 

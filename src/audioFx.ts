@@ -4,7 +4,6 @@
 import { triggerHaptic } from './telegram';
 
 let audioCtx: AudioContext | null = null;
-let isAudioMuted = false;
 
 // Initialize audio context on first user gesture
 function getAudioContext(): AudioContext | null {
@@ -28,7 +27,6 @@ export const getSoundMuted = (): boolean => {
 };
 
 export const setSoundMuted = (muted: boolean) => {
-  isAudioMuted = muted;
   if (typeof window !== 'undefined') {
     localStorage.setItem('volt_audio_muted', muted ? 'true' : 'false');
   }

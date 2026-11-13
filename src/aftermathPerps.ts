@@ -1,7 +1,7 @@
 import { Transaction } from '@mysten/sui/transactions';
 import { bcs } from '@mysten/sui/bcs';
-import { fromBase64, toBase64 } from '@mysten/bcs';
-import { VOLT_TREASURY_ADDRESS } from './EarnVaultsHub';
+import { fromBase64, toBase64 } from '@mysten/sui/utils';
+import { appendFeeToJsonV2Ptb, appendVoltFeeCoinSplit } from './voltFee';
 
 export const AF_PERPS_API = 'https://aftermath.finance/api/perpetuals';
 export const AF_USDC_COIN_TYPE =
@@ -14,6 +14,10 @@ export interface AfMarketInfo {
   symbol: string;
   collateralCoinType: string;
   indexPrice: number;
+  markPrice: number;
+  midPrice: number;
+  volume24hUsd: number;
+  priceChange24hPct: number;
   estimatedFundingRate: number;
   lotSize: bigint;
   tickSize: bigint;
@@ -21,9 +25,23 @@ export interface AfMarketInfo {
   maxLeverage: number;
 }
 
+export interface AfOrderbookLevel {
+  price: number;
+  size: number;
+  totalSize: number;
+}
+
+export interface AfMarketOrderbook {
+  bids: AfOrderbookLevel[];
+  asks: AfOrderbookLevel[];
+  bestBid: number;
+  bestAsk: number;
+  midPrice: number;
+}
+
 export interface AfPositionInfo {
   marketId: string;
-  baseAssetAmount: number; // >0 long, <0 short
+  baseAssetAmount: number;
   quoteAssetNotionalAmount: number;
   collateralUsd: number;
   leverage: number;
@@ -43,7 +61,7 @@ export interface AfAccountState {
   availableCollateralUsd: number;
   totalUnrealizedPnlUsd: number;
   positions: AfPositionInfo[];
-  /** All marketIds that already have an on-chain Position struct (including closed 0-size slots) */
+  /** All marketIds with an existing on-chain Position struct (including closed 0-size slots to prevent MoveAbort 41). */
   positionMarketIds: string[];
 }
 
@@ -108,41 +126,25 @@ function stripKindKeys(val: any): any {
 export function txFromKindBase64(
   txKindBase64: string,
   sender: string,
-  feeMist?: bigint
+  feeMist?: bigint,
+  refSharePct = 0.25
 ): Transaction | string {
   const bytes = fromBase64(txKindBase64);
   try {
     const tx = Transaction.fromKind(bytes);
     tx.setSender(sender);
     if (feeMist && feeMist > 0n) {
-      appendVoltFeeToTx(tx, feeMist);
+      appendVoltFeeCoinSplit(tx, tx.gas, feeMist, sender, refSharePct);
     }
     return tx;
   } catch {
-    // Fallback for @mysten/sui v2 txKind containing CallArg::FundsWithdrawal (enum 2)
     const parsed = TxKindV2.parse(bytes);
     const ptx = stripKindKeys(parsed.ProgrammableTransaction);
     const inputs: any[] = ptx.inputs || [];
     const commands: any[] = ptx.commands || [];
 
     if (feeMist && feeMist > 0n) {
-      const feeIdx = inputs.length;
-      inputs.push({ Pure: { bytes: toBase64(bcs.u64().serialize(feeMist).toBytes()) } });
-      const addrIdx = inputs.length;
-      inputs.push({ Pure: { bytes: toBase64(bcs.Address.serialize(VOLT_TREASURY_ADDRESS).toBytes()) } });
-      const splitCmdIdx = commands.length;
-      commands.push({
-        SplitCoins: {
-          coin: { GasCoin: true },
-          amounts: [{ Input: feeIdx }],
-        },
-      });
-      commands.push({
-        TransferObjects: {
-          objects: [{ NestedResult: [splitCmdIdx, 0] }],
-          address: { Input: addrIdx },
-        },
-      });
+      appendFeeToJsonV2Ptb(inputs, commands, feeMist, sender, refSharePct);
     }
 
     return JSON.stringify({
@@ -156,39 +158,79 @@ export function txFromKindBase64(
   }
 }
 
-export function appendVoltFeeToTx(tx: Transaction, feeMist: bigint): void {
-  if (feeMist <= 0n) return;
-  const [feeCoin] = tx.splitCoins(tx.gas, [feeMist]);
-  tx.transferObjects([feeCoin], VOLT_TREASURY_ADDRESS);
-}
-
 export async function fetchAftermathMarkets(): Promise<Record<string, AfMarketInfo>> {
-  const res = await fetch(`${AF_PERPS_API}/markets`, {
+  const marketsRes = await fetch(`${AF_PERPS_API}/markets`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   });
-  if (!res.ok) {
-    throw new Error(`Aftermath markets HTTP ${res.status}`);
+
+  if (!marketsRes.ok) {
+    throw new Error(`Aftermath markets HTTP ${marketsRes.status}`);
   }
-  const data = await res.json();
+  const data = await marketsRes.json();
+  const marketDatas: any[] = data?.marketDatas || [];
+  const marketIds: string[] = marketDatas
+    .map((item) => String(item?.market?.objectId || ''))
+    .filter(Boolean);
+
+  const [pricesRes, statsRes] =
+    marketIds.length > 0
+      ? await Promise.all([
+          fetch(`${AF_PERPS_API}/markets/prices`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ marketIds }),
+          }).catch(() => null),
+          fetch(`${AF_PERPS_API}/markets/24hr-stats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ marketIds }),
+          }).catch(() => null),
+        ])
+      : [null, null];
+
+  const pricesData = pricesRes?.ok ? await pricesRes.json().catch(() => ({})) : {};
+  const statsData = statsRes?.ok ? await statsRes.json().catch(() => ({})) : {};
+
+  const priceById: Record<string, any> = {};
+  for (const p of pricesData?.marketsPrices || pricesData?.marketPrices || []) {
+    if (p?.marketId) priceById[p.marketId] = p;
+  }
+  const statsById: Record<string, any> = {};
+  const rawStats: any[] = statsData?.marketsStats || statsData?.market24hrStats || [];
+  rawStats.forEach((s, idx) => {
+    const mId = s?.marketId || marketIds[idx];
+    if (mId) statsById[mId] = s;
+  });
+
   const map: Record<string, AfMarketInfo> = {};
-  for (const item of data?.marketDatas || []) {
+  for (const item of marketDatas) {
     const sym = String(item?.metadata?.symbol || '').toUpperCase();
     const m = item?.market;
     const params = m?.marketParams;
     if (!sym || !m?.objectId) continue;
+
     const imr = Number(params?.marginRatioInitial || 0.05);
     let maxLev = imr > 0 ? Math.max(1, Math.floor(1 / imr)) : 20;
-    // Prevent MoveAbort 2003 in position::set_initial_margin_ratio when floor(1e18 / maxLev) < ceil(imr * 1e18) (e.g. 1/15)
+    // Prevent MoveAbort 2003 in position::set_initial_margin_ratio when floor(1e18/maxLev) < ceil(imr*1e18)
     if (maxLev > 1 && Math.floor(1e18 / maxLev) < Math.ceil(imr * 1e18)) {
       maxLev -= 1;
     }
+
+    const pInfo = priceById[m.objectId] || {};
+    const sInfo = statsById[m.objectId] || {};
+    const idxPrice = Number(m.indexPrice || pInfo.basePrice || sInfo.basePrice || 0);
+
     map[sym] = {
       marketId: m.objectId,
       symbol: sym,
       collateralCoinType: m.collateralCoinType || AF_USDC_COIN_TYPE,
-      indexPrice: Number(m.indexPrice || 0),
+      indexPrice: idxPrice,
+      markPrice: Number(pInfo.markPrice || sInfo.markPrice || idxPrice),
+      midPrice: Number(pInfo.midPrice || sInfo.midPrice || idxPrice),
+      volume24hUsd: Number(sInfo.volumeUsd || 0),
+      priceChange24hPct: Number(sInfo.priceChangePercentage || 0) * 100,
       estimatedFundingRate: Number(m.estimatedFundingRate || 0),
       lotSize: parseBigIntN(params?.lotSize, 10000n),
       tickSize: parseBigIntN(params?.tickSize, 10000n),
@@ -197,6 +239,49 @@ export async function fetchAftermathMarkets(): Promise<Record<string, AfMarketIn
     };
   }
   return map;
+}
+
+export async function fetchAftermathOrderbook(marketId: string): Promise<AfMarketOrderbook> {
+  const res = await fetch(`${AF_PERPS_API}/markets/orderbooks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ marketIds: [marketId] }),
+  });
+  if (!res.ok) {
+    throw new Error(`Aftermath orderbooks HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const entry =
+    (data?.orderbooks || []).find((b: any) => b.marketId === marketId) ||
+    data?.orderbooks?.[0] ||
+    {};
+  const book = entry?.orderbook || entry;
+
+  const parseLevels = (arr: any[], reverse = false): AfOrderbookLevel[] => {
+    const clean = (Array.isArray(arr) ? arr : [])
+      .map((lv: any) => ({
+        price: Number(lv?.price ?? lv?.[0] ?? 0),
+        size: Number(lv?.size ?? lv?.[1] ?? 0),
+      }))
+      .filter((lv) => lv.price > 0 && lv.size > 0)
+      .slice(0, 12);
+
+    let cum = 0;
+    const withCum = clean.map((lv) => {
+      cum += lv.size;
+      return { ...lv, totalSize: cum };
+    });
+    return reverse ? withCum.reverse() : withCum;
+  };
+
+  const asks = parseLevels(book.asks, true);
+  const bids = parseLevels(book.bids, false);
+  const bestAsk = asks.length > 0 ? asks[asks.length - 1].price : 0;
+  const bestBid = bids.length > 0 ? bids[0].price : 0;
+  const midPrice =
+    bestBid > 0 && bestAsk > 0 ? (bestBid + bestAsk) / 2 : bestBid || bestAsk || 0;
+
+  return { bids, asks, bestBid, bestAsk, midPrice };
 }
 
 export async function fetchAftermathAccountState(walletAddress: string): Promise<AfAccountState> {
@@ -223,10 +308,10 @@ export async function fetchAftermathAccountState(walletAddress: string): Promise
     };
   }
 
-  // Prefer account with largest collateral, otherwise first account
   const primaryCap =
-    caps.find((c) => c.collateralCoinType === AF_USDC_COIN_TYPE && parseBigIntN(c.collateral, 0n) > 0n) ||
-    caps[0];
+    caps.find(
+      (c) => c.collateralCoinType === AF_USDC_COIN_TYPE && parseBigIntN(c.collateral, 0n) > 0n
+    ) || caps[0];
 
   const accountId: string = primaryCap.accountId;
   const posRes = await fetch(`${AF_PERPS_API}/accounts/positions`, {
@@ -280,7 +365,8 @@ async function postTxKind(
   path: string,
   body: Record<string, any>,
   sender: string,
-  feeMist?: bigint
+  feeMist?: bigint,
+  refSharePct = 0.25
 ): Promise<Transaction | string> {
   const res = await fetch(`${AF_PERPS_API}${path}`, {
     method: 'POST',
@@ -302,7 +388,7 @@ async function postTxKind(
   if (!data?.txKind) {
     throw new Error(`Aftermath API did not return txKind for ${path}`);
   }
-  return txFromKindBase64(data.txKind, sender, feeMist);
+  return txFromKindBase64(data.txKind, sender, feeMist, refSharePct);
 }
 
 export async function buildCreateAccountTx(walletAddress: string): Promise<Transaction | string> {
@@ -354,7 +440,7 @@ export async function buildPlaceMarketOrderTx(params: {
   walletAddress: string;
   accountId: string;
   marketId: string;
-  side: 0 | 1; // 0 = Long (Bid), 1 = Short (Ask)
+  side: 0 | 1;
   sizeContracts: number;
   lotSize: bigint;
   leverage: number;
@@ -364,6 +450,7 @@ export async function buildPlaceMarketOrderTx(params: {
   cancelSlTp: boolean;
   slippage?: number;
   feeMist?: bigint;
+  refSharePct?: number;
 }): Promise<Transaction | string> {
   const lot = params.lotSize > 0n ? params.lotSize : 10000n;
   const rawSize = BigInt(Math.max(1, Math.round(params.sizeContracts * 1e9)));
@@ -385,6 +472,7 @@ export async function buildPlaceMarketOrderTx(params: {
       slippage: params.slippage ?? 0.02,
     },
     params.walletAddress,
-    params.feeMist
+    params.feeMist,
+    params.refSharePct ?? 0.25
   );
 }
