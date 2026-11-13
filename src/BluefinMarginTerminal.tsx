@@ -794,7 +794,23 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     const loadAfMarkets = async () => {
       try {
         const mkts = await fetchAftermathMarkets();
-        if (mounted) setAfMarkets(mkts);
+        if (mounted) {
+          setAfMarkets(mkts);
+          setLiveMarkets((prev) =>
+            prev.map((m) => {
+              const af = mkts[m.baseAsset.toUpperCase()];
+              return af
+                ? { ...m, maxLeverage: af.maxLeverage, initialMarginPct: 1 / af.maxLeverage }
+                : m;
+            })
+          );
+          setSelectedMarket((prev) => {
+            const af = mkts[prev.baseAsset.toUpperCase()];
+            return af
+              ? { ...prev, maxLeverage: af.maxLeverage, initialMarginPct: 1 / af.maxLeverage }
+              : prev;
+          });
+        }
       } catch (e) {
         console.warn('Aftermath markets fetch warning:', e);
       }
@@ -838,11 +854,13 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
       ? suiBalance
       : usdcBalance + (afAccount?.availableCollateralUsd || 0);
 
-  // Active positions stored in localStorage
+  // Active positions stored in localStorage (only real on-chain positions with tx digest)
   const [positions, setPositions] = useState<BluefinPosition[]>(() => {
     try {
       const saved = localStorage.getItem('volt_bluefin_positions');
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter((p: any) => Boolean(p?.digest)) : [];
     } catch (_) {
       return [];
     }

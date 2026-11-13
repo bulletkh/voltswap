@@ -177,7 +177,11 @@ export async function fetchAftermathMarkets(): Promise<Record<string, AfMarketIn
     const params = m?.marketParams;
     if (!sym || !m?.objectId) continue;
     const imr = Number(params?.marginRatioInitial || 0.05);
-    const maxLev = imr > 0 ? Math.max(1, Math.floor(1 / imr)) : 20;
+    let maxLev = imr > 0 ? Math.max(1, Math.floor(1 / imr)) : 20;
+    // Prevent MoveAbort 2003 in position::set_initial_margin_ratio when floor(1e18 / maxLev) < ceil(imr * 1e18) (e.g. 1/15)
+    if (maxLev > 1 && Math.floor(1e18 / maxLev) < Math.ceil(imr * 1e18)) {
+      maxLev -= 1;
+    }
     map[sym] = {
       marketId: m.objectId,
       symbol: sym,
