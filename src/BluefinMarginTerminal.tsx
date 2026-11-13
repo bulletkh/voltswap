@@ -799,16 +799,28 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
           setLiveMarkets((prev) =>
             prev.map((m) => {
               const af = mkts[m.baseAsset.toUpperCase()];
-              return af
-                ? { ...m, maxLeverage: af.maxLeverage, initialMarginPct: 1 / af.maxLeverage }
-                : m;
+              if (!af) return m;
+              const filteredGrid = m.leverageGrid.filter((l) => l < af.maxLeverage);
+              if (!filteredGrid.includes(af.maxLeverage)) filteredGrid.push(af.maxLeverage);
+              return {
+                ...m,
+                maxLeverage: af.maxLeverage,
+                initialMarginPct: 1 / af.maxLeverage,
+                leverageGrid: filteredGrid,
+              };
             })
           );
           setSelectedMarket((prev) => {
             const af = mkts[prev.baseAsset.toUpperCase()];
-            return af
-              ? { ...prev, maxLeverage: af.maxLeverage, initialMarginPct: 1 / af.maxLeverage }
-              : prev;
+            if (!af) return prev;
+            const filteredGrid = prev.leverageGrid.filter((l) => l < af.maxLeverage);
+            if (!filteredGrid.includes(af.maxLeverage)) filteredGrid.push(af.maxLeverage);
+            return {
+              ...prev,
+              maxLeverage: af.maxLeverage,
+              initialMarginPct: 1 / af.maxLeverage,
+              leverageGrid: filteredGrid,
+            };
           });
         }
       } catch (e) {
@@ -1126,8 +1138,10 @@ export const BluefinMarginTerminal: React.FC<BluefinMarginTerminalProps> = ({
     }
 
     const effectiveLeverage = Math.min(leverage, afMarket.maxLeverage);
-    const effectiveSizeUsd = collateralValueUsd * effectiveLeverage;
-    const effectiveContracts = selectedMarket.markPrice > 0 ? effectiveSizeUsd / selectedMarket.markPrice : 0;
+    // Reserve 6% margin buffer for Aftermath taker fees + oracle/slippage spread so end_session_ (abort 30) never rejects
+    const effectiveSizeUsd = collateralValueUsd * effectiveLeverage * 0.94;
+    const refPrice = afMarket.indexPrice > 0 ? afMarket.indexPrice : selectedMarket.markPrice;
+    const effectiveContracts = refPrice > 0 ? effectiveSizeUsd / refPrice : 0;
 
     if (effectiveSizeUsd < afMarket.minOrderUsdValue) {
       showNotification(
