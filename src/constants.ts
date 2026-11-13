@@ -428,7 +428,7 @@ export const TRADER_TIERS: TraderTierConfig[] = [
     badgeBg: 'bg-gradient-to-r from-amber-500/20 via-volt/20 to-amber-500/20',
     badgeBorder: 'border-volt/60',
     badgeText: 'text-volt font-black',
-    badgeGlow: 'shadow-[0_0_30px_rgba(234,252,109,0.4)]',
+    badgeGlow: 'shadow-[0_0_30px_rgba(56, 189, 248,0.4)]',
     tagline: 'Apex $1M Syndicate Legend — Absolute Lowest Fees on Entire Sui Network',
     perks: ['-88% Fee Discount (0.03% flat rate — Absolute Minimum on Sui)', 'Golden Crown VIP Terminal Status', 'Private Low-Latency RPC & Direct Move Execution']
   }

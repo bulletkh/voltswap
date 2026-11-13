@@ -108,7 +108,7 @@ export function App() {
   return (
     <div className="min-h-screen text-slate-100 flex flex-col">
       {/* Top Volt Obsidian Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#090B0E]/92 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#090E16]/92 backdrop-blur-md">
         <div className="w-full mx-auto px-3 sm:px-5 lg:px-6 h-16 flex items-center justify-between gap-4">
           {/* Brand */}
           <div className="flex items-center gap-7">
@@ -131,7 +131,7 @@ export function App() {
                     onClick={() => setActiveTab(item.id)}
                     className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
                       active
-                        ? 'bg-[#D7F626]/15 text-[#D7F626] border border-[#D7F626]/40 shadow-[0_0_20px_rgba(215,246,38,0.14)]'
+                        ? 'bg-[#18C8FF]/15 text-[#18C8FF] border border-[#18C8FF]/40 shadow-[0_0_20px_rgba(24, 200, 255,0.14)]'
                         : 'text-slate-300 hover:text-white hover:bg-white/[0.06] border border-transparent'
                     }`}
                   >
@@ -149,9 +149,9 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setPortfolioOpen(true)}
-                className="px-3.5 py-2 rounded-xl bg-[#101318] hover:bg-[#171B22] border border-white/[0.12] text-sm font-semibold text-white inline-flex items-center gap-2 transition-colors"
+                className="px-3.5 py-2 rounded-xl bg-[#101722] hover:bg-[#171B22] border border-white/[0.12] text-sm font-semibold text-white inline-flex items-center gap-2 transition-colors"
               >
-                <Wallet className="w-4 h-4 text-[#D7F626]" />
+                <Wallet className="w-4 h-4 text-[#18C8FF]" />
                 <span className="hidden sm:inline">Portfolio</span>
               </button>
             )}
@@ -170,7 +170,7 @@ export function App() {
                 onClick={() => setActiveTab(item.id)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 ${
                   active
-                    ? 'bg-[#D7F626]/20 text-[#D7F626] border border-[#D7F626]/40'
+                    ? 'bg-[#18C8FF]/20 text-[#18C8FF] border border-[#18C8FF]/40'
                     : 'text-slate-300 border border-transparent'
                 }`}
               >
@@ -225,7 +225,7 @@ export function App() {
             <span>Cetus Aggregator · DeepBook v3 CLOB &amp; Margin · Aftermath Perps</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#D7F626]" />
+            <Sparkles className="w-3.5 h-3.5 text-[#18C8FF]" />
             <span className="text-slate-200">Non-custodial Sui Move Execution</span>
           </div>
         </div>
@@ -233,14 +233,14 @@ export function App() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] panel-carbon rounded-2xl p-4 shadow-2xl border border-[#D7F626]/25 animate-slide-up">
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100%-2rem)] panel-carbon rounded-2xl p-4 shadow-2xl border border-[#18C8FF]/25 animate-slide-up">
           <div className="flex items-start gap-3">
             {toast.type === 'success' ? (
               <CheckCircle2 className="w-5 h-5 text-[#00E599] shrink-0 mt-0.5" />
             ) : toast.type === 'error' ? (
               <AlertCircle className="w-5 h-5 text-[#FF4D6A] shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-[#D7F626] shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[#18C8FF] shrink-0 mt-0.5" />
             )}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold text-white">{toast.title}</div>
@@ -250,7 +250,7 @@ export function App() {
                   href={toast.actionUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-mono text-[#D7F626] hover:underline mt-1.5"
+                  className="inline-flex items-center gap-1 text-xs font-mono text-[#18C8FF] hover:underline mt-1.5"
                 >
                   <span>{toast.actionLabel}</span>
                   <ExternalLink className="w-3.5 h-3.5" />

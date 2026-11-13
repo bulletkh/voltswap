@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --dapp-kit-background: #0c0f14;
+  --dapp-kit-background: #0B111C;
   --dapp-kit-foreground: #f8fafc;
-  --dapp-kit-primary: #d7f626;
-  --dapp-kit-primary-foreground: #080a0d;
-  --dapp-kit-secondary: #151922;
+  --dapp-kit-primary: #18C8FF;
+  --dapp-kit-primary-foreground: #04111D;
+  --dapp-kit-secondary: #151E2C;
   --dapp-kit-secondary-foreground: #f8fafc;
   --dapp-kit-border: rgba(255, 255, 255, 0.12);
-  --dapp-kit-accent: rgba(215, 246, 38, 0.14);
-  --dapp-kit-accent-foreground: #e9ff52;
-  --dapp-kit-muted: #151922;
+  --dapp-kit-accent: rgba(24, 200, 255, 0.14);
+  --dapp-kit-accent-foreground: #6CE6FF;
+  --dapp-kit-muted: #151E2C;
   --dapp-kit-muted-foreground: #cbd5e1;
-  --dapp-kit-popover: #101318;
+  --dapp-kit-popover: #101722;
   --dapp-kit-popover-foreground: #f8fafc;
   --dapp-kit-positive: #00d98b;
   --dapp-kit-destructive: #f6465d;
-  --dapp-kit-ring: #d7f626;
+  --dapp-kit-ring: #18C8FF;
   --dapp-kit-radius: 14px;
 }
 
@@ -32,13 +32,13 @@
   }
 
   html, body {
-    background-color: #090b0e;
+    background-color: #090e16;
     background-image:
-      radial-gradient(ellipse 68% 42% at 48% 10%, rgba(215, 246, 38, 0.065), transparent 68%),
-      radial-gradient(circle at 76% 24%, rgba(0, 217, 139, 0.04), transparent 52%),
-      radial-gradient(ellipse 85% 28% at 50% 100%, rgba(215, 246, 38, 0.045), transparent 62%);
+      radial-gradient(ellipse 68% 44% at 48% 10%, rgba(24, 200, 255, 0.095), transparent 68%),
+      radial-gradient(circle at 74% 24%, rgba(59, 130, 246, 0.065), transparent 52%),
+      radial-gradient(ellipse 88% 30% at 50% 100%, rgba(14, 165, 233, 0.055), transparent 62%);
     background-attachment: fixed;
-    @apply text-slate-100 font-sans antialiased selection:bg-[#D7F626] selection:text-[#080A0D];
+    @apply text-slate-100 font-sans antialiased selection:bg-[#18C8FF] selection:text-[#04111D];
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden !important;
@@ -46,13 +46,13 @@
 }
 
 .panel-carbon {
-  background: #101318;
+  background: #101722;
   border: 1px solid rgba(255, 255, 255, 0.085);
   box-shadow: 0 12px 36px -14px rgba(0, 0, 0, 0.85);
 }
 
 .panel-carbon-sub {
-  background: #0a0c10;
+  background: #0A1019;
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -65,15 +65,15 @@
 }
 
 .btn-deepbook {
-  background: linear-gradient(135deg, #e7ff4d 0%, #d7f626 55%, #b5e600 100%);
-  color: #080a0d;
+  background: linear-gradient(135deg, #4CE0FF 0%, #18C8FF 55%, #0EA5E9 100%);
+  color: #04111D;
   font-weight: 800;
-  box-shadow: 0 0 22px rgba(215, 246, 38, 0.24);
+  box-shadow: 0 0 22px rgba(24, 200, 255, 0.24);
 }
 
 .btn-deepbook:hover {
-  background: linear-gradient(135deg, #f3ff78 0%, #e1ff38 55%, #c5f700 100%);
-  box-shadow: 0 0 28px rgba(215, 246, 38, 0.42);
+  background: linear-gradient(135deg, #7CE9FF 0%, #2AD4FF 55%, #0284C7 100%);
+  box-shadow: 0 0 28px rgba(24, 200, 255, 0.42);
 }
 
 input[type='number']::-webkit-inner-spin-button,
@@ -97,9 +97,9 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 9999px;
-  background: #d7f626;
-  border: 2px solid #080a0d;
-  box-shadow: 0 0 12px rgba(215, 246, 38, 0.75);
+  background: #18C8FF;
+  border: 2px solid #04111D;
+  box-shadow: 0 0 12px rgba(24, 200, 255, 0.75);
   cursor: pointer;
 }
 
@@ -122,7 +122,7 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar-track {
-  background: #090b0e;
+  background: #090E16;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -131,7 +131,7 @@ input[type='range'].carbon-slider::-webkit-slider-thumb {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(215, 246, 38, 0.55);
+  background: rgba(24, 200, 255, 0.55);
 }
 
 @keyframes slideUpSheet {

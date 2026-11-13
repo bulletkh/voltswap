@@ -143,7 +143,7 @@ export const PwaInstallPrompt: React.FC = () => {
               <button
                 type="button"
                 onClick={handleInstallClick}
-                className="px-3.5 py-2 rounded-xl bg-volt hover:bg-[#ebfd73] active:scale-95 text-black font-extrabold text-xs shadow-volt-glow transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                className="px-3.5 py-2 rounded-xl bg-volt hover:bg-[#56DCFF] active:scale-95 text-black font-extrabold text-xs shadow-volt-glow transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
               >
                 <Download className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Install</span>
