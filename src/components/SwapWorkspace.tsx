@@ -14,6 +14,9 @@ import {
   Search,
   ArrowDownToLine,
   ArrowUpFromLine,
+  ArrowRight,
+  Zap,
+  Layers,
 } from 'lucide-react';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { POPULAR_TOKENS, type Token } from '../constants';
@@ -87,6 +90,16 @@ interface SwapWorkspaceProps {
 }
 
 const SUI_TOKENS = POPULAR_TOKENS.filter((t) => t.chain === 'sui');
+
+export const AGGREGATED_PROTOCOLS = [
+  { id: 'cetus', name: 'Cetus CLMM', note: 'Concentrated AMM' },
+  { id: 'bluefin', name: 'Bluefin / 7K', note: 'Tide RFQ & AMM' },
+  { id: 'deepbook', name: 'DeepBook v3', note: 'Native CLOB' },
+  { id: 'turbos', name: 'Turbos', note: 'CLMM' },
+  { id: 'aftermath', name: 'Aftermath', note: 'Multi-Asset' },
+  { id: 'flowx', name: 'FlowX', note: 'Ecosystem DEX' },
+  { id: 'kriya', name: 'Kriya', note: 'AMM & CLOB' },
+] as const;
 
 const SYMBOL_LOGO_OVERRIDES: Record<string, string> = {
   SUI: '/tokens/sui.svg',
@@ -973,13 +986,21 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           <button
             type="button"
             onClick={() => setMode('market')}
-            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all ${
+            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all flex items-center gap-1.5 ${
               mode === 'market'
                 ? 'bg-[#2B7FFF] text-white shadow-[0_0_12px_rgba(43,127,255,0.28)]'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Swap
+            <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-pulse" />
+            <span>Swap Aggregator</span>
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                mode === 'market' ? 'bg-black/30 text-white' : 'bg-[#2B7FFF]/15 text-[#60A5FA]'
+              }`}
+            >
+              7 DEXs
+            </span>
           </button>
           <button
             type="button"
@@ -997,26 +1018,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
               }`}
             >
               DeepBook v3
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('margin')}
-            className={`px-3.5 py-1.5 rounded-md text-xs sm:text-[13px] font-semibold transition-all flex items-center gap-1.5 ${
-              mode === 'margin'
-                ? 'bg-[#2B7FFF] text-white shadow-[0_0_12px_rgba(43,127,255,0.28)]'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <span>Margin</span>
-            <span
-              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                mode === 'margin'
-                  ? 'bg-black/25 text-white'
-                  : 'bg-[#2B7FFF]/15 text-[#60A5FA]'
-              }`}
-            >
-              4.5x CLOB
             </span>
           </button>
         </div>
@@ -1046,6 +1047,43 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       {/* MODE 1: INSTITUTIONAL INSTANT SWAP STAGE */}
       {mode === 'market' && (
         <div className="max-w-[1280px] mx-auto px-3 sm:px-6 py-6 animate-panel-in">
+          {/* Institutional 7-Protocol Aggregator Ribbon */}
+          <div className="mb-4 p-3 rounded-xl bg-[#06080C] border border-[#263143] flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#2B7FFF]/15 border border-[#2B7FFF]/35 flex items-center justify-center shrink-0">
+                <Zap className="w-4 h-4 text-[#60A5FA]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-white tracking-wide uppercase font-mono">
+                    Sui Multi-DEX Aggregator
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-[#08D189] bg-[#08D189]/15 border border-[#08D189]/30 px-1.5 py-0.5 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-pulse" />
+                    7 Protocols Racing
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Dual-engine parallel routing guaranteeing lowest slippage &amp; maximum return on Sui.
+                </p>
+              </div>
+            </div>
+
+            {/* Protocol Badges */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {AGGREGATED_PROTOCOLS.map((p) => (
+                <span
+                  key={p.id}
+                  className="px-2 py-1 rounded bg-[#0D121B] border border-[#263246] text-[11px] font-mono text-slate-300 flex items-center gap-1 shadow-sm hover:border-[#2B7FFF]/40 transition-colors"
+                  title={`${p.name} (${p.note})`}
+                >
+                  <span className="w-1 h-1 rounded-full bg-[#2B7FFF]" />
+                  <span className="font-semibold text-white">{p.name}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+
           <div
             className={`grid gap-5 items-start ${
               showMarketChart ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'
@@ -1076,9 +1114,9 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 {/* Top Controls */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-white tracking-tight">Instant Swap</span>
-                    <span className="text-[11px] font-mono text-[#60A5FA] px-2 py-0.5 rounded bg-[#2B7FFF]/12 border border-[#2B7FFF]/30">
-                      Cetus + Aftermath
+                    <span className="text-base font-bold text-white tracking-tight">Best-Price Swap</span>
+                    <span className="text-[11px] font-mono text-[#08D189] px-2 py-0.5 rounded bg-[#08D189]/10 border border-[#08D189]/30 font-semibold">
+                      Best Route
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -1103,6 +1141,24 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       <span>{slippagePct}%</span>
                     </button>
                   </div>
+                </div>
+
+                {/* Sub-toggle: Market Swap vs Spot Limit Order */}
+                <div className="grid grid-cols-2 p-1 rounded-lg bg-[#06080C] border border-[#263246] gap-1">
+                  <button
+                    type="button"
+                    className="py-1.5 rounded-md text-xs font-semibold font-mono bg-[#2B7FFF] text-white shadow-sm flex items-center justify-center gap-1"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Market (7 DEXs)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('limit')}
+                    className="py-1.5 rounded-md text-xs font-semibold font-mono text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors flex items-center justify-center gap-1"
+                  >
+                    <span>Spot Limit (CLOB)</span>
+                  </button>
                 </div>
 
                 {showSettings && (
@@ -1247,75 +1303,117 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 </div>
 
                 {/* Route & Fee Details */}
-                <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 space-y-1.5 text-xs font-mono">
-                  <div className="flex items-center justify-between gap-2 text-slate-400">
-                    <span>Best Aggregator</span>
-                    <div className="flex items-center gap-2">
+                <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 space-y-2.5 text-xs font-mono">
+                  {/* Optimal Execution Route Visualizer */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="text-slate-400 font-mono flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5 text-[#2B7FFF]" />
+                        <span>Execution Route</span>
+                      </span>
                       {quote ? (
-                        <>
+                        <div className="flex items-center gap-1.5">
                           <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 text-[11px] font-bold">
-                            {quote.provider === 'Cetus' ? 'Cetus (incl. Bluefin)' : 'Aftermath Router'}
+                            {quote.provider === 'Cetus' ? 'Cetus Engine (incl. Bluefin/7K)' : 'Aftermath Engine'}
                           </span>
                           {quote.savingsPct > 0.001 && (
-                            <span className="text-xs font-bold text-[#08D189]">
+                            <span className="text-[11px] font-bold text-[#08D189] bg-[#08D189]/15 border border-[#08D189]/30 px-1.5 py-0.5 rounded">
                               +{quote.savingsPct.toFixed(2)}%
                             </span>
                           )}
-                        </>
+                        </div>
                       ) : (
-                        <span>—</span>
+                        <span className="text-slate-500">—</span>
                       )}
                     </div>
-                  </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>DEX Hops</span>
-                    <span className="text-white truncate max-w-[230px]">
-                      {quote ? quote.dexHops.join(' + ') : '—'}
-                    </span>
-                  </div>
-                  {quote && quote.alternatives.some((a) => a.amountOutAtomic > 0n) && (
-                    <div className="flex items-center justify-between gap-2 pt-0.5 text-[11px] text-slate-400">
-                      <span>Quotes Race</span>
-                      <div className="flex items-center gap-2.5 tabular-nums">
-                        {quote.alternatives.map((alt) => (
-                          <span
-                            key={alt.provider}
-                            className={
-                              alt.provider === quote.provider
-                                ? 'text-[#08D189] font-semibold'
-                                : 'text-slate-400'
-                            }
-                          >
-                            {alt.provider}:{' '}
-                            {alt.amountOutAtomic > 0n
-                              ? (Number(alt.amountOutAtomic) / Math.pow(10, toToken.decimals)).toFixed(
-                                  toToken.decimals > 6 ? 4 : 3
-                                )
-                              : 'N/A'}
-                          </span>
+
+                    {quote && quote.dexHops.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap p-2 rounded-lg bg-[#06080C] border border-[#242D3D]">
+                        <span className="px-1.5 py-0.5 rounded bg-[#10141E] text-white font-bold text-[11px]">
+                          {fromToken.symbol}
+                        </span>
+                        {quote.dexHops.map((hop, idx) => (
+                          <React.Fragment key={idx}>
+                            <ArrowRight className="w-3 h-3 text-[#2B7FFF] shrink-0" />
+                            <span className="px-1.5 py-0.5 rounded bg-[#2B7FFF]/15 border border-[#2B7FFF]/30 text-[#60A5FA] text-[10px] font-bold truncate max-w-[140px]">
+                              {hop}
+                            </span>
+                          </React.Fragment>
                         ))}
+                        <ArrowRight className="w-3 h-3 text-[#08D189] shrink-0" />
+                        <span className="px-1.5 py-0.5 rounded bg-[#08D189]/15 border border-[#08D189]/30 text-[#08D189] font-bold text-[11px]">
+                          {toToken.symbol}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Multi-Aggregator Parallel Race */}
+                  {quote && quote.alternatives.some((a) => a.amountOutAtomic > 0n) && (
+                    <div className="pt-1 border-t border-[#1F2735]">
+                      <div className="text-[11px] text-slate-400 mb-1.5 flex items-center justify-between">
+                        <span>Quotes Race (Live Comparison)</span>
+                        <span className="text-[10px] text-slate-500">Auto-routed to best</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {quote.alternatives.map((alt) => {
+                          const isWinner = alt.provider === quote.provider;
+                          const outVal =
+                            alt.amountOutAtomic > 0n
+                              ? Number(alt.amountOutAtomic) / Math.pow(10, toToken.decimals)
+                              : 0;
+                          return (
+                            <div
+                              key={alt.provider}
+                              className={`p-2 rounded-lg border transition-all ${
+                                isWinner
+                                  ? 'bg-[#2B7FFF]/10 border-[#2B7FFF]/50 text-white'
+                                  : 'bg-[#06080C] border-[#222A38] text-slate-400'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-[11px] mb-0.5">
+                                <span className={isWinner ? 'text-[#60A5FA] font-bold' : 'text-slate-400'}>
+                                  {alt.provider === 'Cetus' ? 'Cetus + Bluefin/7K' : 'Aftermath Router'}
+                                </span>
+                                {isWinner && (
+                                  <span className="text-[9px] font-bold text-[#08D189] bg-[#08D189]/15 px-1 py-0.2 rounded uppercase">
+                                    Winner
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs font-bold font-mono text-white">
+                                {outVal > 0 ? (outVal >= 1 ? outVal.toFixed(4) : outVal.toFixed(6)) : 'No Route'}{' '}
+                                <span className="text-[10px] text-slate-400 font-normal">{toToken.symbol}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
-                  <div className="flex justify-between text-slate-400">
-                    <span>Volt Tier Fee ({traderTier.name})</span>
-                    <span className="text-[#60A5FA] font-semibold tabular-nums">
-                      {(traderTier.feeRate * 100).toFixed(2)}%
-                      {activeReferrer ? ` (${Math.round(refTier.revSharePct * 100)}% → Ref)` : ''}
-                    </span>
-                  </div>
-                  {quote && (
+
+                  {/* Fee & Slippage info */}
+                  <div className="pt-1 border-t border-[#1F2735] space-y-1">
                     <div className="flex justify-between text-slate-400">
-                      <span>Price Impact</span>
-                      <span
-                        className={`tabular-nums font-semibold ${
-                          quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-[#08D189]'
-                        }`}
-                      >
-                        {quote.priceImpactPct.toFixed(2)}%
+                      <span>Volt Tier Fee ({traderTier.name})</span>
+                      <span className="text-[#60A5FA] font-semibold tabular-nums">
+                        {(traderTier.feeRate * 100).toFixed(2)}%
+                        {activeReferrer ? ` (${Math.round(refTier.revSharePct * 100)}% → Ref)` : ''}
                       </span>
                     </div>
-                  )}
+                    {quote && (
+                      <div className="flex justify-between text-slate-400">
+                        <span>Price Impact</span>
+                        <span
+                          className={`tabular-nums font-semibold ${
+                            quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-[#08D189]'
+                          }`}
+                        >
+                          {quote.priceImpactPct.toFixed(2)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {quoteError && (

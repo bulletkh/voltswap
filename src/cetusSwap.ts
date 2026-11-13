@@ -17,13 +17,27 @@ function isSuiCoin(coinType: string): boolean {
   return norm === safeNormalizeCoinType(SUI_COIN_TYPE) || coinType.endsWith('::sui::SUI');
 }
 
+export function normalizeDexName(raw: string): string {
+  const upper = (raw || '').trim().toUpperCase();
+  if (upper === 'CETUS_TIDE') return 'Bluefin / 7K (Tide RFQ)';
+  if (upper === 'BLUEFIN') return 'Bluefin / 7K';
+  if (upper === 'CETUS') return 'Cetus CLMM';
+  if (upper === 'DEEPBOOK' || upper === 'DEEPBOOK_V3') return 'DeepBook v3';
+  if (upper === 'TURBOS') return 'Turbos Finance';
+  if (upper === 'FLOWX' || upper === 'FLOWX_V3') return 'FlowX';
+  if (upper === 'KRIYA' || upper === 'KRIYA_V3') return 'Kriya';
+  if (upper === 'AFTERMATH') return 'Aftermath';
+  if (upper === 'BLUEMOVE') return 'BlueMove';
+  return raw;
+}
+
 function extractDexHops(router: any): string[] {
   const labels = new Set<string>();
   const paths = router?.paths || [];
   for (const p of paths) {
-    if (p?.provider) labels.add(String(p.provider));
+    if (p?.provider) labels.add(normalizeDexName(String(p.provider)));
   }
-  return labels.size > 0 ? Array.from(labels) : ['Cetus Aggregator'];
+  return labels.size > 0 ? Array.from(labels) : ['Cetus CLMM'];
 }
 
 export async function fetchCetusQuote(params: {

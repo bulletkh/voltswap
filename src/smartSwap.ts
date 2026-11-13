@@ -1,6 +1,6 @@
 import { Transaction } from '@mysten/sui/transactions';
 import { fromBase64 } from '@mysten/sui/utils';
-import { buildCetusSwapTx, fetchCetusQuote, type CetusQuoteResult } from './cetusSwap';
+import { buildCetusSwapTx, fetchCetusQuote, normalizeDexName, type CetusQuoteResult } from './cetusSwap';
 import { txFromKindBase64 } from './aftermathPerps';
 import { safeNormalizeCoinType, SUI_COIN_TYPE } from './suiClient';
 import { addCoinFeeToTx, calcFeeUnits } from './voltFee';
@@ -48,12 +48,12 @@ function extractAftermathDexHops(routes: any[]): string[] {
     for (const r of routes) {
       if (Array.isArray(r?.paths)) {
         for (const p of r.paths) {
-          if (p?.protocolName) hops.add(String(p.protocolName));
+          if (p?.protocolName) hops.add(normalizeDexName(String(p.protocolName)));
         }
       }
     }
   }
-  return hops.size > 0 ? Array.from(hops) : ['Aftermath'];
+  return hops.size > 0 ? Array.from(hops) : ['Aftermath Finance'];
 }
 
 interface AfQuoteResult {
