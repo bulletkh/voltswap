@@ -791,7 +791,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
   return (
     <div className={wrapperClass}>
       {/* Flush Institutional TradingView-Style Chart Header Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-b border-[#1A1E26] bg-[#000000]">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 border-b border-[#2D374B] bg-[#000000]">
         <div className="flex items-center flex-wrap gap-1">
           {/* Timeframes */}
           <div className="flex items-center">
@@ -811,7 +811,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
             ))}
           </div>
 
-          <div className="h-4 w-px bg-[#1A1E26] mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-[#2D374B] mx-1 hidden sm:block" />
 
           {/* Chart Style & Indicators */}
           {engineMode === 'volt' && (
@@ -852,7 +852,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                   <span>fx Indicators</span>
                 </button>
                 {showIndicatorsMenu && (
-                  <div className="absolute left-0 mt-1.5 w-44 rounded-lg bg-[#090B10] border border-[#232834] shadow-2xl p-1.5 z-40 space-y-0.5">
+                  <div className="absolute left-0 mt-1.5 w-44 rounded-lg bg-[#090B10] border border-[#38445B] shadow-2xl p-1.5 z-40 space-y-0.5">
                     <button
                       type="button"
                       onClick={() => setIndicators((p) => ({ ...p, ma: !p.ma }))}
@@ -904,7 +904,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
           )}
 
           {resolvedTvSymbol && (
-            <div className="flex items-center bg-[#090B0E] p-0.5 rounded border border-[#1B1F27]">
+            <div className="flex items-center bg-[#090B0E] p-0.5 rounded border border-[#2E384C]">
               <button
                 type="button"
                 onClick={() => setEngineMode('volt')}
@@ -942,7 +942,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
         {engineMode === 'volt' ? (
           <>
             {/* Flush Vertical Drawing Toolbar */}
-            <div className="w-9 shrink-0 bg-[#000000] border-r border-[#1A1E26] py-2 flex flex-col items-center justify-between select-none">
+            <div className="w-9 shrink-0 bg-[#000000] border-r border-[#2D374B] py-2 flex flex-col items-center justify-between select-none">
               <div className="flex flex-col items-center gap-1">
                 {(
                   [
@@ -977,7 +977,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
                 })}
               </div>
 
-              <div className="flex flex-col items-center gap-1 pt-2 border-t border-[#1A1E26]">
+              <div className="flex flex-col items-center gap-1 pt-2 border-t border-[#2D374B]">
                 <button
                   type="button"
                   title="Undo Last Drawing"
@@ -1246,7 +1246,7 @@ export const ProCandleChart: React.FC<ProCandleChartProps> = ({
 
               {(isLoading || cleanCandles.length === 0) && (
                 <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#000000]/75 backdrop-blur-[1px]">
-                  <div className="px-3 py-1.5 rounded bg-[#0A0C10] border border-[#1E232D] text-xs text-slate-300 font-mono">
+                  <div className="px-3 py-1.5 rounded bg-[#0A0C10] border border-[#323D52] text-xs text-slate-300 font-mono">
                     {isLoading ? 'Loading market candles...' : 'Waiting for market candles...'}
                   </div>
                 </div>

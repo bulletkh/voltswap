@@ -261,9 +261,9 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="w-full max-w-3xl max-h-[88vh] flex flex-col panel-carbon rounded-2xl border border-[#232834] shadow-2xl overflow-hidden animate-panel-in">
+      <div className="w-full max-w-3xl max-h-[88vh] flex flex-col panel-carbon rounded-2xl border border-[#38445B] shadow-2xl overflow-hidden animate-panel-in">
         {/* Top Header */}
-        <div className="px-5 py-4 border-b border-[#1A1E26] bg-[#06070A] flex flex-wrap items-center justify-between gap-3">
+        <div className="px-5 py-4 border-b border-[#2D374B] bg-[#06070A] flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 flex items-center justify-center">
               <Activity className="w-4 h-4 text-[#60A5FA]" />
@@ -286,7 +286,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                 refreshVolume(true);
                 loadProtocolSessions();
               }}
-              className="px-2.5 py-1.5 rounded-lg bg-[#0C0F16] hover:bg-[#131722] border border-[#1E232D] text-xs font-mono text-slate-200 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-2.5 py-1.5 rounded-lg bg-[#0C0F16] hover:bg-[#131722] border border-[#323D52] text-xs font-mono text-slate-200 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 text-[#60A5FA] ${
@@ -306,8 +306,8 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
         </div>
 
         {/* Sub-tab switcher */}
-        <div className="px-5 py-2.5 border-b border-[#1A1E26] bg-[#030406] flex items-center justify-between gap-3">
-          <div className="inline-flex p-0.5 rounded-lg bg-[#0B0E14] border border-[#1E232D]">
+        <div className="px-5 py-2.5 border-b border-[#2D374B] bg-[#030406] flex items-center justify-between gap-3">
+          <div className="inline-flex p-0.5 rounded-lg bg-[#0B0E14] border border-[#323D52]">
             <button
               type="button"
               onClick={() => setTab('ledger')}
@@ -361,7 +361,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                     className={`px-2.5 py-1 rounded-lg text-xs font-mono border transition-colors ${
                       channelFilter === ch
                         ? 'bg-[#2B7FFF]/20 border-[#2B7FFF] text-white font-bold'
-                        : 'bg-[#090B10] border-[#1B1F27] text-[#8E98A8] hover:text-white'
+                        : 'bg-[#090B10] border-[#2E384C] text-[#8E98A8] hover:text-white'
                     }`}
                   >
                     {ch}
@@ -376,7 +376,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                     : `No recent ${channelFilter === 'All' ? '' : channelFilter + ' '}transactions indexed yet.`}
                 </div>
               ) : (
-                <div className="rounded-xl border border-[#1B1F27] divide-y divide-[#161A22] overflow-hidden">
+                <div className="rounded-xl border border-[#2E384C] divide-y divide-[#2A3346] overflow-hidden">
                   {filteredTrades.slice(0, 35).map((tr) => (
                     <div
                       key={`${tr.digest}-${tr.label}`}
@@ -418,7 +418,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
           ) : (
             <div className="space-y-4">
               {/* 1. DeepBook Predict 1-Click Session Key */}
-              <div className="panel-carbon-sub rounded-xl p-4 space-y-3 border border-[#1E232D]">
+              <div className="panel-carbon-sub rounded-xl p-4 space-y-3 border border-[#323D52]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <KeyRound
@@ -432,7 +432,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                     className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
                       predictActive
                         ? 'bg-[#08D189]/15 border border-[#08D189]/40 text-[#08D189]'
-                        : 'bg-white/[0.06] border border-[#232834] text-[#8E98A8]'
+                        : 'bg-white/[0.06] border border-[#38445B] text-[#8E98A8]'
                     }`}
                   >
                     {predictActive
@@ -442,7 +442,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
-                  <div className="rounded-lg bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                  <div className="rounded-lg bg-[#000000] border border-[#2D374B] px-3 py-2">
                     <div className="text-[10px] text-slate-400 font-sans">Local Key Gas Float</div>
                     <div
                       className={`font-semibold mt-0.5 ${
@@ -454,13 +454,13 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                       {(sessionStatus?.sessionGasSui ?? 0).toFixed(4)} SUI
                     </div>
                   </div>
-                  <div className="rounded-lg bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                  <div className="rounded-lg bg-[#000000] border border-[#2D374B] px-3 py-2">
                     <div className="text-[10px] text-slate-400 font-sans">Active On-Chain Grants</div>
                     <div className="text-white font-semibold mt-0.5">
                       {sessionStatus?.activeGrantCount ?? 0} / 20 slots
                     </div>
                   </div>
-                  <div className="rounded-lg bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                  <div className="rounded-lg bg-[#000000] border border-[#2D374B] px-3 py-2">
                     <div className="text-[10px] text-slate-400 font-sans">Session Key Address</div>
                     <div className="text-slate-200 font-semibold mt-0.5 truncate">
                       {sessionStatus?.localKey?.sessionAddress
@@ -490,7 +490,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                       type="button"
                       disabled={sessionBusy}
                       onClick={handleRevokePredictSession}
-                      className="px-3 py-2 rounded-lg bg-[#141720] hover:bg-[#1C212E] border border-[#232834] text-xs font-semibold text-rose-400 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      className="px-3 py-2 rounded-lg bg-[#141720] hover:bg-[#1C212E] border border-[#38445B] text-xs font-semibold text-rose-400 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
                     >
                       <ShieldOff className="w-3.5 h-3.5" />
                       <span>Revoke &amp; Reclaim SUI</span>
@@ -503,7 +503,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                       onClose();
                       onNavigateTab('predict');
                     }}
-                    className="ml-auto px-3 py-2 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#1E232D] text-xs font-mono text-[#60A5FA]"
+                    className="ml-auto px-3 py-2 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#323D52] text-xs font-mono text-[#60A5FA]"
                   >
                     Open Predict →
                   </button>
@@ -511,7 +511,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
               </div>
 
               {/* 2. DeepBook v3 Spot CLOB & Margin Vaults */}
-              <div className="panel-carbon-sub rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 border border-[#1E232D]">
+              <div className="panel-carbon-sub rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 border border-[#323D52]">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-[#60A5FA]" />
@@ -533,7 +533,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                       onClose();
                       onOpenPortfolio();
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#1E232D] text-xs font-semibold text-white"
+                    className="px-3 py-1.5 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#323D52] text-xs font-semibold text-white"
                   >
                     Manage Vaults
                   </button>
@@ -543,7 +543,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                       onClose();
                       onNavigateTab('swap');
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#1E232D] text-xs font-mono text-[#60A5FA]"
+                    className="px-3 py-1.5 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#323D52] text-xs font-mono text-[#60A5FA]"
                   >
                     Open CLOB →
                   </button>
@@ -551,7 +551,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
               </div>
 
               {/* 3. Aftermath Perps Account */}
-              <div className="panel-carbon-sub rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 border border-[#1E232D]">
+              <div className="panel-carbon-sub rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 border border-[#323D52]">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <CheckCircle2
@@ -575,7 +575,7 @@ export const ActivitySessionsModal: React.FC<ActivitySessionsModalProps> = ({
                     onClose();
                     onNavigateTab('perps');
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#1E232D] text-xs font-mono text-[#60A5FA]"
+                  className="px-3 py-1.5 rounded-lg bg-[#090B10] hover:bg-[#121622] border border-[#323D52] text-xs font-mono text-[#60A5FA]"
                 >
                   Open Perps →
                 </button>

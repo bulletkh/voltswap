@@ -1010,11 +1010,11 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
   };
 
   return (
-    <div className="w-full overflow-x-hidden bg-[#000000] border-b border-[#1A1E26] animate-panel-in">
-      {/* Main Institutional DeepBook-Pro Flush Grid */}
-      <div className="w-full grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_265px_325px] xl:grid-cols-[minmax(0,1fr)_290px_345px]">
+    <div className="w-full overflow-x-hidden bg-[#000000] animate-panel-in">
+      {/* Main Institutional DeepBook-Pro Bento Grid */}
+      <div className="w-full p-1.5 sm:p-2 gap-1.5 sm:gap-2 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_265px_325px] xl:grid-cols-[minmax(0,1fr)_290px_345px]">
         {/* 1. Live Perp Market Ribbon (Row 1, Cols 1-2) */}
-        <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-1 bg-[#000000] border-b lg:border-r border-[#1A1E26] px-3 py-2 flex flex-wrap items-center justify-between gap-2.5 relative z-20">
+        <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-1 terminal-pane rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2.5 relative z-20">
           <div className="min-w-0 flex items-center gap-1 flex-wrap">
             {orderedMarkets.slice(0, 5).map((m) => {
               const active = activeMarket?.symbol === m.symbol;
@@ -1048,14 +1048,14 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 className={`px-2.5 py-1 rounded text-xs font-mono whitespace-nowrap flex items-center gap-1.5 border transition-colors ${
                   showMarketPicker
                     ? 'bg-[#2B7FFF]/20 border-[#2B7FFF] text-white font-bold'
-                    : 'bg-[#090B10] hover:bg-[#10141D] border-[#1E232D] text-slate-200 font-semibold'
+                    : 'bg-[#090B10] hover:bg-[#10141D] border-[#323D52] text-slate-200 font-semibold'
                 }`}
               >
                 <span>All ({orderedMarkets.length})</span>
                 <ChevronDown className="w-3.5 h-3.5 text-[#848E9C]" />
               </button>
               {showMarketPicker && (
-                <div className="absolute left-0 top-full mt-1.5 w-80 sm:w-[460px] bg-[#07090D] border border-[#232834] rounded-lg shadow-2xl p-3 z-50">
+                <div className="absolute left-0 top-full mt-1.5 w-80 sm:w-[460px] bg-[#07090D] border border-[#38445B] rounded-lg shadow-2xl p-3 z-50">
                   <div className="relative mb-2.5">
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                     <input
@@ -1064,7 +1064,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       value={marketQuery}
                       onChange={(e) => setMarketQuery(e.target.value)}
                       placeholder="Search 72 markets (BTC, SUI, NVDA, TSLA, XAUT, US100)..."
-                      className="w-full pl-8 pr-3 py-1.5 rounded bg-[#000000] border border-[#1E232D] text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
+                      className="w-full pl-8 pr-3 py-1.5 rounded bg-[#000000] border border-[#323D52] text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
                     />
                   </div>
                   <div className="flex flex-wrap gap-1 mb-2.5">
@@ -1091,7 +1091,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       </button>
                     ))}
                   </div>
-                  <div className="max-h-72 overflow-y-auto divide-y divide-[#161A22]">
+                  <div className="max-h-72 overflow-y-auto divide-y divide-[#2A3346]">
                     {filteredPickerMarkets.map((m) => {
                       const cat = getPerpCategory(m.symbol);
                       const catTag =
@@ -1186,8 +1186,8 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* 2. Chart Pane (Row 2, Col 1) */}
-        <div className="lg:col-start-1 lg:row-start-2 bg-[#000000] border-b lg:border-r border-[#1A1E26] flex flex-col min-w-0">
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#1A1E26] bg-[#000000]">
+        <div className="lg:col-start-1 lg:row-start-2 terminal-pane rounded-xl overflow-hidden flex flex-col min-w-0">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#2D374B]">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -1239,7 +1239,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   No historical funding snapshots returned yet.
                 </div>
               ) : (
-                <div className="divide-y divide-[#161A22] text-xs font-mono">
+                <div className="divide-y divide-[#2A3346] text-xs font-mono">
                   {fundingHistory
                     .slice()
                     .reverse()
@@ -1261,8 +1261,8 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* 3. Order Book & Trades Pane (Row 2, Col 2) */}
-        <div className="min-w-0 lg:col-start-2 lg:row-start-2 bg-[#000000] border-b lg:border-r border-[#1A1E26] flex flex-col h-[465px] lg:h-[590px] xl:h-[620px] overflow-hidden">
-          <div className="px-3 py-2 border-b border-[#1A1E26] flex items-center justify-between shrink-0">
+        <div className="min-w-0 lg:col-start-2 lg:row-start-2 terminal-pane rounded-xl flex flex-col h-[465px] lg:h-[590px] xl:h-[620px] overflow-hidden">
+          <div className="px-3 py-2 border-b border-[#2D374B] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -1294,7 +1294,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
 
           {bookTab === 'book' ? (
             <>
-              <div className="grid grid-cols-3 text-[11px] font-mono text-[#7B8494] px-2.5 py-1.5 border-b border-[#12151C]">
+              <div className="grid grid-cols-3 text-[11px] font-mono text-[#7B8494] px-2.5 py-1.5 border-b border-[#2B3447]">
                 <span>Price</span>
                 <span className="text-right">Size</span>
                 <span className="text-right">Total</span>
@@ -1321,7 +1321,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   ))}
                 </div>
 
-                <div className="py-1 px-2 my-1 border-y border-[#1A1E26] bg-[#06070A] flex items-center justify-between text-[11px] font-mono shrink-0">
+                <div className="py-1 px-2 my-1 border-y border-[#2D374B] bg-[#06070A] flex items-center justify-between text-[11px] font-mono shrink-0">
                   <span className="text-white font-bold">${fmtPrice(markPrice)}</span>
                   <span className="text-[10px] text-[#7B8494]">Spread / Mark</span>
                 </div>
@@ -1350,7 +1350,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             </>
           ) : (
             <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5 text-[11px] font-mono tabular-nums">
-              <div className="grid grid-cols-3 text-[#7B8494] pb-1 border-b border-[#161A22]">
+              <div className="grid grid-cols-3 text-[#7B8494] pb-1 border-b border-[#2A3346]">
                 <span>Price</span>
                 <span className="text-right">Size</span>
                 <span className="text-right">Time</span>
@@ -1375,9 +1375,9 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* 4. Right Full-Height Order Ticket (Col 3, Rows 1-3) */}
-        <div className="min-w-0 overflow-hidden lg:col-start-3 lg:row-start-1 lg:row-span-3 bg-[#000000] border-b lg:border-b-0 border-[#1A1E26] p-3 space-y-2.5">
+        <div className="min-w-0 overflow-hidden lg:col-start-3 lg:row-start-1 lg:row-span-3 terminal-pane rounded-xl p-3 space-y-2.5">
           {/* Account Banner */}
-          <div className="bg-[#06070A] border border-[#1B1F27] rounded-md p-2.5 space-y-2">
+          <div className="bg-[#06070A] border border-[#2E384C] rounded-md p-2.5 space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-300 font-semibold">
                 Perps Account {afState?.accountId ? `#${afState.accountId.replace('n', '')}` : ''}
@@ -1416,7 +1416,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     setCollateralAmt((afState?.availableCollateralUsd || 0).toFixed(2));
                     setCollateralModal('withdraw');
                   }}
-                  className="py-1.5 rounded bg-[#0C0E13] hover:bg-[#141821] text-white text-xs font-bold flex items-center justify-center gap-1 border border-[#232834] transition-colors"
+                  className="py-1.5 rounded bg-[#0C0E13] hover:bg-[#141821] text-white text-xs font-bold flex items-center justify-center gap-1 border border-[#38445B] transition-colors"
                 >
                   <ArrowUpFromLine className="w-3 h-3" />
                   WITHDRAW
@@ -1446,7 +1446,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               className={`py-2 rounded font-bold text-xs uppercase tracking-wide transition-colors border ${
                 side === 'long'
                   ? 'bg-[#2B7FFF]/15 border-[#2B7FFF] text-white'
-                  : 'bg-[#090B10] border-[#1A1E26] text-[#848E9C] hover:text-white'
+                  : 'bg-[#090B10] border-[#2D374B] text-[#848E9C] hover:text-white'
               }`}
             >
               Buy / Long
@@ -1457,7 +1457,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               className={`py-2 rounded font-bold text-xs uppercase tracking-wide transition-colors border ${
                 side === 'short'
                   ? 'bg-[#F0525E]/15 border-[#F0525E] text-white'
-                  : 'bg-[#090B10] border-[#1A1E26] text-[#848E9C] hover:text-white'
+                  : 'bg-[#090B10] border-[#2D374B] text-[#848E9C] hover:text-white'
               }`}
             >
               Sell / Short
@@ -1465,7 +1465,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
           </div>
 
           {/* 5 Order Mode Tabs */}
-          <div className="grid grid-cols-5 gap-1 p-0.5 rounded bg-[#07090D] border border-[#1B1F27] text-xs font-mono">
+          <div className="grid grid-cols-5 gap-1 p-0.5 rounded bg-[#07090D] border border-[#2E384C] text-xs font-mono">
             {(['market', 'limit', 'stop', 'scale', 'twap'] as OrderMode[]).map((m) => (
               <button
                 key={m}
@@ -1547,7 +1547,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
                 placeholder={markPrice > 0 ? fmtPrice(markPrice) : '0.00'}
-                className="w-full bg-[#000000] border border-[#1E232D] rounded px-2.5 py-1.5 text-sm font-mono text-white outline-none focus:border-[#2B7FFF]"
+                className="w-full bg-[#000000] border border-[#323D52] rounded px-2.5 py-1.5 text-sm font-mono text-white outline-none focus:border-[#2B7FFF]"
               />
               <div className="grid grid-cols-4 gap-1 text-xs font-mono">
                 {([
@@ -1563,7 +1563,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     className={`py-1 rounded border ${
                       limitOrderType === val
                         ? 'bg-[#2B7FFF]/20 border-[#2B7FFF] text-white font-bold'
-                        : 'bg-[#07090D] border-[#1A1E26] text-[#848E9C] hover:text-white'
+                        : 'bg-[#07090D] border-[#2D374B] text-[#848E9C] hover:text-white'
                     }`}
                   >
                     {lbl}
@@ -1629,7 +1629,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   if (n > 0 && markPrice > 0) setStopTriggerAbove(n >= markPrice);
                 }}
                 placeholder={`Trigger @ (${fmtPrice(markPrice)})`}
-                className="w-full bg-[#000000] border border-[#1E232D] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#2B7FFF]"
+                className="w-full bg-[#000000] border border-[#323D52] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#2B7FFF]"
               />
               {stopIsLimit && (
                 <input
@@ -1639,7 +1639,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   value={stopLimitPrice}
                   onChange={(e) => setStopLimitPrice(e.target.value)}
                   placeholder="Limit Execution Price (USD)"
-                  className="w-full bg-[#000000] border border-[#1E232D] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#2B7FFF]"
+                  className="w-full bg-[#000000] border border-[#323D52] rounded px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#2B7FFF]"
                 />
               )}
               <div className="flex items-center justify-between text-xs text-slate-400">
@@ -1677,7 +1677,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     value={scaleStartPrice}
                     onChange={(e) => setScaleStartPrice(e.target.value)}
                     placeholder={markPrice > 0 ? fmtPrice(markPrice * 0.96) : '0.00'}
-                    className="w-full bg-[#000000] border border-[#1E232D] rounded px-2 py-1 text-white outline-none focus:border-[#2B7FFF]"
+                    className="w-full bg-[#000000] border border-[#323D52] rounded px-2 py-1 text-white outline-none focus:border-[#2B7FFF]"
                   />
                 </div>
                 <div>
@@ -1688,7 +1688,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     value={scaleEndPrice}
                     onChange={(e) => setScaleEndPrice(e.target.value)}
                     placeholder={markPrice > 0 ? fmtPrice(markPrice * 0.9) : '0.00'}
-                    className="w-full bg-[#000000] border border-[#1E232D] rounded px-2 py-1 text-white outline-none focus:border-[#2B7FFF]"
+                    className="w-full bg-[#000000] border border-[#323D52] rounded px-2 py-1 text-white outline-none focus:border-[#2B7FFF]"
                   />
                 </div>
               </div>
@@ -1715,7 +1715,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     className={`py-1 rounded border ${
                       limitOrderType === val
                         ? 'bg-[#2B7FFF]/20 border-[#2B7FFF] text-white font-bold'
-                        : 'bg-[#07090D] border-[#1A1E26] text-[#848E9C]'
+                        : 'bg-[#07090D] border-[#2D374B] text-[#848E9C]'
                     }`}
                   >
                     {lbl}
@@ -1821,7 +1821,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       setMarginUsdc(usable.toFixed(2));
                     }
                   }}
-                  className="py-1 rounded bg-[#07090D] border border-[#1A1E26] hover:border-[#2B7FFF]/60 text-[11px] font-mono text-slate-200 transition-colors"
+                  className="py-1 rounded bg-[#07090D] border border-[#2D374B] hover:border-[#2B7FFF]/60 text-[11px] font-mono text-slate-200 transition-colors"
                 >
                   {pct === 1 ? (reduceOnly ? '100%' : 'MAX') : `${pct * 100}%`}
                 </button>
@@ -1894,7 +1894,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                         ? fmtPrice(side === 'long' ? markPrice * 1.15 : markPrice * 0.85)
                         : 'Optional'
                     }
-                    className="w-full bg-[#000000] border border-[#1E232D] rounded px-2 py-1 text-white outline-none focus:border-[#08D189]"
+                    className="w-full bg-[#000000] border border-[#323D52] rounded px-2 py-1 text-white outline-none focus:border-[#08D189]"
                   />
                 </div>
                 <div>
@@ -1909,7 +1909,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                         ? fmtPrice(side === 'long' ? markPrice * 0.92 : markPrice * 1.08)
                         : 'Optional'
                     }
-                    className="w-full bg-[#000000] border border-[#1E232D] rounded px-2 py-1 text-white outline-none focus:border-[#F0525E]"
+                    className="w-full bg-[#000000] border border-[#323D52] rounded px-2 py-1 text-white outline-none focus:border-[#F0525E]"
                   />
                 </div>
               </div>
@@ -1979,8 +1979,8 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
         </div>
 
         {/* 5. Bottom Account Dock (Row 3, Cols 1-2 directly below Chart & Orderbook!) */}
-        <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-3 bg-[#000000] lg:border-r border-[#1A1E26] p-3 sm:px-4 space-y-3 min-h-[210px]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A1E26] pb-2">
+        <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-start-3 terminal-pane rounded-xl overflow-hidden p-3 sm:px-4 space-y-3 min-h-[210px]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2D374B] pb-2">
             <div className="flex items-center gap-3 flex-wrap">
               {([
                 ['positions', `Positions (${afState?.positions.length || 0})`],
@@ -2173,7 +2173,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               </div>
               <table className="w-full text-xs font-mono tabular-nums">
                 <thead>
-                  <tr className="text-[#6B7280] text-[10px] uppercase tracking-wider text-left border-b border-[#1A1E26]">
+                  <tr className="text-[#6B7280] text-[10px] uppercase tracking-wider text-left border-b border-[#2D374B]">
                     <th className="py-1.5">Market</th>
                     <th className="py-1.5">Side</th>
                     <th className="py-1.5">Limit Price</th>
@@ -2181,7 +2181,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     <th className="py-1.5 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1A1E26]">
+                <tbody className="divide-y divide-[#2D374B]">
                   {afState.pendingOrders.map((ord) => {
                     const mkt = marketsById[ord.marketId];
                     const isBid = ord.side === 0;
@@ -2607,7 +2607,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   value={modalTp}
                   onChange={(e) => setModalTp(e.target.value)}
                   placeholder="Optional TP Price"
-                  className="w-full bg-[#000000] border border-[#1E232D] rounded px-3 py-2 text-white outline-none focus:border-[#08D189]"
+                  className="w-full bg-[#000000] border border-[#323D52] rounded px-3 py-2 text-white outline-none focus:border-[#08D189]"
                 />
               </div>
               <div>
@@ -2618,7 +2618,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                   value={modalSl}
                   onChange={(e) => setModalSl(e.target.value)}
                   placeholder="Optional SL Price"
-                  className="w-full bg-[#000000] border border-[#1E232D] rounded px-3 py-2 text-white outline-none focus:border-[#F0525E]"
+                  className="w-full bg-[#000000] border border-[#323D52] rounded px-3 py-2 text-white outline-none focus:border-[#F0525E]"
                 />
               </div>
               <div className="flex items-center justify-between text-slate-300">

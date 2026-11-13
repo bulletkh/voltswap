@@ -118,14 +118,14 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
               type="button"
               disabled={isSyncing}
               onClick={() => refreshOnChainVolume(true)}
-              className="px-3.5 py-2.5 rounded-xl bg-[#06070A] border border-[#1E232D] hover:border-[#2B7FFF]/50 text-xs font-mono text-slate-200 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              className="px-3.5 py-2.5 rounded-xl bg-[#06070A] border border-[#323D52] hover:border-[#2B7FFF]/50 text-xs font-mono text-slate-200 inline-flex items-center gap-1.5 transition-colors disabled:opacity-50"
               title="Re-scan Sui Mainnet GraphQL & Aftermath trade history"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#60A5FA] ${isSyncing ? 'animate-spin' : ''}`} />
               <span>{isSyncing ? 'Syncing Chain...' : 'Sync On-Chain'}</span>
             </button>
           )}
-          <div className="inline-flex items-center p-1 rounded-xl bg-[#06070A] border border-[#1E232D] gap-1">
+          <div className="inline-flex items-center p-1 rounded-xl bg-[#06070A] border border-[#323D52] gap-1">
             <button
               type="button"
               onClick={() => setSubTab('traders')}
@@ -194,7 +194,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                       : 'Maximum Tier Reached'}
                   </span>
                 </div>
-                <div className="w-full h-2.5 rounded-full bg-[#121620] overflow-hidden border border-[#1E232D]">
+                <div className="w-full h-2.5 rounded-full bg-[#121620] overflow-hidden border border-[#323D52]">
                   <div
                     className="h-full bg-gradient-to-r from-[#2B7FFF] to-[#08D189] volt-shimmer transition-all duration-500"
                     style={{ width: `${progressPct}%` }}
@@ -223,32 +223,32 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
             </div>
 
             {account?.address && (
-              <div className="pt-4 border-t border-[#1A1E26] grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-mono">
-                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+              <div className="pt-4 border-t border-[#2D374B] grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-mono">
+                <div className="rounded-xl bg-[#000000] border border-[#2D374B] px-3 py-2">
                   <div className="text-[10px] text-slate-400 font-sans">Market Swaps</div>
                   <div className="text-white font-semibold tabular-nums mt-0.5">
                     ${(summary?.spotSwapVolumeUsd ?? 0).toFixed(2)}
                   </div>
                 </div>
-                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                <div className="rounded-xl bg-[#000000] border border-[#2D374B] px-3 py-2">
                   <div className="text-[10px] text-slate-400 font-sans">Spot CLOB</div>
                   <div className="text-[#60A5FA] font-semibold tabular-nums mt-0.5">
                     ${(summary?.clobVolumeUsd ?? 0).toFixed(2)}
                   </div>
                 </div>
-                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                <div className="rounded-xl bg-[#000000] border border-[#2D374B] px-3 py-2">
                   <div className="text-[10px] text-slate-400 font-sans">Margin 4.5x</div>
                   <div className="text-[#60A5FA] font-semibold tabular-nums mt-0.5">
                     ${(summary?.marginVolumeUsd ?? 0).toFixed(2)}
                   </div>
                 </div>
-                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2">
+                <div className="rounded-xl bg-[#000000] border border-[#2D374B] px-3 py-2">
                   <div className="text-[10px] text-slate-400 font-sans">Aftermath Perps</div>
                   <div className="text-white font-semibold tabular-nums mt-0.5">
                     ${(summary?.perpsVolumeUsd ?? 0).toFixed(2)}
                   </div>
                 </div>
-                <div className="rounded-xl bg-[#000000] border border-[#1A1E26] px-3 py-2 col-span-2 sm:col-span-1">
+                <div className="rounded-xl bg-[#000000] border border-[#2D374B] px-3 py-2 col-span-2 sm:col-span-1">
                   <div className="text-[10px] text-slate-400 font-sans">Predict &amp; Earn</div>
                   <div className="text-[#08D189] font-semibold tabular-nums mt-0.5">
                     ${((summary?.predictVolumeUsd ?? 0) + (summary?.earnVolumeUsd ?? 0)).toFixed(2)}
@@ -260,7 +260,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
 
           {/* 6 Dynamic Trader Fee Tiers */}
           <div className="panel-carbon rounded-2xl overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
+            <div className="px-5 py-3.5 border-b border-[#323D52] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
               <span className="text-base font-bold text-white flex items-center gap-2">
                 <TrendingDown className="w-4 h-4 text-[#60A5FA]" />
                 Volume Discount Schedule
@@ -326,7 +326,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           {/* Verified On-Chain Trade Log (Sui Mainnet GraphQL + Aftermath History) */}
           {account?.address && (
             <div className="panel-carbon rounded-2xl overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
+              <div className="px-5 py-3.5 border-b border-[#323D52] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
                 <span className="text-sm font-bold text-white flex items-center gap-2">
                   <Activity className="w-4 h-4 text-[#08D189]" />
                   Verified On-Chain Activity ({summary?.trades.length ?? 0} fills / {summary?.txScannedCount ?? 0} txs scanned)
@@ -343,7 +343,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                     : 'No swaps, CLOB/Margin fills, Perps, or Predict orders found in the latest 100 transactions for this address.'}
                 </div>
               ) : (
-                <div className="divide-y divide-[#1A1E26] bg-[#000000] max-h-72 overflow-y-auto">
+                <div className="divide-y divide-[#2D374B] bg-[#000000] max-h-72 overflow-y-auto">
                   {summary.trades.slice(0, 12).map((t) => (
                     <div
                       key={t.digest}
@@ -420,7 +420,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                   type="text"
                   readOnly
                   value={refUrl}
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#000000] border border-[#1E232D] text-sm font-mono text-white outline-none"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#000000] border border-[#323D52] text-sm font-mono text-white outline-none"
                 />
                 <button
                   type="button"
@@ -465,7 +465,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
 
           {account?.address && (
             <div className="panel-carbon rounded-2xl overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
+              <div className="px-5 py-3.5 border-b border-[#323D52] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
                 <span className="text-sm font-bold text-white">
                   On-Chain Affiliate Rev-Share Received ({summary?.referralPayouts.length ?? 0} payouts)
                 </span>
@@ -479,7 +479,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                   No incoming fee-split payouts detected in the latest 30 transactions yet.
                 </div>
               ) : (
-                <div className="divide-y divide-[#1A1E26] bg-[#000000] max-h-56 overflow-y-auto">
+                <div className="divide-y divide-[#2D374B] bg-[#000000] max-h-56 overflow-y-auto">
                   {summary.referralPayouts.map((p) => (
                     <div
                       key={`${p.digest}-${p.coinSymbol}`}
@@ -519,7 +519,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                   className={`panel-carbon rounded-xl p-5 space-y-3 border transition-all ${
                     isCurrent
                       ? 'border-[#2B7FFF]/65 shadow-[0_0_24px_rgba(43,127,255,0.16)]'
-                      : 'border-[#1E232D]'
+                      : 'border-[#323D52]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -551,7 +551,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
 
       {/* Live Protocol Volume Leaderboard (KV + Sui Mainnet GraphQL Verified) */}
       <div className="panel-carbon rounded-2xl overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-[#1E232D] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
+        <div className="px-5 py-3.5 border-b border-[#323D52] flex flex-wrap items-center justify-between gap-2 bg-[#06070A]">
           <span className="text-sm font-bold text-white flex items-center gap-2">
             <Trophy className="w-4 h-4 text-[#2B7FFF]" />
             Verified Protocol Volume Leaderboard
@@ -580,7 +580,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
             No recent treasury-routed fills indexed in the latest window.
           </div>
         ) : (
-          <div className="divide-y divide-[#161A22] bg-[#000000]">
+          <div className="divide-y divide-[#2A3346] bg-[#000000]">
             {leaderboardData.leaderboard.slice(0, 8).map((row) => (
               <div
                 key={row.fullAddress || row.address}

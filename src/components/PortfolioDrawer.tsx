@@ -365,8 +365,8 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/80 backdrop-blur-[2px]">
-      <div className="w-full max-w-[420px] h-full flex flex-col bg-[#000000] border-l border-[#1E232D] animate-drawer-in">
-        <div className="px-5 py-3.5 border-b border-[#1A1E26] flex items-center justify-between bg-[#000000]">
+      <div className="w-full max-w-[420px] h-full flex flex-col bg-[#000000] border-l border-[#323D52] animate-drawer-in">
+        <div className="px-5 py-3.5 border-b border-[#2D374B] flex items-center justify-between bg-[#000000]">
           <div className="flex items-center gap-2.5">
             <Wallet className="w-4 h-4 text-[#60A5FA]" />
             <span className="text-sm font-bold text-white tracking-tight">Portfolio &amp; Vaults</span>
@@ -378,7 +378,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                 loadPortfolio();
                 loadPredictState(account?.address);
               }}
-              className="p-2 rounded-lg bg-[#06070A] border border-[#1B1F27] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
+              className="p-2 rounded-lg bg-[#06070A] border border-[#2E384C] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
               title="Refresh portfolio"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -386,7 +386,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-lg bg-[#06070A] border border-[#1B1F27] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
+              className="p-2 rounded-lg bg-[#06070A] border border-[#2E384C] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
               title="Close drawer"
             >
               <X className="w-3.5 h-3.5" />
@@ -402,7 +402,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
           ) : (
             <>
               {/* Unified Total Equity & Allocation Matrix */}
-              <div className="pb-4 border-b border-[#1A1E26] space-y-3">
+              <div className="pb-4 border-b border-[#2D374B] space-y-3">
                 <div>
                   <div className="text-xs text-slate-400 font-medium">Total Portfolio Equity</div>
                   <div className="text-4xl font-mono tabular-nums font-bold text-white tracking-tight mt-1">
@@ -410,7 +410,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 rounded-lg bg-[#06070A] border border-[#1B1F27] p-2.5 text-[11px] font-mono">
+                <div className="grid grid-cols-3 gap-2 rounded-lg bg-[#06070A] border border-[#2E384C] p-2.5 text-[11px] font-mono">
                   <div>
                     <div className="text-slate-500 font-sans">Wallet Spot</div>
                     <div className="text-slate-100 font-semibold tabular-nums">${spotUsd.toFixed(2)}</div>
@@ -460,7 +460,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
 
                 {/* 1. DeepBook Spot CLOB BalanceManager */}
                 {hasClobFundsOrOrders || clobStatus || clobError ? (
-                  <div className="bg-[#06070A] rounded-lg p-3 space-y-2.5 border border-[#1B1F27]">
+                  <div className="bg-[#06070A] rounded-lg p-3 space-y-2.5 border border-[#2E384C]">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white uppercase tracking-wider">
                         Spot CLOB ({nonEmptyClobManagers.length})
@@ -473,7 +473,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     {hasClobFundsOrOrders && (
                       <>
                         <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                          <div className="rounded bg-[#000000] border border-[#1A1E26] px-2.5 py-2">
+                          <div className="rounded bg-[#000000] border border-[#2D374B] px-2.5 py-2">
                             <div className="text-[10px] text-slate-500 font-sans">Unlocked in Vaults</div>
                             <div className="text-white font-semibold mt-0.5 tabular-nums">
                               {clobUnlockedSui.toFixed(4)} SUI
@@ -487,7 +487,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                               </div>
                             )}
                           </div>
-                          <div className="rounded bg-[#000000] border border-[#1A1E26] px-2.5 py-2">
+                          <div className="rounded bg-[#000000] border border-[#2D374B] px-2.5 py-2">
                             <div className="text-[10px] text-slate-500 font-sans">
                               In Open Orders ({clobOpenOrders.length})
                             </div>
@@ -507,7 +507,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                             return (
                               <div
                                 key={m.managerId}
-                                className="flex items-center justify-between text-[11px] font-mono px-2.5 py-1.5 rounded bg-[#000000] border border-[#1A1E26]"
+                                className="flex items-center justify-between text-[11px] font-mono px-2.5 py-1.5 rounded bg-[#000000] border border-[#2D374B]"
                               >
                                 <a
                                   href={`https://suiscan.xyz/mainnet/object/${m.managerId}`}
@@ -570,7 +570,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     )}
                   </div>
                 ) : (
-                  <div className="bg-[#06070A] border border-[#1B1F27] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
+                  <div className="bg-[#06070A] border border-[#2E384C] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
                     <span className="text-slate-400 font-medium">Spot CLOB BalanceManager</span>
                     <span className="font-mono text-slate-500 tabular-nums">$0.00</span>
                   </div>
@@ -604,7 +604,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                         return (
                           <div
                             key={pos.managerId}
-                            className="rounded-lg bg-[#000000] border border-[#1A1E26] p-2.5 space-y-2"
+                            className="rounded-lg bg-[#000000] border border-[#2D374B] p-2.5 space-y-2"
                           >
                             <div className="flex items-center justify-between text-xs font-mono">
                               <div className="flex items-center gap-2">
@@ -684,7 +684,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     )}
                   </div>
                 ) : (
-                  <div className="bg-[#06070A] border border-[#1B1F27] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
+                  <div className="bg-[#06070A] border border-[#2E384C] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
                     <span className="text-slate-400 font-medium">Margin 4.5x Isolated Vault</span>
                     <span className="font-mono text-slate-500 tabular-nums">$0.00</span>
                   </div>
@@ -692,7 +692,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
 
                 {/* 3. Aftermath Perps Account */}
                 {afState?.accountId || perpsUsd > 0.001 || perpsStatusMsg || perpsErrorMsg ? (
-                  <div className="bg-[#06070A] rounded-lg p-3 space-y-2.5 border border-[#1B1F27]">
+                  <div className="bg-[#06070A] rounded-lg p-3 space-y-2.5 border border-[#2E384C]">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white uppercase tracking-wider">
                         Aftermath Perps{' '}
@@ -704,13 +704,13 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                      <div className="rounded bg-[#000000] border border-[#1A1E26] px-2.5 py-2">
+                      <div className="rounded bg-[#000000] border border-[#2D374B] px-2.5 py-2">
                         <div className="text-[10px] text-slate-500 font-sans">Free Collateral</div>
                         <div className="text-[#08D189] font-semibold mt-0.5 tabular-nums">
                           ${perpsFreeUsdc.toFixed(2)} USDC
                         </div>
                       </div>
-                      <div className="rounded bg-[#000000] border border-[#1A1E26] px-2.5 py-2">
+                      <div className="rounded bg-[#000000] border border-[#2D374B] px-2.5 py-2">
                         <div className="text-[10px] text-slate-500 font-sans">
                           Positions ({afState?.positions.length ?? 0})
                         </div>
@@ -751,7 +751,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     )}
                   </div>
                 ) : (
-                  <div className="bg-[#06070A] border border-[#1B1F27] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
+                  <div className="bg-[#06070A] border border-[#2E384C] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
                     <span className="text-slate-400 font-medium">Aftermath Perps Account</span>
                     <span className="font-mono text-slate-500 tabular-nums">$0.00</span>
                   </div>
@@ -789,7 +789,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                     )}
                   </div>
                 ) : (
-                  <div className="bg-[#06070A] border border-[#1B1F27] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
+                  <div className="bg-[#06070A] border border-[#2E384C] rounded-lg px-3.5 py-2.5 flex items-center justify-between text-xs">
                     <span className="text-slate-400 font-medium">DeepBook Predict Escrow</span>
                     <span className="font-mono text-slate-500 tabular-nums">$0.00</span>
                   </div>
@@ -801,7 +801,7 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                   <div className="text-xs font-bold uppercase tracking-wider text-slate-300 px-0.5">
                     DeepBook v3 Lending Deposits
                   </div>
-                  <div className="divide-y divide-[#1A1E26] bg-[#06070A] border border-[#1B1F27] rounded-lg overflow-hidden">
+                  <div className="divide-y divide-[#2D374B] bg-[#06070A] border border-[#2E384C] rounded-lg overflow-hidden">
                     {activeMarginEntries.map((m) => (
                       <div
                         key={m.coinKey}
@@ -838,11 +838,11 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                 </div>
 
                 {heldTokens.length === 0 ? (
-                  <div className="bg-[#06070A] border border-[#1B1F27] rounded-lg p-5 text-center text-xs text-slate-500">
+                  <div className="bg-[#06070A] border border-[#2E384C] rounded-lg p-5 text-center text-xs text-slate-500">
                     No assets yet
                   </div>
                 ) : (
-                  <div className="divide-y divide-[#1A1E26] bg-[#06070A] border border-[#1B1F27] rounded-lg overflow-hidden">
+                  <div className="divide-y divide-[#2D374B] bg-[#06070A] border border-[#2E384C] rounded-lg overflow-hidden">
                     {heldTokens.map(({ token, amount, usd }) => (
                       <div
                         key={token.address + token.symbol}

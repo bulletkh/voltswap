@@ -137,7 +137,7 @@ export function App() {
   return (
     <div className="min-h-screen w-full overflow-x-hidden volt-hero-surface text-slate-100 flex flex-col">
       {/* Top Institutional DeepBook-Style Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-[#1A1E26] bg-[#000000]/90 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-[#2D374B] bg-[#000000]/90 backdrop-blur-xl">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#2B7FFF]/45 to-transparent" />
         <div className="w-full mx-auto px-3 sm:px-5 h-[54px] flex items-center justify-between gap-4">
           {/* Left: Brand */}
@@ -180,7 +180,7 @@ export function App() {
 
           {/* Right: Network Status, Portfolio Drawer & Wallet */}
           <div className="flex items-center gap-2">
-            <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#090B0E]/90 border border-[#1B1F27] text-[11px] font-mono text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#090B0E]/90 border border-[#2E384C] text-[11px] font-mono text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#08D189] animate-live-dot" />
               <span>Mainnet</span>
             </div>
@@ -189,7 +189,7 @@ export function App() {
                 <button
                   type="button"
                   onClick={() => setActivityOpen(true)}
-                  className="px-2.5 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#1E232E] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
+                  className="px-2.5 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#323D52] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
                   title="Multi-Market Order Ledger & 1-Click Session Keys"
                 >
                   <KeyRound
@@ -209,7 +209,7 @@ export function App() {
                 <button
                   type="button"
                   onClick={() => setPortfolioOpen(true)}
-                  className="px-3 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#1E232E] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
+                  className="px-3 py-1.5 rounded bg-[#090B0E] hover:bg-[#10141D] border border-[#323D52] hover:border-[#2B7FFF]/60 text-xs font-semibold text-white inline-flex items-center gap-1.5 transition-all"
                 >
                   <Wallet className="w-3.5 h-3.5 text-[#2B7FFF]" />
                   <span className="hidden sm:inline">Portfolio</span>
@@ -221,7 +221,7 @@ export function App() {
         </div>
 
         {/* Mobile Tab Strip */}
-        <div className="md:hidden border-t border-[#1A1E26] px-2.5 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar bg-[#050608]">
+        <div className="md:hidden border-t border-[#2D374B] px-2.5 py-1.5 flex items-center gap-1 overflow-x-auto no-scrollbar bg-[#050608]">
           {navItems.map((item) => {
             const active = activeTab === item.id;
             return (
@@ -295,7 +295,7 @@ export function App() {
       </main>
 
       {/* Clean Institutional Footer */}
-      <footer className="border-t border-[#1A1E26] bg-[#000000] py-2.5 px-4 sm:px-5 text-[11px] font-mono text-[#7B8494]">
+      <footer className="border-t border-[#2D374B] bg-[#000000] py-2.5 px-4 sm:px-5 text-[11px] font-mono text-[#7B8494]">
         <div className="w-full mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <span className="text-white font-semibold">Volt Protocol</span>

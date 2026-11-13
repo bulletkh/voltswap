@@ -387,9 +387,9 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col panel-carbon rounded-xl border border-[#1B1F27] shadow-2xl overflow-hidden animate-panel-in">
+      <div className="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col panel-carbon rounded-xl border border-[#2E384C] shadow-2xl overflow-hidden animate-panel-in">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-[#1A1E26] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-[#2D374B] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 flex items-center justify-center text-[#60A5FA]">
               <Bot className="w-5 h-5" />
@@ -429,7 +429,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
         </div>
 
         {/* Subtabs */}
-        <div className="px-5 pt-3 flex items-center gap-2 border-b border-[#1A1E26] pb-3">
+        <div className="px-5 pt-3 flex items-center gap-2 border-b border-[#2D374B] pb-3">
           {[
             { id: 'predict' as AiCopilotTab, label: 'Predict Alpha', icon: TrendingUp },
             { id: 'grid' as AiCopilotTab, label: 'Spot CLOB Grid', icon: Grid3X3 },
@@ -445,7 +445,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                 className={`px-3.5 py-2 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 border transition-colors ${
                   active
                     ? 'bg-[#2B7FFF]/15 border-[#2B7FFF]/45 text-[#60A5FA]'
-                    : 'bg-[#000000] border-[#1A1E26] text-[#9CA3AF] hover:text-white'
+                    : 'bg-[#000000] border-[#2D374B] text-[#9CA3AF] hover:text-white'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -481,7 +481,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                       className={`px-2.5 py-1 rounded border font-semibold transition-colors ${
                         predictBudget === amt
                           ? 'bg-[#2B7FFF]/20 border-[#2B7FFF]/45 text-[#60A5FA]'
-                          : 'bg-[#000000] border-[#1A1E26] text-[#9CA3AF] hover:text-white'
+                          : 'bg-[#000000] border-[#2D374B] text-[#9CA3AF] hover:text-white'
                       }`}
                     >
                       ${amt}
@@ -510,7 +510,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                     return (
                       <div
                         key={setup.id}
-                        className="panel-carbon-sub rounded-lg p-4 flex flex-col justify-between gap-3 border border-[#1A1E26]"
+                        className="panel-carbon-sub rounded-lg p-4 flex flex-col justify-between gap-3 border border-[#2D374B]"
                       >
                         <div className="space-y-2">
                           <div className="flex items-center justify-between gap-2">
@@ -527,7 +527,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                           </p>
                         </div>
 
-                        <div className="space-y-2 pt-2 border-t border-[#1A1E26] text-[11px] font-mono">
+                        <div className="space-y-2 pt-2 border-t border-[#2D374B] text-[11px] font-mono">
                           <div className="flex justify-between text-slate-300">
                             <span>Implied Prob</span>
                             <span>{setup.winProbPct.toFixed(1)}%</span>
@@ -628,7 +628,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                 </div>
 
                 {gridPreview.rungs.length > 0 ? (
-                  <div className="divide-y divide-[#1A1E26] rounded-lg bg-[#000000] border border-[#1A1E26] overflow-hidden text-xs font-mono">
+                  <div className="divide-y divide-[#2D374B] rounded-lg bg-[#000000] border border-[#2D374B] overflow-hidden text-xs font-mono">
                     {gridPreview.rungs.map((r, idx) => (
                       <div key={idx} className="px-3.5 py-2 flex items-center justify-between">
                         <span
@@ -697,7 +697,7 @@ export const AiCopilotModal: React.FC<AiCopilotModalProps> = ({
                   {yieldReport.topVaults.map((v) => (
                     <div
                       key={v.coinKey}
-                      className="rounded-lg bg-[#000000] border border-[#1A1E26] p-3 text-xs font-mono space-y-1"
+                      className="rounded-lg bg-[#000000] border border-[#2D374B] p-3 text-xs font-mono space-y-1"
                     >
                       <div className="text-white font-bold">{v.coinKey} Pool</div>
                       <div className="text-lg font-bold text-[#08D189]">{v.apr.toFixed(2)}% APR</div>

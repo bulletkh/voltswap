@@ -382,8 +382,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-7 space-y-5 animate-panel-in text-white font-sans">
       {/* Hero Treasury Panel */}
-      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl overflow-hidden">
-        <div className="p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 border-b border-[#1A1E26]">
+      <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
+        <div className="p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 border-b border-[#2D374B]">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#2B7FFF]/12 border border-[#2B7FFF]/35 text-[#60A5FA] font-mono text-[11px] font-bold uppercase tracking-wider">
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -409,7 +409,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                 playClickSound();
               }}
               disabled={isRefreshing}
-              className="p-2 rounded-lg bg-[#000000] hover:bg-[#0C0E13] border border-[#1A1E26] text-slate-300 hover:text-white hover:border-[#2B7FFF]/50 transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
+              className="p-2 rounded-lg bg-[#000000] hover:bg-[#0C0E13] border border-[#2D374B] text-slate-300 hover:text-white hover:border-[#2B7FFF]/50 transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
               title="Refresh Live Balances & Ledger"
             >
               <RefreshCw className={`w-4 h-4 text-[#60A5FA] ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -418,7 +418,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
 
         {/* Joined Real Metrics Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#1A1E26] bg-[#000000]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#2D374B] bg-[#000000]">
           {/* Card 1: Live Vault Net Worth */}
           <div className="p-5 space-y-1">
             <div className="text-slate-400 text-[11px] font-mono uppercase flex items-center gap-1.5">
@@ -479,7 +479,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
 
         {/* Live Multi-Coin Vault Holdings Strip */}
-        <div className="p-5 border-t border-[#1A1E26] bg-[#06070A]">
+        <div className="p-5 border-t border-[#2D374B] bg-[#06070A]">
           <div className="text-xs font-mono text-slate-400 mb-3 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-[#60A5FA]" />
@@ -488,7 +488,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
             <span className="text-slate-500 text-xs">Synced via Suiscan &amp; Sui GraphQL</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+            <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 font-mono">
               <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>SUI</span>
                 <span className="text-[#60A5FA] font-bold">${(treasurySuiBalance * suiPriceUsd).toFixed(2)}</span>
@@ -498,7 +498,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+            <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 font-mono">
               <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>USDC</span>
                 <span className="text-[#08D189] font-bold">${usdcBalance.toFixed(2)}</span>
@@ -508,7 +508,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+            <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 font-mono">
               <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>VOLT Token</span>
                 <span className="text-[#60A5FA] font-bold">Genesis</span>
@@ -518,7 +518,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               </div>
             </div>
 
-            <div className="bg-[#000000] border border-[#1A1E26] rounded-lg p-3 font-mono">
+            <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 font-mono">
               <div className="text-xs text-slate-400 flex items-center justify-between">
                 <span>HAEDAL</span>
                 <span className="text-purple-400 font-bold">Rewards</span>
@@ -530,10 +530,10 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           </div>
 
           {/* Treasury Vault Address & Suiscan Link */}
-          <div className="mt-4 pt-3.5 border-t border-[#1A1E26] flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+          <div className="mt-4 pt-3.5 border-t border-[#2D374B] flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
             <div className="flex items-center gap-2">
               <span className="text-slate-400">Treasury Vault:</span>
-              <code className="bg-[#000000] px-2.5 py-1 rounded text-[#60A5FA] border border-[#1A1E26] select-all">
+              <code className="bg-[#000000] px-2.5 py-1 rounded text-[#60A5FA] border border-[#2D374B] select-all">
                 {VOLT_TREASURY_ADDRESS}
               </code>
               <button
@@ -560,7 +560,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       {/* Stream Breakdown Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Stream 1: Market DEX Swaps */}
-        <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
+        <div className="bg-[#06070A] border border-[#2E384C] rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="w-9 h-9 rounded-lg bg-[#2B7FFF]/12 border border-[#2B7FFF]/35 flex items-center justify-center text-[#60A5FA]">
               <Zap className="w-4 h-4" />
@@ -575,7 +575,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               Swap routing across Cetus CLMM and DeepBook v3 liquidity pools.
             </p>
           </div>
-          <div className="space-y-1.5 pt-3 border-t border-[#1A1E26] font-mono text-xs">
+          <div className="space-y-1.5 pt-3 border-t border-[#2D374B] font-mono text-xs">
             <div className="flex justify-between text-slate-400">
               <span>Swaps Executed:</span>
               <span className="font-bold text-white">{marketSwapsCount}</span>
@@ -590,7 +590,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
 
         {/* Stream 2: Aftermath Perps Clearing */}
-        <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
+        <div className="bg-[#06070A] border border-[#2E384C] rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="w-9 h-9 rounded-lg bg-amber-500/12 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <TrendingUp className="w-4 h-4" />
@@ -605,7 +605,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               Perpetual margin trading on Sui orderbooks with non-custodial protocol fee routing.
             </p>
           </div>
-          <div className="space-y-1.5 pt-3 border-t border-[#1A1E26] font-mono text-xs">
+          <div className="space-y-1.5 pt-3 border-t border-[#2D374B] font-mono text-xs">
             <div className="flex justify-between text-slate-400">
               <span>Positions Opened:</span>
               <span className="font-bold text-white">{perpsCount}</span>
@@ -620,7 +620,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
         </div>
 
         {/* Stream 3: DeepBook Limit Orders */}
-        <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
+        <div className="bg-[#06070A] border border-[#2E384C] rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div className="w-9 h-9 rounded-lg bg-[#08D189]/12 border border-[#08D189]/30 flex items-center justify-center text-[#08D189]">
               <Target className="w-4 h-4" />
@@ -635,7 +635,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
               On-chain central limit order book orders executed with zero slippage.
             </p>
           </div>
-          <div className="space-y-1.5 pt-3 border-t border-[#1A1E26] font-mono text-xs">
+          <div className="space-y-1.5 pt-3 border-t border-[#2D374B] font-mono text-xs">
             <div className="flex justify-between text-slate-400">
               <span>Orders Placed:</span>
               <span className="font-bold text-white">{limitSwapsCount}</span>
@@ -651,8 +651,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       </div>
 
       {/* REAL ON-CHAIN TRANSACTION LEDGER */}
-      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl overflow-hidden">
-        <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1A1E26] bg-[#000000]">
+      <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
+        <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#2D374B] bg-[#000000]">
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Activity className="w-4 h-4 text-[#60A5FA]" />
@@ -663,7 +663,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
             </p>
           </div>
 
-          <span className="px-2.5 py-1 rounded bg-[#06070A] border border-[#1A1E26] text-xs font-mono text-slate-300">
+          <span className="px-2.5 py-1 rounded bg-[#06070A] border border-[#2D374B] text-xs font-mono text-slate-300">
             Total Transactions: <strong className="text-[#60A5FA]">{recordedSwaps.length}</strong>
           </span>
         </div>
@@ -679,7 +679,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
                 <thead>
-                  <tr className="border-b border-[#1A1E26] text-slate-400 text-xs">
+                  <tr className="border-b border-[#2D374B] text-slate-400 text-xs">
                     <th className="py-2.5 px-3">Time</th>
                     <th className="py-2.5 px-3">Trader</th>
                     <th className="py-2.5 px-3">Pair</th>
@@ -689,7 +689,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                     <th className="py-2.5 px-3 text-right">Suiscan</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1A1E26]/70">
+                <tbody className="divide-y divide-[#2D374B]/70">
                   {recordedSwaps.map((item, idx) => {
                     const feeRate = typeof item.feeRate === 'number' ? item.feeRate : parseFloat(item.feeRate || '0') || 0.0016;
                     const vol = typeof item.volumeUsd === 'number' ? item.volumeUsd : parseFloat(item.volumeUsd || '0') || 0;
@@ -705,7 +705,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                         <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">{timeFormatted}</td>
                         <td className="py-2.5 px-3 text-slate-300">
                           <div className="flex items-center gap-1.5 max-w-[320px] sm:max-w-none">
-                            <code className="text-xs font-mono text-[#60A5FA] bg-[#000000] px-2 py-0.5 rounded border border-[#1A1E26] select-all break-all">
+                            <code className="text-xs font-mono text-[#60A5FA] bg-[#000000] px-2 py-0.5 rounded border border-[#2D374B] select-all break-all">
                               {fullTraderAddr}
                             </code>
                             <button
@@ -772,8 +772,8 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       </div>
 
       {/* DeepBook v3 Native Monetization & Referrals */}
-      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A1E26] pb-3.5">
+      <div className="bg-[#06070A] border border-[#2E384C] rounded-xl p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2D374B] pb-3.5">
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-[#60A5FA]" />
@@ -786,7 +786,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           <button
             type="button"
             onClick={loadDeepBookMonetization}
-            className="px-3 py-1.5 rounded-lg bg-[#000000] border border-[#1A1E26] text-xs text-slate-300 hover:text-white hover:border-[#2B7FFF]/50 inline-flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-[#000000] border border-[#2D374B] text-xs text-slate-300 hover:text-white hover:border-[#2B7FFF]/50 inline-flex items-center gap-1.5 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${monetizationLoading ? 'animate-spin' : ''}`} />
             Refresh Status
@@ -804,7 +804,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* 1. Predict BuilderCode + Account Referrer */}
-          <div className="rounded-xl bg-[#000000] border border-[#1A1E26] p-4 space-y-3 flex flex-col justify-between">
+          <div className="rounded-xl bg-[#000000] border border-[#2D374B] p-4 space-y-3 flex flex-col justify-between">
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-white flex items-center gap-1.5">
@@ -884,7 +884,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           </div>
 
           {/* 2. MarginPool SupplyReferral */}
-          <div className="rounded-xl bg-[#000000] border border-[#1A1E26] p-4 space-y-3 flex flex-col justify-between">
+          <div className="rounded-xl bg-[#000000] border border-[#2D374B] p-4 space-y-3 flex flex-col justify-between">
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-white flex items-center gap-1.5">
@@ -904,7 +904,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                       className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
                         found
                           ? 'bg-[#08D189]/10 border-[#08D189]/35 text-[#08D189]'
-                          : 'bg-[#06070A] border-[#1A1E26] text-slate-500'
+                          : 'bg-[#06070A] border-[#2D374B] text-slate-500'
                       }`}
                     >
                       {coin} {found ? '✓' : '·'}
@@ -968,7 +968,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
           </div>
 
           {/* 3. Spot CLOB DeepBookPoolReferral */}
-          <div className="rounded-xl bg-[#000000] border border-[#1A1E26] p-4 space-y-3 flex flex-col justify-between">
+          <div className="rounded-xl bg-[#000000] border border-[#2D374B] p-4 space-y-3 flex flex-col justify-between">
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-white flex items-center gap-1.5">
@@ -988,7 +988,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
                       className={`px-2 py-0.5 rounded text-[10px] font-mono border ${
                         found
                           ? 'bg-[#08D189]/10 border-[#08D189]/35 text-[#08D189]'
-                          : 'bg-[#06070A] border-[#1A1E26] text-slate-500'
+                          : 'bg-[#06070A] border-[#2D374B] text-slate-500'
                       }`}
                     >
                       {pool} {found ? '✓' : '·'}
@@ -1055,7 +1055,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       </div>
 
       {/* Protocol Ownership & Direct Sui Management */}
-      <div className="bg-[#06070A] border border-[#1B1F27] rounded-xl p-5">
+      <div className="bg-[#06070A] border border-[#2E384C] rounded-xl p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -1074,7 +1074,7 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
             href={`https://suiscan.xyz/mainnet/account/${VOLT_TREASURY_ADDRESS}`}
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-2 rounded-lg bg-[#000000] hover:bg-[#0C0E13] border border-[#1A1E26] hover:border-[#2B7FFF]/50 text-white font-mono text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="px-4 py-2 rounded-lg bg-[#000000] hover:bg-[#0C0E13] border border-[#2D374B] hover:border-[#2B7FFF]/50 text-white font-mono text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0"
           >
             Suiscan History <ExternalLink className="w-3.5 h-3.5" />
           </a>

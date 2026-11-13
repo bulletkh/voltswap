@@ -150,7 +150,7 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
       className={`rounded-lg border px-3 py-2.5 text-xs transition-colors ${
         isActive
           ? 'bg-[#08D189]/10 border-[#08D189]/35'
-          : 'bg-[#000000] border-[#1A1E26]'
+          : 'bg-[#000000] border-[#2D374B]'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
@@ -183,10 +183,10 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
       </div>
 
       {expanded && (
-        <div className="mt-2.5 pt-2.5 border-t border-[#1A1E26] space-y-2.5">
+        <div className="mt-2.5 pt-2.5 border-t border-[#2D374B] space-y-2.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-[#9CA3AF]">Session Window</span>
-            <div className="inline-flex rounded-lg p-0.5 bg-[#000000] border border-[#1A1E26]">
+            <div className="inline-flex rounded-lg p-0.5 bg-[#000000] border border-[#2D374B]">
               {DURATION_OPTIONS.map((opt) => (
                 <button
                   key={opt.label}
@@ -212,7 +212,7 @@ export const PredictSessionPanel: React.FC<PredictSessionPanelProps> = ({
               step="1"
               value={depositInput}
               onChange={(e) => setDepositInput(e.target.value)}
-              className="w-24 px-2 py-1 rounded-lg bg-[#000000] border border-[#1A1E26] text-right text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
+              className="w-24 px-2 py-1 rounded-lg bg-[#000000] border border-[#2D374B] text-right text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
             />
           </div>
 

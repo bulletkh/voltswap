@@ -236,7 +236,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-xl panel-carbon border border-[#1B1F27] rounded-xl p-6 shadow-2xl space-y-5 text-white max-h-[90vh] overflow-y-auto animate-panel-in">
+      <div className="relative w-full max-w-xl panel-carbon border border-[#2E384C] rounded-xl p-6 shadow-2xl space-y-5 text-white max-h-[90vh] overflow-y-auto animate-panel-in">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -264,7 +264,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
         {/* Preview Card (Visual Replica) */}
         <div className="relative rounded-xl bg-gradient-to-b from-[#06070A] to-[#000000] border border-[#2B7FFF]/30 p-5 shadow-2xl space-y-4 overflow-hidden">
           {/* Card Top Row */}
-          <div className="flex items-center justify-between border-b border-[#1A1E26] pb-3">
+          <div className="flex items-center justify-between border-b border-[#2D374B] pb-3">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-[#2B7FFF] fill-[#2B7FFF]" />
               <span className="font-extrabold text-sm tracking-wider font-mono text-white">VOLT PROTOCOL</span>
@@ -307,11 +307,11 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
 
           {/* Route Engine & Finality */}
           <div className="grid grid-cols-2 gap-2.5 text-xs font-mono pt-1 text-slate-300">
-            <div className="p-3 rounded-lg bg-[#000000] border border-[#1A1E26]">
+            <div className="p-3 rounded-lg bg-[#000000] border border-[#2D374B]">
               <span className="text-[#6B7280] block text-xs">Routing Engine</span>
               <span className="text-[#60A5FA] font-bold">{engineName}</span>
             </div>
-            <div className="p-3 rounded-lg bg-[#000000] border border-[#1A1E26]">
+            <div className="p-3 rounded-lg bg-[#000000] border border-[#2D374B]">
               <span className="text-[#6B7280] block text-xs">Execution Speed</span>
               <span className="text-[#60A5FA] font-bold">~390ms Single PTB</span>
             </div>
@@ -362,7 +362,7 @@ export const PnlShareModal: React.FC<PnlShareModalProps> = ({
           {/* Copy Link */}
           <button
             onClick={handleCopyLink}
-            className="py-3 px-3 rounded-lg bg-[#0C0E13] hover:bg-[#1A1E26] text-white font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-[#1A1E26] active:scale-95"
+            className="py-3 px-3 rounded-lg bg-[#0C0E13] hover:bg-[#2D374B] text-white font-extrabold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-[#2D374B] active:scale-95"
           >
             {copied ? (
               <>

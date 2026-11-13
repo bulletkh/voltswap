@@ -329,9 +329,9 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
   };
 
   return (
-    <div className="bg-[#000000] p-3 flex flex-col gap-3">
+    <div className="p-3 flex flex-col gap-3">
       {/* Compact Isolated Margin Vault Banner (Direct Deposit / Withdraw) */}
-      <div className="bg-[#06070A] border border-[#1E232D] hover:border-[#2B7FFF]/40 rounded-lg px-2.5 py-2 space-y-2 text-xs transition-colors">
+      <div className="bg-[#06070A] border border-[#323D52] hover:border-[#2B7FFF]/40 rounded-lg px-2.5 py-2 space-y-2 text-xs transition-colors">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <ShieldCheck className="w-3.5 h-3.5 text-[#60A5FA] shrink-0" />
@@ -361,7 +361,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
             type="button"
             disabled={!account || !position || isVaultBusy}
             onClick={() => setShowMarginVaultModal('withdraw')}
-            className="py-1.5 rounded bg-[#10131A] hover:bg-[#171C26] border border-[#262C3B] text-[11px] font-bold text-slate-200 hover:text-white flex items-center justify-center gap-1 disabled:opacity-45 transition-colors"
+            className="py-1.5 rounded bg-[#10131A] hover:bg-[#171C26] border border-[#3B475E] text-[11px] font-bold text-slate-200 hover:text-white flex items-center justify-center gap-1 disabled:opacity-45 transition-colors"
           >
             <ArrowUpFromLine className="w-3.5 h-3.5" />
             <span>WITHDRAW</span>
@@ -378,7 +378,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
             className={`py-2 rounded-md text-xs font-extrabold uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all border ${
               side === 'long'
                 ? 'bg-[#08D189]/20 text-[#08D189] border-[#08D189] shadow-[inset_0_0_12px_rgba(8,209,137,0.14)]'
-                : 'bg-[#06070A] text-[#94A3B8] hover:text-white border-[#1E232D]'
+                : 'bg-[#06070A] text-[#94A3B8] hover:text-white border-[#323D52]'
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
@@ -390,7 +390,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
             className={`py-2 rounded-md text-xs font-extrabold uppercase tracking-wide flex items-center justify-center gap-1.5 transition-all border ${
               side === 'short'
                 ? 'bg-[#F0525E]/20 text-[#F0525E] border-[#F0525E] shadow-[inset_0_0_12px_rgba(240,82,94,0.14)]'
-                : 'bg-[#06070A] text-[#94A3B8] hover:text-white border-[#1E232D]'
+                : 'bg-[#06070A] text-[#94A3B8] hover:text-white border-[#323D52]'
             }`}
           >
             <TrendingDown className="w-3.5 h-3.5" />
@@ -399,7 +399,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
         </div>
 
         {/* Market / Limit Order Sub-Tabs */}
-        <div className="flex items-center justify-between gap-2 border-b border-[#1A1E26] pb-1.5">
+        <div className="flex items-center justify-between gap-2 border-b border-[#2D374B] pb-1.5">
           <div className="inline-flex items-center gap-3">
             {(['market', 'limit'] as const).map((style) => (
               <button
@@ -429,13 +429,13 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
         </div>
 
         {/* Collateral Input + Asset Toggle */}
-        <div className="bg-[#06070A] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 rounded-lg p-2.5 space-y-1.5 transition-colors">
+        <div className="bg-[#06070A] border border-[#2D374B] focus-within:border-[#2B7FFF]/60 rounded-lg p-2.5 space-y-1.5 transition-colors">
           <div className="flex items-center justify-between text-xs text-slate-400">
             <span className="font-medium">Collateral Deposit</span>
             <button
               type="button"
               onClick={() => setCollateralSide((prev) => (prev === 'quote' ? 'base' : 'quote'))}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#0C0E13] border border-[#1A1E26] hover:border-[#2B7FFF]/40 text-[#60A5FA] font-mono font-semibold text-[11px]"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#0C0E13] border border-[#2D374B] hover:border-[#2B7FFF]/40 text-[#60A5FA] font-mono font-semibold text-[11px]"
             >
               <ArrowUpDown className="w-3 h-3" />
               <span>{collateralSide === 'quote' ? pool.quoteSymbol : pool.baseSymbol}</span>
@@ -468,7 +468,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
         </div>
 
         {/* Leverage Slider (Live Risk Ratio Safe) */}
-        <div className="bg-[#06070A] border border-[#1A1E26] rounded-lg p-2.5 space-y-2">
+        <div className="bg-[#06070A] border border-[#2D374B] rounded-lg p-2.5 space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-slate-400 font-medium">Spot Margin Leverage</span>
             <span className="font-mono font-bold text-[#60A5FA] text-sm">
@@ -494,7 +494,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
                 className={`py-1 rounded text-[11px] font-mono font-semibold transition-all border ${
                   Math.abs(leverage - lv) < 0.05
                     ? 'bg-[#2B7FFF]/18 text-[#60A5FA] border-[#2B7FFF]/45'
-                    : 'bg-[#0C0E13] hover:bg-[#12151C] text-slate-400 border-[#1A1E26]'
+                    : 'bg-[#0C0E13] hover:bg-[#12151C] text-slate-400 border-[#2D374B]'
                 }`}
               >
                 {lv.toFixed(1)}x
@@ -505,7 +505,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
 
         {/* Limit Price Input when Limit selected */}
         {orderStyle === 'limit' && (
-          <div className="bg-[#06070A] border border-[#1A1E26] focus-within:border-[#2B7FFF]/60 rounded-lg p-2.5 space-y-1 transition-colors">
+          <div className="bg-[#06070A] border border-[#2D374B] focus-within:border-[#2B7FFF]/60 rounded-lg p-2.5 space-y-1 transition-colors">
             <div className="flex justify-between text-xs text-slate-400">
               <span>Limit Execution Price</span>
               <button
@@ -545,7 +545,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
 
           {enableTpSl && (
             <div className="grid grid-cols-2 gap-1.5">
-              <div className="bg-[#06070A] border border-[#1A1E26] focus-within:border-[#08D189]/60 rounded-lg p-2 space-y-1">
+              <div className="bg-[#06070A] border border-[#2D374B] focus-within:border-[#08D189]/60 rounded-lg p-2 space-y-1">
                 <div className="text-[11px] text-[#08D189] font-medium">Take Profit</div>
                 <input
                   type="number"
@@ -557,7 +557,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
                   className="w-full bg-transparent text-sm font-mono tabular-nums text-white outline-none"
                 />
               </div>
-              <div className="bg-[#06070A] border border-[#1A1E26] focus-within:border-[#F0525E]/60 rounded-lg p-2 space-y-1">
+              <div className="bg-[#06070A] border border-[#2D374B] focus-within:border-[#F0525E]/60 rounded-lg p-2 space-y-1">
                 <div className="text-[11px] text-[#F0525E] font-medium">Stop Loss</div>
                 <input
                   type="number"
@@ -574,7 +574,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
         </div>
 
         {/* Metrics Summary */}
-        <div className="rounded-lg bg-[#06070A] border border-[#1A1E26] p-2.5 space-y-1.5 text-xs font-mono">
+        <div className="rounded-lg bg-[#06070A] border border-[#2D374B] p-2.5 space-y-1.5 text-xs font-mono">
           <div className="flex justify-between">
             <span className="text-slate-400">Borrowed from MarginPool</span>
             <span className="text-white font-semibold tabular-nums">
@@ -666,7 +666,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-1.5 bg-[#06070A] p-1 rounded-lg border border-[#1E232D]">
+            <div className="grid grid-cols-2 gap-1.5 bg-[#06070A] p-1 rounded-lg border border-[#323D52]">
               <button
                 type="button"
                 onClick={() => setVaultAssetSide('quote')}
@@ -691,7 +691,7 @@ export const DeepBookMarginTicket: React.FC<DeepBookMarginTicketProps> = ({
               </button>
             </div>
 
-            <div className="bg-[#06070A] border border-[#1E232D] rounded-lg p-3 space-y-2">
+            <div className="bg-[#06070A] border border-[#323D52] rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>
                   Amount ({vaultAssetSide === 'base' ? pool.baseSymbol : pool.quoteSymbol})
@@ -831,7 +831,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
 
   const liquidityCards = (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs font-mono tabular-nums">
-      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+      <div className="rounded-md bg-[#06070A] border border-[#323D52] p-2.5">
         <div className="text-[11px] text-[#8E98A8] mb-1">Pool Liquidity ({pool.baseSymbol})</div>
         <div className="text-white font-bold text-sm">
           {riskConfig
@@ -843,7 +843,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
           Borrow APR {riskConfig ? `${riskConfig.baseBorrowAprPct.toFixed(2)}%` : '—'}
         </div>
       </div>
-      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+      <div className="rounded-md bg-[#06070A] border border-[#323D52] p-2.5">
         <div className="text-[11px] text-[#8E98A8] mb-1">Pool Liquidity ({pool.quoteSymbol})</div>
         <div className="text-white font-bold text-sm">
           {riskConfig
@@ -855,7 +855,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
           Borrow APR {riskConfig ? `${riskConfig.quoteBorrowAprPct.toFixed(2)}%` : '—'}
         </div>
       </div>
-      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+      <div className="rounded-md bg-[#06070A] border border-[#323D52] p-2.5">
         <div className="text-[11px] text-[#8E98A8] mb-1">Risk Ratio Thresholds</div>
         <div className="text-white font-bold text-sm">
           Open {(riskConfig?.minOpenRiskRatio ?? 1.18).toFixed(2)}x · Borrow{' '}
@@ -865,7 +865,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
           Liq Floor {(riskConfig?.liquidationRiskRatio ?? 1.1).toFixed(2)}x
         </div>
       </div>
-      <div className="rounded-md bg-[#06070A] border border-[#1E232D] p-2.5">
+      <div className="rounded-md bg-[#06070A] border border-[#323D52] p-2.5">
         <div className="text-[11px] text-[#8E98A8] mb-1">Custody &amp; Max Leverage</div>
         <div className="text-[#08D189] font-bold text-sm">
           Up to {(riskConfig?.maxLeverageSafe ?? 4.5).toFixed(1)}x Isolated
@@ -880,7 +880,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
   if (!account?.address) {
     return (
       <div className="bg-[#000000] p-3.5 sm:p-4 space-y-3 min-h-[210px]">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A1E26] pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2D374B] pb-2">
           <div className="flex items-center gap-4 text-xs font-mono">
             <span className="pb-1 border-b-2 border-[#2B7FFF] text-white font-semibold -mb-[9px]">
               Isolated Margin Manager ({pool.poolName.replace('_', '/')})
@@ -916,7 +916,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
 
   return (
     <div className="bg-[#000000] p-3.5 sm:p-4 space-y-3.5 min-h-[210px]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A1E26] pb-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#2D374B] pb-2">
         <div className="flex flex-wrap items-center gap-4">
           <button
             type="button"
@@ -954,7 +954,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
         <button
           type="button"
           onClick={onRefresh}
-          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded bg-[#06070A] border border-[#1E232D] text-slate-300 hover:border-[#2B7FFF]/50 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded bg-[#06070A] border border-[#323D52] text-slate-300 hover:border-[#2B7FFF]/50 hover:text-white transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           <span>Refresh Position</span>
@@ -966,7 +966,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
       ) : position ? (
         <div className="space-y-3">
           {/* Live Health Factor Gauge + Est. Liquidation + Standalone Pro Controls */}
-          <div className="rounded-lg bg-[#06070A] border border-[#1A1E26] p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+          <div className="rounded-lg bg-[#06070A] border border-[#2D374B] p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
             <div className="lg:col-span-4 space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-400 font-medium">Margin Health Gauge</span>
@@ -1007,7 +1007,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
             </div>
 
             <div className="lg:col-span-4 flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded p-0.5 bg-[#000000] border border-[#1A1E26] text-[11px] font-mono">
+              <div className="inline-flex rounded p-0.5 bg-[#000000] border border-[#2D374B] text-[11px] font-mono">
                 <button
                   type="button"
                   onClick={() => setCollatAsset('quote')}
@@ -1034,7 +1034,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                 value={collatAmt}
                 onChange={(e) => setCollatAmt(e.target.value)}
                 placeholder={`Add ${collatAsset === 'quote' ? pool.quoteSymbol : pool.baseSymbol}`}
-                className="w-24 px-2 py-1.5 rounded bg-[#000000] border border-[#1A1E26] text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
+                className="w-24 px-2 py-1.5 rounded bg-[#000000] border border-[#2D374B] text-xs font-mono text-white outline-none focus:border-[#2B7FFF]"
               />
               <button
                 type="button"
@@ -1076,7 +1076,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                 value={tpTriggerInput}
                 onChange={(e) => setTpTriggerInput(e.target.value)}
                 placeholder="TP $"
-                className="w-20 px-2 py-1.5 rounded bg-[#000000] border border-[#1A1E26] text-xs font-mono text-[#08D189] placeholder:text-slate-500 outline-none focus:border-[#08D189]"
+                className="w-20 px-2 py-1.5 rounded bg-[#000000] border border-[#2D374B] text-xs font-mono text-[#08D189] placeholder:text-slate-500 outline-none focus:border-[#08D189]"
               />
               <input
                 type="number"
@@ -1085,7 +1085,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                 value={slTriggerInput}
                 onChange={(e) => setSlTriggerInput(e.target.value)}
                 placeholder="SL $"
-                className="w-20 px-2 py-1.5 rounded bg-[#000000] border border-[#1A1E26] text-xs font-mono text-[#F0525E] placeholder:text-slate-500 outline-none focus:border-[#F0525E]"
+                className="w-20 px-2 py-1.5 rounded bg-[#000000] border border-[#2D374B] text-xs font-mono text-[#F0525E] placeholder:text-slate-500 outline-none focus:border-[#F0525E]"
               />
               <button
                 type="button"
@@ -1106,7 +1106,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                     })
                   )
                 }
-                className="px-2.5 py-1.5 rounded text-xs font-semibold bg-[#121620] border border-[#232938] text-white hover:border-[#2B7FFF]/50 disabled:opacity-45"
+                className="px-2.5 py-1.5 rounded text-xs font-semibold bg-[#121620] border border-[#38445B] text-white hover:border-[#2B7FFF]/50 disabled:opacity-45"
               >
                 {busyAction === 'Attach Conditional TP/SL' ? '...' : 'Set TP/SL'}
               </button>
@@ -1116,7 +1116,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 items-start">
           {/* Health + Assets & Debts */}
           <div className="xl:col-span-5 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-mono">
-            <div className="bg-[#06070A] border border-[#1A1E26] rounded-lg p-2.5">
+            <div className="bg-[#06070A] border border-[#2D374B] rounded-lg p-2.5">
               <div className="text-slate-400 mb-1 font-sans">Risk Ratio</div>
               <div
                 className={`text-base font-bold ${
@@ -1130,12 +1130,12 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                 {hasDebt ? `${position.riskRatio.toFixed(2)}x` : 'No Debt'}
               </div>
             </div>
-            <div className="bg-[#06070A] border border-[#1A1E26] rounded-lg p-2.5">
+            <div className="bg-[#06070A] border border-[#2D374B] rounded-lg p-2.5">
               <div className="text-slate-400 mb-1 font-sans">{pool.baseSymbol} Asset / Debt</div>
               <div className="text-sm font-bold text-white">{position.baseAsset.toFixed(4)}</div>
               <div className="text-xs text-[#F0525E]">Debt: {position.baseDebt.toFixed(4)}</div>
             </div>
-            <div className="bg-[#06070A] border border-[#1A1E26] rounded-lg p-2.5">
+            <div className="bg-[#06070A] border border-[#2D374B] rounded-lg p-2.5">
               <div className="text-slate-400 mb-1 font-sans">{pool.quoteSymbol} Asset / Debt</div>
               <div className="text-sm font-bold text-white">{position.quoteAsset.toFixed(4)}</div>
               <div className="text-xs text-[#F0525E]">Debt: {position.quoteDebt.toFixed(4)}</div>
@@ -1171,7 +1171,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
             </div>
 
             {position.openOrders.length === 0 ? (
-              <div className="bg-[#06070A] border border-[#1A1E26] rounded-lg px-3 py-2.5 text-xs text-slate-500">
+              <div className="bg-[#06070A] border border-[#2D374B] rounded-lg px-3 py-2.5 text-xs text-slate-500">
                 No resting margin limit orders.
               </div>
             ) : (
@@ -1179,7 +1179,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                 {position.openOrders.map((ord) => (
                   <div
                     key={ord.orderId}
-                    className="bg-[#06070A] border border-[#1A1E26] rounded-lg px-3 py-2 flex items-center justify-between text-xs font-mono"
+                    className="bg-[#06070A] border border-[#2D374B] rounded-lg px-3 py-2 flex items-center justify-between text-xs font-mono"
                   >
                     <span className={ord.isBid ? 'text-[#08D189] font-bold' : 'text-[#F0525E] font-bold'}>
                       {ord.isBid ? 'LONG' : 'SHORT'} {ord.quantity.toFixed(2)} @ {ord.price.toFixed(4)}
@@ -1265,7 +1265,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                       })
                     )
                   }
-                  className="py-2 px-3 rounded-lg bg-[#0C0E13] border border-[#1A1E26] text-white text-xs font-semibold hover:bg-[#141821]"
+                  className="py-2 px-3 rounded-lg bg-[#0C0E13] border border-[#2D374B] text-white text-xs font-semibold hover:bg-[#141821]"
                 >
                   Repay All
                 </button>
@@ -1276,7 +1276,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
               <button
                 type="button"
                 onClick={() => setWithdrawAsset((prev) => (prev === 'quote' ? 'base' : 'quote'))}
-                className="px-2.5 py-1.5 rounded bg-[#06070A] border border-[#1A1E26] text-xs font-mono text-[#60A5FA]"
+                className="px-2.5 py-1.5 rounded bg-[#06070A] border border-[#2D374B] text-xs font-mono text-[#60A5FA]"
               >
                 {withdrawAsset === 'quote' ? pool.quoteSymbol : pool.baseSymbol}
               </button>
@@ -1287,7 +1287,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                 value={withdrawAmt}
                 onChange={(e) => setWithdrawAmt(e.target.value)}
                 placeholder="Withdraw amt"
-                className="flex-1 min-w-0 px-2.5 py-1.5 rounded bg-[#06070A] border border-[#1A1E26] text-xs font-mono text-white outline-none focus:border-[#2B7FFF]/60"
+                className="flex-1 min-w-0 px-2.5 py-1.5 rounded bg-[#06070A] border border-[#2D374B] text-xs font-mono text-white outline-none focus:border-[#2B7FFF]/60"
               />
               <button
                 type="button"
@@ -1303,7 +1303,7 @@ export const DeepBookMarginAccountBar: React.FC<DeepBookMarginAccountBarProps> =
                     })
                   )
                 }
-                className="px-3 py-1.5 rounded bg-[#121620] hover:bg-[#1A202E] border border-[#232938] text-xs font-bold text-white disabled:opacity-40"
+                className="px-3 py-1.5 rounded bg-[#121620] hover:bg-[#1A202E] border border-[#38445B] text-xs font-bold text-white disabled:opacity-40"
               >
                 Withdraw
               </button>
