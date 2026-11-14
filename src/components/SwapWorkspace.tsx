@@ -2434,19 +2434,22 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                                   ? Number(limitPrice) || orderbook.midPrice || 1
                                   : orderbook.midPrice || 1;
                               if (limitSide === 'buy') {
-                                const totalQuote =
-                                  limitWalletQuoteBal + (managerState?.quoteBalance ?? 0);
-                                const quoteAmt = totalQuote * pct * 0.97;
+                                const walletQuote = Math.max(
+                                  0,
+                                  limitWalletQuoteBal - (activePool.quoteSymbol === 'SUI' ? 0.05 : 0)
+                                );
+                                const quoteAmt = walletQuote * pct * 0.97;
                                 setLimitQty(
                                   qtyCurrency === 'quote'
                                     ? quoteAmt.toFixed(2)
                                     : (quoteAmt / px).toFixed(2)
                                 );
                               } else {
-                                const totalBase =
-                                  Math.max(0, limitWalletBaseBal - (activePool.baseSymbol === 'SUI' ? 0.08 : 0)) +
-                                  (managerState?.baseBalance ?? 0);
-                                const baseAmt = totalBase * pct * 0.98;
+                                const walletBase = Math.max(
+                                  0,
+                                  limitWalletBaseBal - (activePool.baseSymbol === 'SUI' ? 0.05 : 0)
+                                );
+                                const baseAmt = walletBase * pct * 0.98;
                                 setLimitQty(
                                   qtyCurrency === 'quote'
                                     ? (baseAmt * px).toFixed(2)
