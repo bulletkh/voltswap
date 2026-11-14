@@ -455,7 +455,7 @@ export async function quotePredictTrade(params: {
   owner: string;
   market: ActiveMarket;
   side: 'up' | 'down' | 'range';
-  strike?: number;
+  strike?: number | 'reference';
   lowerStrike?: number;
   upperStrike?: number;
   amountUsdc: number;
@@ -495,7 +495,10 @@ export async function quotePredictTrade(params: {
             expiryMs: market.expiryMs,
             marketId: market.id,
             side,
-            strike: snapStrike(strike || 1, step, 'nearest'),
+            strike:
+              strike === 'reference'
+                ? ('reference' as const)
+                : snapStrike(strike || 1, step, 'nearest'),
           };
     const plan = await client.predict.read.planMint(owner, desc, {
       amount: amountUsdc,
