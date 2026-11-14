@@ -79,9 +79,13 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
   );
   const refTier = useMemo(() => resolveReferralTier(volumeUsd), [volumeUsd]);
 
+  const originUrl =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://voltswap.org';
   const refUrl = account?.address
-    ? `https://voltswap.org/?ref=${account.address}`
-    : 'https://voltswap.org/?ref=<YOUR_SUI_ADDRESS>';
+    ? `${originUrl}/?ref=${account.address}`
+    : `${originUrl}/?ref=<YOUR_SUI_ADDRESS>`;
 
   const copyRefLink = () => {
     if (!account?.address) return;
@@ -107,7 +111,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           </h1>
           <p className="text-sm text-slate-300 mt-0.5">
             {subTab === 'traders'
-              ? 'Volume-based fee rebates down to 0.03% across Market Swap, DeepBook Limit, Margin & Perps.'
+              ? 'Volume-based fee rebates down to 0.03% across Market Swap, DeepBook Limit, Margin, Perps & Predict.'
               : 'Instant non-custodial PTB rev-share paid directly to your wallet on every referred trade.'}
           </p>
         </div>
@@ -266,7 +270,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                 Volume Discount Schedule
               </span>
               <span className="text-xs text-[#8E98A8] font-mono">
-                Applies across Market Swap · DeepBook Limit · Margin · Perps · Earn
+                Applies across Market Swap · DeepBook Limit · Margin · Perps · Predict · Earn
               </span>
             </div>
 

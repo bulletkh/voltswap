@@ -298,20 +298,15 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
       }
     });
 
-    // If balances haven't populated yet, fallback to known authentic numbers from Suiscan
-    const effectiveUsdc = usdc > 0 ? usdc : (allCoinBalances.length > 0 ? 0.8145 : 0.8145);
-    const effectiveVolt = volt > 0 ? volt : 100000000;
-    const effectiveSui = treasurySuiBalance > 0 ? treasurySuiBalance : 1.271954621;
-
-    const totalUsd = (effectiveSui * suiPriceUsd) + (effectiveUsdc * 1.0);
-    const totalSui = suiPriceUsd > 0 ? (totalUsd / suiPriceUsd) : 2.462;
+    const totalUsd = treasurySuiBalance * suiPriceUsd + usdc;
+    const totalSui = suiPriceUsd > 0 ? totalUsd / suiPriceUsd : treasurySuiBalance;
 
     return {
-      usdcBalance: effectiveUsdc,
-      voltBalance: effectiveVolt,
-      haedalBalance: haedal > 0 ? haedal : 0.0815,
+      usdcBalance: usdc,
+      voltBalance: volt,
+      haedalBalance: haedal,
       netWorthUsd: totalUsd,
-      netWorthSui: totalSui
+      netWorthSui: totalSui,
     };
   }, [allCoinBalances, treasurySuiBalance, suiPriceUsd]);
 
@@ -333,10 +328,11 @@ export const TreasuryDashboard: React.FC<TreasuryDashboardProps> = ({
     let perpFees = 0;
 
     recordedSwaps.forEach((s) => {
-      const v = typeof s.volumeUsd === 'number' ? s.volumeUsd : parseFloat(s.volumeUsd || '0') || 0;
-      const rate = typeof s.feeRate === 'number' ? s.feeRate : parseFloat(s.feeRate || '0') || 0.0016;
+      const v = typeof s.volumeUsd === 'number' ? s.volumeUsd : parseFloat(String(s.volumeUsd ?? '0')) || 0;
+      const parsedRate = typeof s.feeRate === 'number' ? s.feeRate : Number(s.feeRate);
+      const rate = Number.isFinite(parsedRate) && parsedRate >= 0 ? parsedRate : 0;
       vol += v;
-      fees += (v * rate);
+      fees += v * rate;
 
       const mode = (s.swapMode || 'market').toLowerCase();
       if (mode.includes('perp')) {
