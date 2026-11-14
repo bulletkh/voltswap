@@ -260,7 +260,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [showPoolDropdown, setShowPoolDropdown] = useState(false);
   const [poolSearch, setPoolSearch] = useState('');
   const [poolQuoteFilter, setPoolQuoteFilter] = useState<'all' | 'usdc' | 'sui' | 'bluechip'>('all');
-  const [spotDockTab, setSpotDockTab] = useState<'orders' | 'history' | 'vault'>('orders');
+  const [spotDockTab, setSpotDockTab] = useState<'orders' | 'history'>('orders');
   const [spotHistory, setSpotHistory] = useState<
     Array<{
       id: string;
@@ -2634,17 +2634,6 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       >
                         History ({spotHistory.length})
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setSpotDockTab('vault')}
-                        className={`pb-1 text-xs font-mono border-b-2 -mb-[9px] transition-colors ${
-                          spotDockTab === 'vault'
-                            ? 'border-[#2B7FFF] text-white font-semibold'
-                            : 'border-transparent text-[#8E98A8] hover:text-white'
-                        }`}
-                      >
-                        BalanceManager Vault ({managerIds.length || 'Auto'})
-                      </button>
                       {vaultSummary.openOrders.length > 0 && (
                         <button
                           type="button"
@@ -2677,65 +2666,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     </button>
                   </div>
 
-                  {spotDockTab === 'vault' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-[#06070A] border border-[#323D52] rounded-lg p-3">
-                      <div className="md:col-span-5 space-y-1.5">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-white">
-                          <ShieldCheck className="w-4 h-4 text-[#60A5FA]" />
-                          <span>Shared DeepBook BalanceManager Custody</span>
-                        </div>
-                        <p className="text-[11px] text-[#8E98A8] leading-snug">
-                          Shared across all {pools.length} Spot pairs. Pre-deposit is optional — orders auto-draw from your wallet and Market orders auto-settle back to wallet.
-                        </p>
-                      </div>
-
-                      <div className="md:col-span-3 grid grid-cols-2 gap-2 text-xs font-mono tabular-nums">
-                        <div className="bg-[#000000] rounded px-2.5 py-2 border border-[#323D52]">
-                          <div className="text-[#8E98A8] text-[10px]">Free {activePool.baseSymbol}</div>
-                          <div className="text-white font-bold">{vaultSummary.freeBase.toFixed(4)}</div>
-                        </div>
-                        <div className="bg-[#000000] rounded px-2.5 py-2 border border-[#323D52]">
-                          <div className="text-[#8E98A8] text-[10px]">Free {activePool.quoteSymbol}</div>
-                          <div className="text-white font-bold">{vaultSummary.freeQuote.toFixed(4)}</div>
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-4 flex flex-wrap sm:flex-nowrap items-center gap-1.5">
-                        <select
-                          value={depositCoinSide}
-                          onChange={(e) => setDepositCoinSide(e.target.value as 'base' | 'quote')}
-                          className="bg-[#000000] border border-[#323D52] rounded px-2 py-1.5 text-xs font-mono text-white outline-none"
-                        >
-                          <option value="quote">{activePool.quoteSymbol}</option>
-                          <option value="base">{activePool.baseSymbol}</option>
-                        </select>
-                        <input
-                          type="number"
-                          placeholder="Amount"
-                          value={depositAmt}
-                          onChange={(e) => setDepositAmt(e.target.value)}
-                          className="w-full min-w-0 bg-[#000000] border border-[#323D52] focus:border-[#2B7FFF]/60 rounded px-2.5 py-1.5 text-xs font-mono text-white outline-none"
-                        />
-                        <button
-                          type="button"
-                          disabled={isVaultBusy || !account || !depositAmt}
-                          onClick={handleDepositManager}
-                          className="px-2.5 py-1.5 rounded bg-[#121620] hover:bg-[#1A202E] border border-[#38445B] text-xs font-semibold text-white shrink-0 disabled:opacity-45"
-                        >
-                          {!managerState && managerIds.length === 0 ? 'Create & Deposit' : 'Deposit'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isVaultBusy || !managerState}
-                          onClick={() => handleWithdrawManagerAll(false)}
-                          className="px-2.5 py-1.5 rounded btn-deepbook text-xs shrink-0 disabled:opacity-45"
-                          title="Withdraw unlocked & settled funds across all DeepBook vaults to wallet"
-                        >
-                          Withdraw All
-                        </button>
-                      </div>
-                    </div>
-                  ) : spotDockTab === 'history' ? (
+                  {spotDockTab === 'history' ? (
                     !account ? (
                       <div className="text-xs text-[#8E98A8] py-8 text-center font-mono">
                         Connect your Sui wallet to view your Spot CLOB order &amp; fill history.
