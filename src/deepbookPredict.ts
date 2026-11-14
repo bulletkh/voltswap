@@ -10,6 +10,7 @@ import {
   registryMoveCalls,
   builderCodeMoveCalls,
   predictAccountMoveCalls,
+  plpMoveCalls,
   queueMoveCalls,
   queueTx,
   deriveAccountWrapperId,
@@ -861,4 +862,121 @@ export function buildClaimPredictBuilderFeesTx(sender: string): Transaction {
   );
   tx.transferObjects([coin], sender);
   return tx;
+}
+
+export interface PredictPlpVaultState {
+  plpTotalSupply: number;
+  idleUsdc: number;
+  supplyRequestsPending: number;
+  withdrawRequestsPending: number;
+  userPlpSharesRaw: bigint;
+  userPlpShares: number;
+  vaultAvailableUsdc: number;
+  hasAccount: boolean;
+}
+
+export async function fetchPredictPlpVault(owner?: string): Promise<PredictPlpVaultState> {
+  const client = createPredictClient();
+  const wrapperId = owner ? deriveAccountWrapperId(MAINNET_CONFIG, owner) : '';
+  const [pool, userPlpRaw, bal, accExists] = await Promise.all([
+    client.predict.read.pool().catch(() => ({
+      plpTotalSupply: 0n,
+      idleUsdc: 0,
+      supplyRequestsPending: 0,
+      withdrawRequestsPending: 0,
+    })),
+    owner ? client.predict.read.plpBalance(owner).catch(() => 0n) : Promise.resolve(0n),
+    owner ? client.predict.read.balance(owner).catch(() => 0) : Promise.resolve(0),
+    wrapperId ? checkObjectExists(wrapperId) : Promise.resolve({ exists: false }),
+  ]);
+
+  return {
+    plpTotalSupply: rawToUsdc(pool.plpTotalSupply),
+    idleUsdc: pool.idleUsdc,
+    supplyRequestsPending: pool.supplyRequestsPending,
+    withdrawRequestsPending: pool.withdrawRequestsPending,
+    userPlpSharesRaw: userPlpRaw,
+    userPlpShares: rawToUsdc(userPlpRaw),
+    vaultAvailableUsdc: typeof bal === 'number' ? bal : 0,
+    hasAccount: accExists.exists,
+  };
+}
+
+export function buildPredictPlpSupplyTx(params: {
+  sender: string;
+  amountUsdc: number;
+  hasAccount: boolean;
+  vaultAvailableUsdc: number;
+  referrerWrapperId?: string;
+}): Transaction {
+  const { sender, amountUsdc, hasAccount, vaultAvailableUsdc, referrerWrapperId } = params;
+  const tx = new Transaction();
+  tx.setSender(sender);
+
+  const cfg = toGeneratedConfig(MAINNET_CONFIG);
+  const accCfg = {
+    accountPackageId: MAINNET_CONFIG.packages.account,
+    accountRegistry: MAINNET_CONFIG.objects.accountRegistry,
+    accountPackageIdLatest: MAINNET_CONFIG.packages.accountLatest,
+  };
+
+  const amountRaw = usdcToRaw(amountUsdc);
+  const availRaw = usdcToRaw(vaultAvailableUsdc);
+  const shortfallRaw = availRaw >= amountRaw ? 0n : amountRaw - availRaw;
+  const existingWrapperId = deriveAccountWrapperId(MAINNET_CONFIG, sender);
+
+  let wrapperTarget: any = existingWrapperId;
+  if (!hasAccount) {
+    wrapperTarget = tx.add(
+      referrerWrapperId
+        ? accountRegistryMoveCalls.newWithReferrer({
+            config: accCfg,
+            arguments: { referrer: referrerWrapperId },
+          })
+        : accountRegistryMoveCalls._new({ config: accCfg })
+    );
+  }
+
+  if (shortfallRaw > 0n) {
+    const coin = coinWithBalance({
+      type: MAINNET_CONFIG.quoteCoinType,
+      balance: shortfallRaw,
+      useGasCoin: false,
+    })(tx);
+    const authDep = tx.add(generateAuth(MAINNET_CONFIG));
+    tx.add(
+      accountMoveCalls.depositFunds({
+        config: accCfg,
+        arguments: { wrapper: wrapperTarget, auth: authDep, coin },
+        typeArguments: [MAINNET_CONFIG.quoteCoinType],
+      })
+    );
+  }
+
+  const authPlp = tx.add(generateAuth(MAINNET_CONFIG));
+  tx.add(
+    plpMoveCalls.requestSupply({
+      config: cfg,
+      arguments: {
+        wrapper: wrapperTarget,
+        auth: authPlp,
+        amount: amountRaw,
+        minPlpOut: 0n,
+      },
+    })
+  );
+
+  if (!hasAccount) {
+    tx.add(accountMoveCalls.share({ config: accCfg, arguments: { self: wrapperTarget } }));
+  }
+
+  return tx;
+}
+
+export function buildPredictPlpWithdrawTx(params: {
+  sender: string;
+  sharesRaw: bigint;
+}): Transaction {
+  const client = createPredictClient();
+  return client.predict.tx.withdrawPlp(params.sender, params.sharesRaw);
 }

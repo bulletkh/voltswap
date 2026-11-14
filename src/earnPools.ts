@@ -568,10 +568,11 @@ export function buildDeepBookMarginWithdrawTx(params: {
 /**
  * Fetches live APYs, TVL, and Cetus swap exchange rates for on-site LST & RWA Yield Vaults.
  */
-export async function fetchLstVaultStats(): Promise<LstVaultLiveStat[]> {
-  const [llamaRes, voloRes, rateQuotes] = await Promise.all([
+export async function fetchLstVaultStats(suiPriceUsd?: number): Promise<LstVaultLiveStat[]> {
+  const [llamaRes, voloRes, pricesMap, rateQuotes] = await Promise.all([
     fetch('https://yields.llama.fi/pools').catch(() => null),
     fetch('https://open-api.naviprotocol.io/api/volo/stats').catch(() => null),
+    suiPriceUsd && suiPriceUsd > 0 ? Promise.resolve(null) : fetchDeepBookCoinPrices(),
     Promise.allSettled(
       LST_VAULT_OPTIONS.map(async (opt) => {
         const baseType = opt.basePayCoin === 'USDC' ? USDC_COIN_TYPE : SUI_COIN_TYPE;
@@ -622,9 +623,11 @@ export async function fetchLstVaultStats(): Promise<LstVaultLiveStat[]> {
     let apyPct = Number(match?.apy || opt.defaultApyPct);
     let tvlUsd = Number(match?.tvlUsd || 0);
 
+    const liveSuiPx =
+      suiPriceUsd && suiPriceUsd > 0 ? suiPriceUsd : (pricesMap?.SUI ?? 0);
     if (opt.symbol === 'vSUI' && voloApy > 0) {
       apyPct = Math.max(apyPct, voloApy);
-      if (tvlUsd <= 0 && voloTvlSui > 0) tvlUsd = voloTvlSui * 0.81;
+      if (tvlUsd <= 0 && voloTvlSui > 0 && liveSuiPx > 0) tvlUsd = voloTvlSui * liveSuiPx;
     }
 
     const qRes = rateQuotes[idx];

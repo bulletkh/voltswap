@@ -26,6 +26,14 @@ import {
   type UserMarginPosition,
   type VoltMarginSupplyReferral,
 } from '../earnPools';
+import {
+  buildPredictPlpSupplyTx,
+  buildPredictPlpWithdrawTx,
+  fetchPredictPlpVault,
+  fetchPredictProtocolStatus,
+  type PredictPlpVaultState,
+} from '../deepbookPredict';
+import { usdcToRaw } from '@mysten/deepbook-v3/predict';
 import { extractTxDigest, fetchWalletBalances, readBalanceFromMap, SUI_COIN_TYPE } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
 import {
@@ -51,7 +59,8 @@ interface EarnWorkspaceProps {
 
 type SelectedAction =
   | { kind: 'margin'; op: 'supply' | 'withdraw'; coinKey: string }
-  | { kind: 'lst'; op: 'stake' | 'unstake'; symbol: string };
+  | { kind: 'lst'; op: 'stake' | 'unstake'; symbol: string }
+  | { kind: 'plp'; op: 'supply' | 'withdraw' };
 
 export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
   onNotify,
@@ -68,6 +77,8 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
 
   const [marginVaults, setMarginVaults] = useState<DeepBookMarginVault[]>([]);
   const [lstStats, setLstStats] = useState<LstVaultLiveStat[]>([]);
+  const [plpVault, setPlpVault] = useState<PredictPlpVaultState | null>(null);
+  const [plpReferrerId, setPlpReferrerId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
   const [balances, setBalances] = useState<Record<string, bigint>>({});
@@ -101,18 +112,24 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
   const loadAllYieldData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [margins, lsts, refs] = await Promise.all([
+      const [margins, lsts, refs, plp, proto] = await Promise.all([
         fetchDeepBookMarginVaults().catch(() => []),
         fetchLstVaultStats().catch(() => []),
         fetchVoltMarginSupplyReferrals().catch(() => ({})),
+        fetchPredictPlpVault(account?.address).catch(() => null),
+        fetchPredictProtocolStatus().catch(() => null),
       ]);
       setMarginVaults(margins);
       setLstStats(lsts);
       setMarginReferrals(refs);
+      setPlpVault(plp);
+      if (proto?.referrerWrapperExists) {
+        setPlpReferrerId(proto.referrerWrapperId);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [account?.address]);
 
   const refreshUserPortfolio = useCallback(async () => {
     if (!account?.address) {
@@ -121,16 +138,18 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
       setMarginPositions({});
       return;
     }
-    const [balMap, posData] = await Promise.all([
+    const [balMap, posData, plp] = await Promise.all([
       fetchWalletBalances(account.address).catch(() => ({})),
       fetchUserDeepBookMarginPositions(account.address).catch(() => ({
         supplierCapIds: [],
         positions: {},
       })),
+      fetchPredictPlpVault(account.address).catch(() => null),
     ]);
     setBalances(balMap);
     setSupplierCapIds(posData.supplierCapIds);
     setMarginPositions(posData.positions);
+    if (plp) setPlpVault(plp);
   }, [account?.address]);
 
   useEffect(() => {
@@ -150,6 +169,10 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
     if (next.kind === 'margin' && next.op === 'withdraw') {
       const pos = marginPositions[next.coinKey];
       setAmountInput(pos && pos.suppliedAmount > 0 ? String(pos.suppliedAmount) : '');
+    } else if (next.kind === 'plp' && next.op === 'withdraw') {
+      setAmountInput(plpVault && plpVault.userPlpShares > 0 ? String(plpVault.userPlpShares) : '');
+    } else if (next.kind === 'plp' && next.op === 'supply') {
+      setAmountInput('10');
     } else if (next.kind === 'lst' && next.op === 'unstake') {
       const meta = LST_VAULT_OPTIONS.find((x) => x.symbol === next.symbol);
       const held =
@@ -189,6 +212,13 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
       }
       return marginPositions[activeMarginVault.coinKey]?.suppliedAmount ?? 0;
     }
+    if (selected.kind === 'plp') {
+      if (selected.op === 'supply') {
+        const walletUsdc = readBalanceFromMap(balances, USDC_COIN_TYPE, 6);
+        return walletUsdc + (plpVault?.vaultAvailableUsdc ?? 0);
+      }
+      return plpVault?.userPlpShares ?? 0;
+    }
     if (selected.kind === 'lst' && activeLstVault) {
       if (selected.op === 'stake') {
         const payCoinType = lstSettlementCoin === 'USDC' ? USDC_COIN_TYPE : SUI_COIN_TYPE;
@@ -206,10 +236,13 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
     balances,
     marginPositions,
     lstSettlementCoin,
+    plpVault,
   ]);
 
+  const suiPriceUsd = marginVaults.find((m) => m.symbol === 'SUI')?.priceUsd ?? 0;
+
   const summaryMetrics = useMemo(() => {
-    const marginTvl = marginVaults.reduce((s, v) => s + v.tvlUsd, 0);
+    const marginTvl = marginVaults.reduce((s, v) => s + v.tvlUsd, 0) + (plpVault?.idleUsdc ?? 0);
     const topMarginApr = marginVaults.reduce((m, v) => Math.max(m, v.supplyAprPct), 0);
     const topLstApy = lstStats.reduce((m, l) => Math.max(m, l.apyPct), 0);
     const userMarginUsd = marginVaults.reduce((s, v) => {
@@ -219,18 +252,18 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
     const userLstUsd = account?.address
       ? lstStats.reduce((s, l) => {
           const bal = readBalanceFromMap(balances, l.coinType, l.decimals);
-          const unitUsd =
-            l.category === 'rwa' ? 1 : (marginVaults.find((m) => m.symbol === 'SUI')?.priceUsd ?? 0.81);
+          const unitUsd = l.category === 'rwa' ? 1 : suiPriceUsd;
           return s + bal * (l.exchangeRateToBase ?? 1) * unitUsd;
         }, 0)
       : 0;
+    const userPlpUsd = plpVault?.userPlpShares ?? 0;
     return {
       marginTvl,
       topMarginApr,
       topLstApy,
-      userTotalUsd: userMarginUsd + userLstUsd,
+      userTotalUsd: userMarginUsd + userLstUsd + userPlpUsd,
     };
-  }, [marginVaults, lstStats, marginPositions, balances, account?.address]);
+  }, [marginVaults, lstStats, marginPositions, balances, account?.address, suiPriceUsd, plpVault]);
 
   const filteredMargins = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -388,6 +421,85 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
             `https://suiscan.xyz/mainnet/tx/${digest}`
           );
         }
+      } else if (selected.kind === 'plp') {
+        if (selected.op === 'supply') {
+          const tx = buildPredictPlpSupplyTx({
+            sender: account.address,
+            amountUsdc: amtNum,
+            hasAccount: Boolean(plpVault?.hasAccount),
+            vaultAvailableUsdc: plpVault?.vaultAvailableUsdc ?? 0,
+            referrerWrapperId: plpReferrerId,
+          });
+          const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+          if (!sim.ok) {
+            onNotify('error', 'PLP Preflight Failed', sim.errorMessage || 'PLP supply aborted.');
+            return;
+          }
+          const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+          const digest = extractTxDigest(res);
+          const nextVol = addWalletVolumeUsd(account.address, amtNum);
+          onVolumeUpdated?.(nextVol);
+          fetch('/api/record-swap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              digest,
+              address: account.address,
+              fromToken: 'USDC',
+              toToken: 'PLP',
+              fromAmount: amtNum,
+              toAmount: amtNum,
+              volumeUsd: amtNum,
+              feeRate: 0,
+              tierName: traderTier.name,
+              swapMode: 'DEEPBOOK_PLP_SUPPLY',
+              referrer: activeReferrer,
+            }),
+          }).catch(() => {});
+          onNotify(
+            'success',
+            `PLP Supply Queued (${amtNum.toFixed(2)} USDC)`,
+            'Your PLP shares will mint on the next DeepBook Predict pool flush.',
+            'Suiscan',
+            `https://suiscan.xyz/mainnet/tx/${digest}`
+          );
+          onTradeRecorded({
+            fromToken: 'USDC',
+            toToken: 'Predict PLP',
+            fromAmount: amtNum.toFixed(2),
+            toAmount: 'Queued',
+            volumeUsd: amtNum,
+            digest,
+            orderType: 'SWAP',
+          });
+        } else {
+          const sharesRaw =
+            amtNum >= (plpVault?.userPlpShares ?? 0) * 0.995 && plpVault?.userPlpSharesRaw
+              ? plpVault.userPlpSharesRaw
+              : usdcToRaw(amtNum);
+          if (sharesRaw <= 0n) {
+            onNotify('warning', 'No PLP Shares', 'You have no PLP shares to withdraw.');
+            return;
+          }
+          const tx = buildPredictPlpWithdrawTx({
+            sender: account.address,
+            sharesRaw,
+          });
+          const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+          if (!sim.ok) {
+            onNotify('error', 'PLP Withdraw Failed', sim.errorMessage || 'PLP withdraw aborted.');
+            return;
+          }
+          const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+          const digest = extractTxDigest(res);
+          onNotify(
+            'success',
+            'PLP Withdraw Queued',
+            `Requested withdrawal of ${amtNum.toFixed(4)} PLP shares on next pool flush.`,
+            'Suiscan',
+            `https://suiscan.xyz/mainnet/tx/${digest}`
+          );
+        }
       } else if (selected.kind === 'lst' && activeLstVault) {
         const baseType = lstSettlementCoin === 'USDC' ? USDC_COIN_TYPE : SUI_COIN_TYPE;
         const baseDec = lstSettlementCoin === 'USDC' ? 6 : 9;
@@ -417,12 +529,31 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
         const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
         const digest = extractTxDigest(res);
         const outHuman = (Number(expectedOutAtomic) / Math.pow(10, outDec)).toFixed(4);
-        const suiPx = marginVaults.find((m) => m.symbol === 'SUI')?.priceUsd ?? 0.81;
         const estUsd =
-          inSym === 'USDC' || inSym === 'USDY' || inSym === 'BUCK' ? amtNum : amtNum * suiPx;
+          inSym === 'USDC' || inSym === 'USDY' || inSym === 'BUCK'
+            ? amtNum
+            : amtNum * (suiPriceUsd > 0 ? suiPriceUsd : 1);
 
         const nextVol = addWalletVolumeUsd(account.address, estUsd);
         onVolumeUpdated?.(nextVol);
+
+        fetch('/api/record-swap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            digest,
+            address: account.address,
+            fromToken: inSym,
+            toToken: outSym,
+            fromAmount: amtNum,
+            toAmount: Number(outHuman),
+            volumeUsd: estUsd,
+            feeRate: traderTier.feeRate,
+            tierName: traderTier.name,
+            swapMode: 'EARN_LST_ZAP',
+            referrer: activeReferrer,
+          }),
+        }).catch(() => {});
 
         onNotify(
           'success',
@@ -462,16 +593,17 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
       };
     }
     if (selected.kind === 'lst' && activeLstVault) {
-      const suiPx = marginVaults.find((m) => m.symbol === 'SUI')?.priceUsd ?? 0.81;
       const baseUsd =
-        lstSettlementCoin === 'USDC' || activeLstVault.category === 'rwa' ? amt : amt * suiPx;
+        lstSettlementCoin === 'USDC' || activeLstVault.category === 'rwa'
+          ? amt
+          : amt * (suiPriceUsd > 0 ? suiPriceUsd : 0);
       return {
         apr: activeLstVault.apyPct,
         estUsdYr: baseUsd * (activeLstVault.apyPct / 100),
       };
     }
     return null;
-  }, [amountInput, selected, activeMarginVault, activeLstVault, lstSettlementCoin, marginVaults]);
+  }, [amountInput, selected, activeMarginVault, activeLstVault, lstSettlementCoin, suiPriceUsd]);
 
   return (
     <div className="w-full space-y-4 animate-panel-in">
@@ -727,6 +859,80 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
             </div>
           )}
 
+          {/* SECTION 1B: DeepBook Predict Liquidity Pool (PLP) */}
+          {(tab === 'onsite' || tab === 'margin') && (
+            <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#2D374B] flex flex-wrap items-center justify-between gap-2 bg-[#000000]">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#60A5FA]" />
+                  <span className="text-sm font-bold text-white">
+                    DeepBook Predict Liquidity Pool (PLP)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 text-[11px] font-mono font-semibold">
+                    OPTIONS MARKET MAKING
+                  </span>
+                </div>
+                <span className="text-xs font-mono text-slate-400">
+                  Earn Spread &amp; Binary Option Fees (USDC)
+                </span>
+              </div>
+
+              <div className="p-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 min-w-[260px] font-mono tabular-nums text-xs">
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">Pool Idle USDC</div>
+                    <div className="text-sm font-bold text-white mt-0.5">
+                      ${plpVault ? plpVault.idleUsdc.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">Total PLP Supply</div>
+                    <div className="text-sm font-bold text-white mt-0.5">
+                      {plpVault ? plpVault.plpTotalSupply.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">Pending Queue</div>
+                    <div className="text-sm font-bold text-[#60A5FA] mt-0.5">
+                      {plpVault
+                        ? `${plpVault.supplyRequestsPending} in / ${plpVault.withdrawRequestsPending} out`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">My PLP Shares</div>
+                    <div className="text-sm font-bold text-[#08D189] mt-0.5">
+                      {plpVault && plpVault.userPlpShares > 0.0001
+                        ? `${plpVault.userPlpShares.toFixed(4)} PLP`
+                        : '0.00'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => selectVaultAction({ kind: 'plp', op: 'supply' })}
+                    className="px-3 py-1.5 rounded-md btn-deepbook font-bold text-xs transition-colors"
+                  >
+                    Supply USDC
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectVaultAction({ kind: 'plp', op: 'withdraw' })}
+                    className={`px-2.5 py-1.5 rounded-md border text-xs font-semibold transition-colors ${
+                      plpVault && plpVault.userPlpShares > 0.0001
+                        ? 'border-[#08D189]/45 text-[#08D189] hover:bg-[#08D189]/15'
+                        : 'border-[#323D52] text-slate-300 hover:text-white hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* SECTION 2: Liquid Staking & RWA Yield Vaults (On-Site Stake & Unstake) */}
           {(tab === 'onsite' || tab === 'lst') && (
             <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
@@ -844,6 +1050,80 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
               </div>
             </div>
           )}
+
+          {/* SECTION 1B: DeepBook Predict Liquidity Pool (PLP) */}
+          {(tab === 'onsite' || tab === 'margin') && (
+            <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#2D374B] flex flex-wrap items-center justify-between gap-2 bg-[#000000]">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#60A5FA]" />
+                  <span className="text-sm font-bold text-white">
+                    DeepBook Predict Liquidity Pool (PLP)
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 text-[11px] font-mono font-semibold">
+                    OPTIONS MARKET MAKING
+                  </span>
+                </div>
+                <span className="text-xs font-mono text-slate-400">
+                  Earn Spread &amp; Binary Option Fees (USDC)
+                </span>
+              </div>
+
+              <div className="p-4 flex flex-wrap items-center justify-between gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 min-w-[260px] font-mono tabular-nums text-xs">
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">Pool Idle USDC</div>
+                    <div className="text-sm font-bold text-white mt-0.5">
+                      ${plpVault ? plpVault.idleUsdc.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">Total PLP Supply</div>
+                    <div className="text-sm font-bold text-white mt-0.5">
+                      {plpVault ? plpVault.plpTotalSupply.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">Pending Queue</div>
+                    <div className="text-sm font-bold text-[#60A5FA] mt-0.5">
+                      {plpVault
+                        ? `${plpVault.supplyRequestsPending} in / ${plpVault.withdrawRequestsPending} out`
+                        : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-slate-400 font-sans">My PLP Shares</div>
+                    <div className="text-sm font-bold text-[#08D189] mt-0.5">
+                      {plpVault && plpVault.userPlpShares > 0.0001
+                        ? `${plpVault.userPlpShares.toFixed(4)} PLP`
+                        : '0.00'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => selectVaultAction({ kind: 'plp', op: 'supply' })}
+                    className="px-3 py-1.5 rounded-md btn-deepbook font-bold text-xs transition-colors"
+                  >
+                    Supply USDC
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectVaultAction({ kind: 'plp', op: 'withdraw' })}
+                    className={`px-2.5 py-1.5 rounded-md border text-xs font-semibold transition-colors ${
+                      plpVault && plpVault.userPlpShares > 0.0001
+                        ? 'border-[#08D189]/45 text-[#08D189] hover:bg-[#08D189]/15'
+                        : 'border-[#323D52] text-slate-300 hover:text-white hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    Withdraw
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Sticky Execution Ticket (Always Interactive On-Site) */}
@@ -852,7 +1132,53 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
           className="lg:col-span-4 bg-[#06070A] border border-[#2E384C] rounded-xl p-4 space-y-4 lg:sticky lg:top-16"
         >
           {/* Mode Switcher */}
-          {selected.kind === 'margin' && activeMarginVault ? (
+          {selected.kind === 'plp' ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-[#2B7FFF]/20 border border-[#2B7FFF]/50 flex items-center justify-center text-xs font-bold text-[#60A5FA]">
+                    PLP
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-white">Predict Liquidity Pool</div>
+                    <div className="text-xs font-mono text-[#60A5FA]">
+                      DeepBook Predict Market Maker Vault
+                    </div>
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/40">
+                  Predict PLP
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#000000] border border-[#2D374B]">
+                <button
+                  type="button"
+                  onClick={() => selectVaultAction({ kind: 'plp', op: 'supply' })}
+                  className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    selected.op === 'supply'
+                      ? 'bg-[#2B7FFF] text-white font-bold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                  <span>Supply USDC</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectVaultAction({ kind: 'plp', op: 'withdraw' })}
+                  className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    selected.op === 'withdraw'
+                      ? 'bg-[#08D189] text-[#02060A]'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ArrowUpFromLine className="w-3.5 h-3.5" />
+                  <span>Withdraw PLP</span>
+                </button>
+              </div>
+            </>
+          ) : selected.kind === 'margin' && activeMarginVault ? (
             <>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -1002,7 +1328,11 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
               <span className="text-slate-400">
                 {selected.kind === 'margin' && selected.op === 'withdraw'
                   ? 'Deposited Balance'
-                  : 'Wallet Balance'}
+                  : selected.kind === 'plp' && selected.op === 'withdraw'
+                    ? 'My PLP Shares'
+                    : selected.kind === 'plp'
+                      ? 'Wallet + Predict Vault'
+                      : 'Wallet Balance'}
               </span>
               <span className="text-white font-semibold tabular-nums">
                 {availableActionBalance.toFixed(4)}
@@ -1020,11 +1350,15 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                 className="flex-1 min-w-0 bg-transparent text-2xl font-mono font-bold text-white outline-none"
               />
               <span className="px-2.5 py-1 rounded bg-[#0C0E13] border border-[#2D374B] text-xs font-mono font-bold text-white">
-                {selected.kind === 'margin'
-                  ? activeMarginVault?.symbol || 'USDC'
-                  : selected.op === 'stake'
-                    ? lstSettlementCoin
-                    : activeLstVault?.symbol || 'haSUI'}
+                {selected.kind === 'plp'
+                  ? selected.op === 'supply'
+                    ? 'USDC'
+                    : 'PLP'
+                  : selected.kind === 'margin'
+                    ? activeMarginVault?.symbol || 'USDC'
+                    : selected.op === 'stake'
+                      ? lstSettlementCoin
+                      : activeLstVault?.symbol || 'haSUI'}
               </span>
             </div>
 
@@ -1042,65 +1376,160 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
             </div>
           </div>
 
-          {/* Transparent Estimates & Volt Fee Breakdown */}
-          <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 space-y-2 text-xs font-mono">
-            {estYieldPerYear && (
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Est. Yield / Year</span>
-                <span className="text-[#08D189] font-bold">
-                  +${estYieldPerYear.estUsdYr.toFixed(2)} ({estYieldPerYear.apr.toFixed(2)}%)
-                </span>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">
-                {selected.kind === 'margin'
-                  ? 'Vault Deposit Fee'
-                  : `Volt Tier Fee (${traderTier.name})`}
-              </span>
-              <span className="text-[#60A5FA] font-semibold">
-                {selected.kind === 'margin'
-                  ? selected.op === 'withdraw'
-                    ? '0.00% (Free Withdraw)'
-                    : '0.00% (100% Principal · DeepBook Ref)'
-                  : `${(traderTier.feeRate * 100).toFixed(2)}%`}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Custody Model</span>
-              <span className="text-[#08D189] inline-flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Wallet / SupplierCap
-              </span>
-            </div>
-          </div>
+          {(() => {
+            const parsedAmt = Number(amountInput) || 0;
+            const insufficientBalance = Boolean(account && parsedAmt > availableActionBalance + 1e-6);
+            const capLeft =
+              selected.kind === 'margin' && activeMarginVault && activeMarginVault.supplyCap > 0
+                ? Math.max(0, activeMarginVault.supplyCap - activeMarginVault.totalSupply)
+                : null;
+            const capExceeded = Boolean(
+              selected.kind === 'margin' &&
+                selected.op === 'supply' &&
+                capLeft !== null &&
+                parsedAmt > capLeft + 1e-6
+            );
+            const poolAvailLiq =
+              selected.kind === 'margin' && activeMarginVault
+                ? Math.max(0, activeMarginVault.totalSupply - activeMarginVault.totalBorrow)
+                : null;
+            const liqExceeded = Boolean(
+              selected.kind === 'margin' &&
+                selected.op === 'withdraw' &&
+                poolAvailLiq !== null &&
+                parsedAmt > poolAvailLiq + 1e-6
+            );
 
-          <button
-            type="button"
-            disabled={isExecuting}
-            onClick={executeOnSiteAction}
-            className={`w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 ${
-              (selected.kind === 'margin' && selected.op === 'withdraw') ||
-              (selected.kind === 'lst' && selected.op === 'unstake')
-                ? 'bg-[#08D189] hover:bg-[#0DE295] text-[#02060A]'
-                : 'btn-deepbook'
-            }`}
-          >
-            {isExecuting && <Loader2 className="w-4 h-4 animate-spin" />}
-            <span>
-              {!account
-                ? 'Connect Sui Wallet'
-                : isExecuting
-                  ? 'Confirm in Wallet...'
-                  : selected.kind === 'margin'
-                    ? selected.op === 'supply'
-                      ? `Supply ${activeMarginVault?.symbol || ''} to Vault`
-                      : `Withdraw ${activeMarginVault?.symbol || ''}`
-                    : selected.op === 'stake'
-                      ? `Stake ${lstSettlementCoin} -> ${activeLstVault?.symbol || ''}`
-                      : `Redeem ${activeLstVault?.symbol || ''} -> ${lstSettlementCoin}`}
-            </span>
-          </button>
+            let estLstReceive: number | null = null;
+            if (selected.kind === 'lst' && activeLstVault && parsedAmt > 0 && activeLstVault.exchangeRateToBase) {
+              const rate = activeLstVault.exchangeRateToBase; // 1 LST = rate baseCoin
+              if (selected.op === 'stake') {
+                const baseIn =
+                  lstSettlementCoin === 'USDC' && activeLstVault.category === 'lst' && suiPriceUsd > 0
+                    ? parsedAmt / suiPriceUsd
+                    : parsedAmt;
+                estLstReceive = baseIn / rate;
+              } else {
+                const baseOut = parsedAmt * rate;
+                estLstReceive =
+                  lstSettlementCoin === 'USDC' && activeLstVault.category === 'lst' && suiPriceUsd > 0
+                    ? baseOut * suiPriceUsd
+                    : baseOut;
+              }
+            }
+
+            const blocked = Boolean(
+              account && (parsedAmt <= 0 || insufficientBalance || capExceeded || liqExceeded)
+            );
+
+            return (
+              <>
+                {/* Transparent Estimates & Volt Fee Breakdown */}
+                <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 space-y-2 text-xs font-mono">
+                  {estLstReceive !== null && activeLstVault && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Est. You Receive</span>
+                      <span className="text-white font-bold">
+                        ~{estLstReceive.toFixed(4)}{' '}
+                        {selected.op === 'stake' ? activeLstVault.symbol : lstSettlementCoin}
+                      </span>
+                    </div>
+                  )}
+                  {estYieldPerYear && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Est. Yield / Year</span>
+                      <span className="text-[#08D189] font-bold">
+                        +${estYieldPerYear.estUsdYr.toFixed(2)} ({estYieldPerYear.apr.toFixed(2)}%)
+                      </span>
+                    </div>
+                  )}
+                  {selected.kind === 'margin' && selected.op === 'supply' && capLeft !== null && activeMarginVault && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Vault Cap Remaining</span>
+                      <span className={capExceeded ? 'text-[#F0525E] font-bold' : 'text-slate-200'}>
+                        {capLeft.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                        {activeMarginVault.symbol}
+                      </span>
+                    </div>
+                  )}
+                  {selected.kind === 'margin' && selected.op === 'withdraw' && poolAvailLiq !== null && activeMarginVault && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Pool Free Liquidity</span>
+                      <span className={liqExceeded ? 'text-[#F0525E] font-bold' : 'text-slate-200'}>
+                        {poolAvailLiq.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                        {activeMarginVault.symbol}
+                      </span>
+                    </div>
+                  )}
+                  {selected.kind === 'plp' && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Settlement</span>
+                      <span className="text-[#60A5FA]">Queued · Next Pool Flush</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">
+                      {selected.kind === 'margin' || selected.kind === 'plp'
+                        ? 'Vault Deposit Fee'
+                        : `Volt Tier Fee (${traderTier.name})`}
+                    </span>
+                    <span className="text-[#60A5FA] font-semibold">
+                      {selected.kind === 'margin' || selected.kind === 'plp'
+                        ? selected.op === 'withdraw'
+                          ? '0.00% (Protocol Terms)'
+                          : '0.00% (100% Principal · DeepBook Ref)'
+                        : `${(traderTier.feeRate * 100).toFixed(2)}%`}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Custody Model</span>
+                    <span className="text-[#08D189] inline-flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      {selected.kind === 'plp' ? 'AccountWrapper / PLP' : 'Wallet / SupplierCap'}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isExecuting || blocked}
+                  onClick={executeOnSiteAction}
+                  className={`w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-45 disabled:cursor-not-allowed ${
+                    (selected.kind === 'margin' && selected.op === 'withdraw') ||
+                    (selected.kind === 'lst' && selected.op === 'unstake') ||
+                    (selected.kind === 'plp' && selected.op === 'withdraw')
+                      ? 'bg-[#08D189] hover:bg-[#0DE295] text-[#02060A]'
+                      : 'btn-deepbook'
+                  }`}
+                >
+                  {isExecuting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>
+                    {!account
+                      ? 'Connect Sui Wallet'
+                      : isExecuting
+                        ? 'Confirm in Wallet...'
+                        : insufficientBalance
+                          ? 'Insufficient Balance'
+                          : capExceeded
+                            ? 'Exceeds Pool Supply Cap'
+                            : liqExceeded
+                              ? 'Exceeds Pool Free Liquidity'
+                              : selected.kind === 'plp'
+                                ? selected.op === 'supply'
+                                  ? 'Supply USDC to Predict PLP'
+                                  : 'Withdraw Predict PLP Shares'
+                                : selected.kind === 'margin'
+                                  ? selected.op === 'supply'
+                                    ? `Supply ${activeMarginVault?.symbol || ''} to Vault`
+                                    : `Withdraw ${activeMarginVault?.symbol || ''}`
+                                  : selected.op === 'stake'
+                                    ? `Stake ${lstSettlementCoin} -> ${activeLstVault?.symbol || ''}`
+                                    : `Redeem ${activeLstVault?.symbol || ''} -> ${lstSettlementCoin}`}
+                  </span>
+                </button>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>
