@@ -68,7 +68,8 @@ export default async function handler(req, res) {
     const totalFees = merged.reduce((acc, s) => {
       if (typeof s.feeEarnedUsd === 'number') return acc + s.feeEarnedUsd;
       const vol = parseFloat(s.volumeUsd) || 0;
-      const rate = parseFloat(s.feeRate) || 0.0025;
+      const r = parseFloat(s.feeRate);
+      const rate = Number.isFinite(r) && r >= 0 ? r : 0;
       return acc + vol * rate;
     }, 0);
 
@@ -115,8 +116,8 @@ export default async function handler(req, res) {
 
       const isMarket = String(swapMode).toLowerCase().includes('market');
       const isPerps = String(swapMode).toLowerCase().includes('perp');
-      let parsedFeeRate = parseFloat(feeRate);
-      if (isNaN(parsedFeeRate) || parsedFeeRate <= 0) {
+      let parsedFeeRate = feeRate === null || feeRate === undefined ? NaN : parseFloat(feeRate);
+      if (isNaN(parsedFeeRate) || parsedFeeRate < 0) {
         parsedFeeRate = isPerps ? 0.0005 : isMarket ? 0.002 : 0.0025;
       }
 
