@@ -298,38 +298,45 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
       return;
     }
     let cancelled = false;
-    setIsLoadingLadder(true);
-    fetchPredictStrikeLadder(selectedMarket.market, selectedMarket.forwardPrice)
-      .then((rows) => {
-        if (cancelled) return;
-        setLadder(rows);
-        const key = `${selectedMarket.market.id}:${side}`;
-        if (strikeInitializedRef.current !== key && selectedMarket.forwardPrice > 0) {
-          strikeInitializedRef.current = key;
-          const step = Math.max(1, selectedMarket.market.admissionTickSize || 1);
-          if (side === 'range') {
-            setLowerStrikeInput(
-              String(snapStrike(selectedMarket.forwardPrice * 0.997, step, 'down'))
-            );
-            setUpperStrikeInput(
-              String(snapStrike(selectedMarket.forwardPrice * 1.003, step, 'up'))
-            );
-          } else {
-            const best = pickDefaultValidStrike(
-              rows,
-              side,
-              selectedMarket.market,
-              selectedMarket.forwardPrice
-            );
-            setStrikeInput(String(best));
+    const refreshLadder = (showLoader: boolean) => {
+      if (showLoader) setIsLoadingLadder(true);
+      const refSpot = liveBtcSpot > 0 ? liveBtcSpot : selectedMarket.forwardPrice;
+      fetchPredictStrikeLadder(selectedMarket.market, refSpot)
+        .then((rows) => {
+          if (cancelled) return;
+          setLadder(rows);
+          const key = `${selectedMarket.market.id}:${side}`;
+          if (strikeInitializedRef.current !== key && refSpot > 0) {
+            strikeInitializedRef.current = key;
+            const step = Math.max(1, selectedMarket.market.admissionTickSize || 1);
+            if (side === 'range') {
+              setLowerStrikeInput(
+                String(snapStrike(refSpot * 0.997, step, 'down'))
+              );
+              setUpperStrikeInput(
+                String(snapStrike(refSpot * 1.003, step, 'up'))
+              );
+            } else {
+              const best = pickDefaultValidStrike(
+                rows,
+                side,
+                selectedMarket.market,
+                refSpot
+              );
+              setStrikeInput(String(best));
+            }
           }
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoadingLadder(false);
-      });
+        })
+        .finally(() => {
+          if (!cancelled && showLoader) setIsLoadingLadder(false);
+        });
+    };
+
+    refreshLadder(true);
+    const id = setInterval(() => refreshLadder(false), 10_000);
     return () => {
       cancelled = true;
+      clearInterval(id);
     };
   }, [selectedMarket, side]);
 
@@ -417,13 +424,24 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
     };
   }, [predictMode, simpleMarket, account?.address, parsedAmount, slippageCents, liveBtcSpot]);
 
-  const handleBestOtmStrike = () => {
+  const handleBestOtmStrike = async () => {
     if (!selectedMarket || side === 'range') return;
+    const refSpot = liveBtcSpot > 0 ? liveBtcSpot : selectedMarket.forwardPrice;
+    let rows = ladder;
+    try {
+      const fresh = await fetchPredictStrikeLadder(selectedMarket.market, refSpot);
+      if (fresh.length > 0) {
+        rows = fresh;
+        setLadder(fresh);
+      }
+    } catch {
+      // fallback to current ladder
+    }
     const best = pickDefaultValidStrike(
-      ladder,
+      rows,
       side,
       selectedMarket.market,
-      selectedMarket.forwardPrice
+      refSpot
     );
     setStrikeInput(String(best));
   };
@@ -1715,9 +1733,20 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               </div>
 
               {quoteError && (
-                <div className="rounded-lg bg-[#F0525E]/10 border border-[#F0525E]/35 px-2.5 py-1.5 text-[11px] text-[#F0525E] flex items-start gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>{quoteError}</span>
+                <div className="rounded-lg bg-[#F0525E]/10 border border-[#F0525E]/35 px-2.5 py-1.5 text-[11px] text-[#F0525E] flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>{quoteError}</span>
+                  </div>
+                  {side !== 'range' && /entry band|pick a strike|probability/i.test(quoteError) && (
+                    <button
+                      type="button"
+                      onClick={handleBestOtmStrike}
+                      className="shrink-0 px-2 py-0.5 rounded bg-[#2B7FFF]/20 border border-[#2B7FFF]/50 text-[#60A5FA] hover:bg-[#2B7FFF]/30 font-semibold text-[10px] whitespace-nowrap"
+                    >
+                      Auto-fit
+                    </button>
+                  )}
                 </div>
               )}
 

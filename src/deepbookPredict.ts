@@ -433,14 +433,19 @@ export function pickDefaultValidStrike(
 ): number {
   const valid = ladder.filter((row) => (side === 'up' ? row.upInBand : row.downInBand));
   if (valid.length > 0) {
-    // Pick the one closest to 42% prob (~2.38x) for balanced binary odds
-    const targetProb = 0.42;
-    valid.sort((a, b) => {
+    // Prefer strikes comfortably inside [0.18, 0.48] so small price ticks don't push them out of [0.15, 0.50]
+    const safePool = valid.filter((row) => {
+      const p = side === 'up' ? row.upProb : row.downProb;
+      return p >= 0.18 && p <= 0.48;
+    });
+    const candidates = safePool.length > 0 ? [...safePool] : [...valid];
+    const targetProb = 0.40;
+    candidates.sort((a, b) => {
       const pa = side === 'up' ? a.upProb : a.downProb;
       const pb = side === 'up' ? b.upProb : b.downProb;
       return Math.abs(pa - targetProb) - Math.abs(pb - targetProb);
     });
-    return valid[0].strike;
+    return candidates[0].strike;
   }
   const step = Math.max(1, market.admissionTickSize || 1);
   const remMin = Math.max(0.5, (Number(market.expiryMs) - Date.now()) / 60_000);
