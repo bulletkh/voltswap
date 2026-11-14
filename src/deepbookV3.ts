@@ -1068,12 +1068,18 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
   const selfMatching = SelfMatchingOptions.SELF_MATCHING_ALLOWED;
 
   // Input side & fee cushion (DeepBook v3 input fee ~0.20% max when payWithDeep is false)
+  const lotStep = params.pool.lotSize > 0 ? params.pool.lotSize : 0.0001;
+  const alignedQty = Math.max(
+    params.pool.minSize || lotStep,
+    Math.floor(params.quantity / lotStep) * lotStep
+  );
+
   const payingCoinKey = params.isBid ? params.pool.quoteSymbol : params.pool.baseSymbol;
   const payingCoinType = params.isBid ? params.pool.quoteCoinId : params.pool.baseCoinId;
   const payingDecimals = params.isBid ? params.pool.quoteDecimals : params.pool.baseDecimals;
   const requiredAmount = params.isBid
-    ? params.price * params.quantity * 1.005
-    : params.quantity * 1.005;
+    ? params.price * alignedQty * (params.payWithDeep ? 1.001 : 1.005)
+    : alignedQty * (params.payWithDeep ? 1.001 : 1.005);
 
   const alreadyInManager = params.existingManagerDepositCoin ?? 0;
   const shortfall = Math.max(0, requiredAmount - alreadyInManager);
@@ -1082,7 +1088,7 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
   const quoteScale = Math.pow(10, params.pool.quoteDecimals);
   const onChainPrice = BigInt(Math.round((params.price * 1e9 * quoteScale) / baseScale));
   const lotAtoms = BigInt(Math.max(1, Math.round(params.pool.lotSize * baseScale)));
-  const rawQtyAtoms = BigInt(Math.max(1, Math.round(params.quantity * baseScale)));
+  const rawQtyAtoms = BigInt(Math.max(1, Math.round(alignedQty * baseScale)));
   const onChainQty = (rawQtyAtoms / lotAtoms) * lotAtoms || lotAtoms;
   const expireTs = params.expireTimestampMs
     ? BigInt(Math.floor(params.expireTimestampMs))
@@ -1102,13 +1108,22 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
         )
       );
     }
+    if (params.payWithDeep && payingCoinType !== DEEPBOOK_DEEP_COIN_TYPE) {
+      const deepFeeCushion = BigInt(Math.round(0.25 * (mainnetCoins.DEEP.scalar || 1_000_000)));
+      const deepCoin = coinWithBalance({ type: DEEPBOOK_DEEP_COIN_TYPE, balance: deepFeeCushion })(tx);
+      tx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+        arguments: [tx.object(params.managerId), deepCoin],
+        typeArguments: [DEEPBOOK_DEEP_COIN_TYPE],
+      });
+    }
     tx.add(
       ext.deepbook.deepBook.placeLimitOrder({
         poolKey: params.pool.poolName,
         balanceManagerKey: 'MAIN',
         clientOrderId,
         price: params.price,
-        quantity: params.quantity,
+        quantity: alignedQty,
         isBid: params.isBid,
         orderType,
         selfMatchingOption: selfMatching,
@@ -1134,6 +1149,16 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
       arguments: [manager, depositCoin],
       typeArguments: [payingCoinType],
     });
+
+    if (params.payWithDeep && payingCoinType !== DEEPBOOK_DEEP_COIN_TYPE) {
+      const deepFeeCushion = BigInt(Math.round(0.25 * (mainnetCoins.DEEP.scalar || 1_000_000)));
+      const deepCoin = coinWithBalance({ type: DEEPBOOK_DEEP_COIN_TYPE, balance: deepFeeCushion })(tx);
+      tx.moveCall({
+        target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+        arguments: [manager, deepCoin],
+        typeArguments: [DEEPBOOK_DEEP_COIN_TYPE],
+      });
+    }
 
     const tradeProof = tx.moveCall({
       package: DEEPBOOK_PACKAGE_ID,
@@ -1309,6 +1334,16 @@ export function buildPlaceDeepBookMarketOrderTx(params: {
     target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::generate_proof_as_owner`,
     arguments: [targetManagerArg],
   });
+
+  if (payWithDeep && inputCoinType !== DEEPBOOK_DEEP_COIN_TYPE) {
+    const deepFeeCushion = BigInt(Math.round(0.25 * (mainnetCoins.DEEP.scalar || 1_000_000)));
+    const deepCoin = coinWithBalance({ type: DEEPBOOK_DEEP_COIN_TYPE, balance: deepFeeCushion })(tx);
+    tx.moveCall({
+      target: `${DEEPBOOK_PACKAGE_ID}::balance_manager::deposit`,
+      arguments: [targetManagerArg, deepCoin],
+      typeArguments: [DEEPBOOK_DEEP_COIN_TYPE],
+    });
+  }
 
   tx.moveCall({
     target: `${DEEPBOOK_PACKAGE_ID}::pool::place_market_order`,

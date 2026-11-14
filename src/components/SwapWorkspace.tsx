@@ -434,6 +434,11 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
   // Poll DeepBook L2 Orderbook & Recent Trades in Limit & Margin modes
   useEffect(() => {
+    setQtyCurrency('base');
+    setLimitQty(String(Math.max(activePool.minSize || 0.01, activePool.baseSymbol === 'SUI' ? 1 : activePool.minSize || 0.01)));
+  }, [activePool.poolName, activePool.minSize, activePool.baseSymbol]);
+
+  useEffect(() => {
     if (mode === 'market') return;
     let cancelled = false;
     setOraclePrice(null);
@@ -2438,7 +2443,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                                   0,
                                   limitWalletQuoteBal - (activePool.quoteSymbol === 'SUI' ? 0.05 : 0)
                                 );
-                                const quoteAmt = walletQuote * pct * 0.97;
+                                const buySafety =
+                                  1 -
+                                  (spotOrderStyle === 'market' ? spotMarketSlippage / 100 + 0.01 : 0.01);
+                                const quoteAmt = walletQuote * pct * buySafety;
                                 setLimitQty(
                                   qtyCurrency === 'quote'
                                     ? quoteAmt.toFixed(2)
@@ -2522,51 +2530,68 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       const rawInput = Number(limitQty) || 0;
                       const baseQty = qtyCurrency === 'quote' && activePx > 0 ? rawInput / activePx : rawInput;
                       const quoteTotal = activePx * baseQty;
+                      const payingNeeded = limitSide === 'buy' ? quoteTotal : baseQty;
+                      const walletAvail =
+                        limitSide === 'buy'
+                          ? limitWalletQuoteBal + (managerState?.quoteBalance ?? 0)
+                          : limitWalletBaseBal + (managerState?.baseBalance ?? 0);
+                      const isZeroQty = !Number.isFinite(baseQty) || baseQty <= 0;
+                      const isBelowMinSize = !isZeroQty && baseQty < activePool.minSize;
+                      const isInsufficient = Boolean(account?.address) && !isZeroQty && payingNeeded > walletAvail * 1.0001;
+                      const btnDisabled = isPlacingLimit || (Boolean(account?.address) && (isZeroQty || isBelowMinSize || isInsufficient || activePx <= 0));
+                      const btnText = !account?.address
+                        ? 'Connect Sui Wallet to Trade'
+                        : isZeroQty
+                          ? 'Enter an amount'
+                          : isBelowMinSize
+                            ? `Min ${activePool.minSize} ${activePool.baseSymbol}`
+                            : isInsufficient
+                              ? `Insufficient ${limitSide === 'buy' ? activePool.quoteSymbol : activePool.baseSymbol}`
+                              : spotOrderStyle === 'market'
+                                ? `Market ${limitSide === 'buy' ? 'Buy' : 'Sell'} ${activePool.baseSymbol} (Direct Wallet)`
+                                : `Place Limit ${limitSide === 'buy' ? 'Buy' : 'Sell'} ${activePool.baseSymbol}`;
+
                       return (
-                        <div className="text-xs font-mono space-y-1.5 text-slate-400 pt-1 border-t border-[#2D374B]">
-                          <div className="flex justify-between pt-1">
-                            <span>You pay</span>
-                            <span className="text-white font-semibold tabular-nums">
-                              {limitSide === 'buy'
-                                ? `${quoteTotal.toFixed(4)} ${activePool.quoteSymbol}`
-                                : `${baseQty.toFixed(4)} ${activePool.baseSymbol}`}
-                            </span>
+                        <>
+                          <div className="text-xs font-mono space-y-1.5 text-slate-400 pt-1 border-t border-[#2D374B]">
+                            <div className="flex justify-between pt-1">
+                              <span>You pay</span>
+                              <span className="text-white font-semibold tabular-nums">
+                                {limitSide === 'buy'
+                                  ? `${quoteTotal.toFixed(4)} ${activePool.quoteSymbol}`
+                                  : `${baseQty.toFixed(4)} ${activePool.baseSymbol}`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>You receive</span>
+                              <span className="text-[#08D189] font-semibold tabular-nums">
+                                {limitSide === 'buy'
+                                  ? `${baseQty.toFixed(4)} ${activePool.baseSymbol}`
+                                  : `${quoteTotal.toFixed(4)} ${activePool.quoteSymbol}`}
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-[11px]">
+                              <span>Volt Fee ({traderTier.name})</span>
+                              <span className="text-[#60A5FA] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+                            </div>
                           </div>
-                          <div className="flex justify-between">
-                            <span>You receive</span>
-                            <span className="text-[#08D189] font-semibold tabular-nums">
-                              {limitSide === 'buy'
-                                ? `${baseQty.toFixed(4)} ${activePool.baseSymbol}`
-                                : `${quoteTotal.toFixed(4)} ${activePool.quoteSymbol}`}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-[11px]">
-                            <span>Volt Fee ({traderTier.name})</span>
-                            <span className="text-[#60A5FA] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
-                          </div>
-                        </div>
+
+                          <button
+                            type="button"
+                            disabled={btnDisabled}
+                            onClick={spotOrderStyle === 'market' ? executePlaceSpotMarket : executePlaceLimit}
+                            className={`w-full py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                              limitSide === 'buy'
+                                ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.35)]'
+                                : 'bg-[#F0525E] hover:bg-[#FF6370] text-white shadow-[0_0_16px_rgba(240,82,94,0.35)]'
+                            } disabled:opacity-50`}
+                          >
+                            {isPlacingLimit && <Loader2 className="w-4 h-4 animate-spin" />}
+                            <span>{btnText}</span>
+                          </button>
+                        </>
                       );
                     })()}
-
-                    <button
-                      type="button"
-                      disabled={isPlacingLimit}
-                      onClick={spotOrderStyle === 'market' ? executePlaceSpotMarket : executePlaceLimit}
-                      className={`w-full py-3 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                        limitSide === 'buy'
-                          ? 'btn-deepbook shadow-[0_0_16px_rgba(43,127,255,0.35)]'
-                          : 'bg-[#F0525E] hover:bg-[#FF6370] text-white shadow-[0_0_16px_rgba(240,82,94,0.35)]'
-                      } disabled:opacity-50`}
-                    >
-                      {isPlacingLimit && <Loader2 className="w-4 h-4 animate-spin" />}
-                      <span>
-                        {!account?.address
-                          ? 'Connect Sui Wallet to Trade'
-                          : spotOrderStyle === 'market'
-                            ? `Market ${limitSide === 'buy' ? 'Buy' : 'Sell'} ${activePool.baseSymbol} (Direct Wallet)`
-                            : `Place Limit ${limitSide === 'buy' ? 'Buy' : 'Sell'} ${activePool.baseSymbol}`}
-                      </span>
-                    </button>
 
                     <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-[#08D189] text-center pt-0.5">
                       <CheckCircle2 className="w-3.5 h-3.5" />
