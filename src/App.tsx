@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ExternalLink,
   KeyRound,
-  Layers,
   Shield,
   Sparkles,
   Target,
@@ -31,9 +30,6 @@ const PerpsWorkspace = lazy(() =>
 const PredictWorkspace = lazy(() =>
   import('./components/PredictWorkspace').then((m) => ({ default: m.PredictWorkspace }))
 );
-const EarnWorkspace = lazy(() =>
-  import('./components/EarnWorkspace').then((m) => ({ default: m.EarnWorkspace }))
-);
 const TiersReferralsWorkspace = lazy(() =>
   import('./components/TiersReferralsWorkspace').then((m) => ({
     default: m.TiersReferralsWorkspace,
@@ -58,7 +54,7 @@ const WorkspaceFallback: React.FC = () => (
   </div>
 );
 
-type ActiveTab = 'swap' | 'perps' | 'predict' | 'earn' | 'tiers' | 'treasury';
+type ActiveTab = 'swap' | 'perps' | 'predict' | 'tiers' | 'treasury';
 
 interface ToastState {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -148,7 +144,6 @@ export function App() {
     { id: 'swap', label: 'Swap', icon: <Zap className="w-4 h-4" /> },
     { id: 'perps', label: 'Perps', icon: <Activity className="w-4 h-4" /> },
     { id: 'predict', label: 'Predict', icon: <Target className="w-4 h-4" /> },
-    { id: 'earn', label: 'Earn', icon: <Layers className="w-4 h-4" /> },
     { id: 'tiers', label: 'Tiers & Referrals', icon: <Award className="w-4 h-4" /> },
   ];
 
@@ -297,14 +292,6 @@ export function App() {
 
             {activeTab === 'predict' && (
               <PredictWorkspace
-                onNotify={notify}
-                onTradeRecorded={(t) => setPnlTrade(t)}
-                onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-              />
-            )}
-
-            {activeTab === 'earn' && (
-              <EarnWorkspace
                 onNotify={notify}
                 onTradeRecorded={(t) => setPnlTrade(t)}
                 onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}

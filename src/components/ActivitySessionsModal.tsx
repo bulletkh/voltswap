@@ -38,7 +38,7 @@ interface ActivitySessionsModalProps {
   onClose: () => void;
   sessionStatus: SessionStatusSnapshot | null;
   onRefreshSession: () => Promise<void>;
-  onNavigateTab: (tab: 'swap' | 'perps' | 'predict' | 'earn' | 'tiers') => void;
+  onNavigateTab: (tab: 'swap' | 'perps' | 'predict' | 'tiers') => void;
   onOpenPortfolio: () => void;
   onNotify: (
     type: 'success' | 'error' | 'info' | 'warning',
