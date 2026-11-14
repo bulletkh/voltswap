@@ -2,16 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { ExternalLink, Loader2, RefreshCw, ShieldAlert, Wallet, X } from 'lucide-react';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
 import { POPULAR_TOKENS } from '../constants';
-import { fetchWalletBalances, getRpcPoolStats, readBalanceFromMap } from '../suiClient';
+import { extractTxDigest, fetchWalletBalances, getRpcPoolStats, readBalanceFromMap } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
-import { useDAppKit as usePredictDAppKit } from '@mysten/dapp-kit-react';
-import { buildPredictWithdrawTx, fetchPredictBoard } from '../deepbookPredict';
-import { extractTxDigest as extractPredictTxDigest } from '../suiClient';
-import { fetchAftermathAccountState, type AfAccountState } from '../aftermathPerps';
-import { buildWithdrawCollateralTx } from '../aftermathPerps';
 import {
+  buildPredictPlpWithdrawTx,
+  buildPredictWithdrawTx,
+  fetchPredictBoard,
+  fetchPredictPlpVault,
+  type PredictPlpVaultState,
+} from '../deepbookPredict';
+import { fetchAftermathAccountState, buildWithdrawCollateralTx, type AfAccountState } from '../aftermathPerps';
+import {
+  buildWithdrawAllManagersAndCancelTx,
   DEEPBOOK_DEEP_COIN_TYPE,
+  DEFAULT_DEEPBOOK_POOLS,
+  discoverBalanceManagers,
+  fetchAllDeepBookManagerStates,
   fetchDeepBookPools,
+  type DeepBookManagerState,
   type DeepBookPoolMeta,
 } from '../deepbookV3';
 import {
@@ -20,14 +28,6 @@ import {
   fetchAllMarginPositionsForOwner,
   type MarginManagerPosition,
 } from '../deepbookMargin';
-import { extractTxDigest } from '../suiClient';
-import {
-  buildWithdrawAllManagersAndCancelTx,
-  DEFAULT_DEEPBOOK_POOLS,
-  discoverBalanceManagers,
-  fetchAllDeepBookManagerStates,
-  type DeepBookManagerState,
-} from '../deepbookV3';
 import {
   fetchDeepBookMarginVaults,
   fetchUserDeepBookMarginPositions,
@@ -226,10 +226,11 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
     }
   };
 
-  const predictDAppKit = usePredictDAppKit();
   const [predictAvailableUsd, setPredictAvailableUsd] = useState(0);
   const [predictPendingUsd, setPredictPendingUsd] = useState(0);
+  const [plpState, setPlpState] = useState<PredictPlpVaultState | null>(null);
   const [isWithdrawingPredict, setIsWithdrawingPredict] = useState(false);
+  const [isWithdrawingPlp, setIsWithdrawingPlp] = useState(false);
   const [predictStatusMsg, setPredictStatusMsg] = useState<string | null>(null);
   const rpcStats = isOpen ? getRpcPoolStats() : null;
 
@@ -237,12 +238,17 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
     if (!owner) {
       setPredictAvailableUsd(0);
       setPredictPendingUsd(0);
+      setPlpState(null);
       return;
     }
     try {
-      const board = await fetchPredictBoard(owner);
+      const [board, plp] = await Promise.all([
+        fetchPredictBoard(owner),
+        fetchPredictPlpVault(owner).catch(() => null),
+      ]);
       setPredictAvailableUsd(board.account?.availableUsdc ?? 0);
       setPredictPendingUsd(board.account?.pendingUsdc ?? 0);
+      setPlpState(plp);
     } catch {
       // ignore transient rpc errors
     }
@@ -259,8 +265,8 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
         setPredictStatusMsg(sim.errorMessage || 'Withdraw simulation failed.');
         return;
       }
-      const res = await predictDAppKit.signAndExecuteTransaction({ transaction: tx });
-      const digest = extractPredictTxDigest(res);
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
       setPredictStatusMsg(
         digest
           ? `Withdrew $${predictAvailableUsd.toFixed(2)} USDC (tx ${digest.slice(0, 8)}...)`
@@ -272,6 +278,35 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
       setPredictStatusMsg(err?.message || 'Wallet rejected withdrawal.');
     } finally {
       setIsWithdrawingPredict(false);
+    }
+  };
+
+  const handleWithdrawPlp = async () => {
+    if (!account?.address || !plpState || plpState.userPlpSharesRaw <= 0n) return;
+    setIsWithdrawingPlp(true);
+    setPredictStatusMsg(null);
+    try {
+      const tx = buildPredictPlpWithdrawTx({
+        sender: account.address,
+        sharesRaw: plpState.userPlpSharesRaw,
+      });
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        setPredictStatusMsg(sim.errorMessage || 'PLP withdraw simulation failed.');
+        return;
+      }
+      const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+      const digest = extractTxDigest(res);
+      setPredictStatusMsg(
+        digest
+          ? `Queued PLP withdraw (${plpState.userPlpShares.toFixed(2)} shares · ${digest.slice(0, 8)}...)`
+          : `Queued PLP withdraw (${plpState.userPlpShares.toFixed(2)} shares).`
+      );
+      await loadPredictState(account.address);
+    } catch (err: any) {
+      setPredictStatusMsg(err?.message || 'Wallet rejected PLP withdrawal.');
+    } finally {
+      setIsWithdrawingPlp(false);
     }
   };
 
@@ -291,9 +326,15 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
 
   if (!isOpen) return null;
 
+  const livePriceBySymbol: Record<string, number> = {};
+  for (const v of marginVaults) {
+    if (v.priceUsd > 0) livePriceBySymbol[v.symbol.toUpperCase()] = v.priceUsd;
+  }
+
   const heldTokens = SUI_TOKENS.map((t) => {
     const amount = account?.address ? readBalanceFromMap(balances, t.address, t.decimals) : 0;
-    const usd = amount * (t.priceUsd || 0);
+    const livePx = livePriceBySymbol[t.symbol.toUpperCase()] ?? (t.priceUsd || 0);
+    const usd = amount * livePx;
     return { token: t, amount, usd };
   }).filter((item) => item.amount > 0.00001);
 
@@ -307,9 +348,9 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
   const perpsUsd = afState?.totalEquityUsd ?? 0;
   const vaultsUsd = activeMarginEntries.reduce((sum, item) => sum + item.usd, 0);
 
-  const suiPrice = SUI_TOKENS.find((t) => t.symbol === 'SUI')?.priceUsd || 0.8;
-  const usdcPrice = SUI_TOKENS.find((t) => t.symbol === 'USDC')?.priceUsd || 1;
-  const deepPrice = SUI_TOKENS.find((t) => t.symbol === 'DEEP')?.priceUsd || 0;
+  const suiPrice = livePriceBySymbol.SUI || SUI_TOKENS.find((t) => t.symbol === 'SUI')?.priceUsd || 0;
+  const usdcPrice = livePriceBySymbol.USDC || 1;
+  const deepPrice = livePriceBySymbol.DEEP || SUI_TOKENS.find((t) => t.symbol === 'DEEP')?.priceUsd || 0;
 
   const clobOpenOrders = clobManagers.flatMap((m) => m.openOrders);
   const clobUnlockedSui = clobManagers.reduce((s, m) => s + m.baseBalance + m.settledBase, 0);
@@ -357,7 +398,8 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
       p.openOrders.length > 0
   );
 
-  const predictTotalUsd = predictAvailableUsd + predictPendingUsd;
+  const plpSharesUsd = plpState?.userPlpShares ?? 0;
+  const predictTotalUsd = predictAvailableUsd + predictPendingUsd + plpSharesUsd;
   const totalCustodyVaultsUsd =
     clobVaultsUsd + marginTradingEquityUsd + perpsUsd + predictTotalUsd;
   const totalPortfolioEquityUsd = spotUsd + totalCustodyVaultsUsd + vaultsUsd;
@@ -757,20 +799,28 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                   </div>
                 )}
 
-                {/* 4. DeepBook Predict Account */}
-                {predictAvailableUsd > 0.001 || predictPendingUsd > 0.001 || predictStatusMsg ? (
+                {/* 4. DeepBook Predict Account & PLP */}
+                {predictAvailableUsd > 0.001 ||
+                predictPendingUsd > 0.001 ||
+                plpSharesUsd > 0.001 ||
+                predictStatusMsg ? (
                   <div className="bg-[#06070A] rounded-lg p-3 space-y-2.5 border border-[#08D189]/30">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white uppercase tracking-wider">
-                        DeepBook Predict Escrow
+                        DeepBook Predict Escrow &amp; PLP
                       </span>
                       <span className="text-xs font-mono text-[#08D189] tabular-nums font-semibold">
-                        ${predictAvailableUsd.toFixed(2)} USDC
+                        ${predictTotalUsd.toFixed(2)}
                       </span>
                     </div>
                     {predictPendingUsd > 0.001 && (
                       <div className="text-[11px] font-mono text-amber-300">
                         Pending escrow: ${predictPendingUsd.toFixed(2)} USDC
+                      </div>
+                    )}
+                    {plpSharesUsd > 0.001 && (
+                      <div className="text-[11px] font-mono text-[#60A5FA]">
+                        PLP Pool Shares: {plpSharesUsd.toFixed(4)} PLP
                       </div>
                     )}
                     {predictStatusMsg && (
@@ -785,6 +835,17 @@ export const PortfolioDrawer: React.FC<PortfolioDrawerProps> = ({ isOpen, onClos
                       >
                         {isWithdrawingPredict && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                         <span>Withdraw All Predict USDC (${predictAvailableUsd.toFixed(2)})</span>
+                      </button>
+                    )}
+                    {plpSharesUsd > 0.001 && (
+                      <button
+                        type="button"
+                        disabled={isWithdrawingPlp}
+                        onClick={handleWithdrawPlp}
+                        className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 text-[#60A5FA] hover:bg-[#2B7FFF]/25 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                      >
+                        {isWithdrawingPlp && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        <span>Withdraw PLP Shares ({plpSharesUsd.toFixed(2)})</span>
                       </button>
                     )}
                   </div>
