@@ -5,11 +5,10 @@ import {
   mainnetPackageIds,
 } from '@mysten/deepbook-v3';
 import { Transaction } from '@mysten/sui/transactions';
-import { buildCetusSwapTx, fetchCetusQuote } from './cetusSwap';
 import { VOLT_TREASURY_ADDRESS } from './constants';
-import { suiGrpcClient, SUI_COIN_TYPE, USDC_COIN_TYPE } from './suiClient';
+import { suiGrpcClient, USDC_COIN_TYPE } from './suiClient';
 
-export type EarnFilterTab = 'onsite' | 'margin' | 'lst';
+export type EarnFilterTab = 'all' | 'lending' | 'plp';
 
 export interface DeepBookMarginVault {
   coinKey: keyof typeof mainnetMarginPools;
@@ -36,108 +35,12 @@ export interface UserMarginPosition {
   suppliedAmount: number;
 }
 
-export interface LstVaultOption {
-  symbol: string;
-  name: string;
-  protocol: string;
-  category: 'lst' | 'rwa';
-  coinType: string;
-  decimals: number;
-  logo: string;
-  defaultApyPct: number;
-  basePayCoin: 'SUI' | 'USDC';
-}
-
-export interface LstVaultLiveStat extends LstVaultOption {
-  apyPct: number;
-  tvlUsd: number;
-  exchangeRateToBase: number | null; // e.g., 1 haSUI = 1.084 SUI
-}
-
 export interface VoltMarginSupplyReferral {
   coinKey: keyof typeof mainnetMarginPools;
   marginPoolId: string;
   referralId: string;
   owner: string;
 }
-
-export const LST_VAULT_OPTIONS: LstVaultOption[] = [
-  {
-    symbol: 'haSUI',
-    name: 'Haedal Staked SUI',
-    protocol: 'Haedal Liquid Staking',
-    category: 'lst',
-    coinType:
-      '0xbde4ba4c2e274a60ce15c1cfff9e5c42e41654ac8b6d906a57efa4bd3c29f47d::hasui::HASUI',
-    decimals: 9,
-    logo: '/tokens/hasui.png',
-    defaultApyPct: 2.35,
-    basePayCoin: 'SUI',
-  },
-  {
-    symbol: 'afSUI',
-    name: 'Aftermath Staked SUI',
-    protocol: 'Aftermath Staking',
-    category: 'lst',
-    coinType:
-      '0xf325ce1300e8dac124071d3152c5c5ee6174914f8bc2161e88329cf579246efc::afsui::AFSUI',
-    decimals: 9,
-    logo: '/tokens/afsui.svg',
-    defaultApyPct: 2.4,
-    basePayCoin: 'SUI',
-  },
-  {
-    symbol: 'vSUI',
-    name: 'Volo Staked SUI',
-    protocol: 'Volo / Navi',
-    category: 'lst',
-    coinType:
-      '0x549e8b69270defbfafd4f94e17ec44cdbdd99820b33bda2278dea3b9a32d3f55::cert::CERT',
-    decimals: 9,
-    logo: '/tokens/vsui.png',
-    defaultApyPct: 2.25,
-    basePayCoin: 'SUI',
-  },
-  {
-    symbol: 'sSUI',
-    name: 'SpringSui Staked SUI',
-    protocol: 'SpringSui / Suilend',
-    category: 'lst',
-    coinType:
-      '0x83556891f4a0f233ce7b05cfe7f957d4020492a34f5405b2cb9377d060bef4bf::spring_sui::SPRING_SUI',
-    decimals: 9,
-    logo: '/tokens/sui.svg',
-    defaultApyPct: 2.45,
-    basePayCoin: 'SUI',
-  },
-  {
-    symbol: 'USDY',
-    name: 'Ondo US Dollar Yield',
-    protocol: 'Ondo RWA Treasury',
-    category: 'rwa',
-    coinType:
-      '0x960b531667636f39e85867775f52f6b1f220a058c4de786905bdf761e06a56bb::usdy::USDY',
-    decimals: 6,
-    logo: '/tokens/ondo.png',
-    defaultApyPct: 3.75,
-    basePayCoin: 'USDC',
-  },
-  {
-    symbol: 'BUCK',
-    name: 'Bucket Protocol USD',
-    protocol: 'Bucket Savings',
-    category: 'rwa',
-    coinType:
-      '0xce7ff77a83ea0cb6fd39bd8748e2ec89a3f41e8efdc3f4eb123e0ca37b184db2::buck::BUCK',
-    decimals: 9,
-    logo: '/tokens/buck.svg',
-    defaultApyPct: 3.2,
-    basePayCoin: 'USDC',
-  },
-];
-
-// Keep backward-compatible alias if imported elsewhere
-export const SUI_LST_OPTIONS = LST_VAULT_OPTIONS;
 
 const MARGIN_VAULT_META: Array<{
   coinKey: keyof typeof mainnetMarginPools;
@@ -563,122 +466,6 @@ export function buildDeepBookMarginWithdrawTx(params: {
   tx.transferObjects([withdrawnCoin], sender);
 
   return tx;
-}
-
-/**
- * Fetches live APYs, TVL, and Cetus swap exchange rates for on-site LST & RWA Yield Vaults.
- */
-export async function fetchLstVaultStats(suiPriceUsd?: number): Promise<LstVaultLiveStat[]> {
-  const [llamaRes, voloRes, pricesMap, rateQuotes] = await Promise.all([
-    fetch('https://yields.llama.fi/pools').catch(() => null),
-    fetch('https://open-api.naviprotocol.io/api/volo/stats').catch(() => null),
-    suiPriceUsd && suiPriceUsd > 0 ? Promise.resolve(null) : fetchDeepBookCoinPrices(),
-    Promise.allSettled(
-      LST_VAULT_OPTIONS.map(async (opt) => {
-        const baseType = opt.basePayCoin === 'USDC' ? USDC_COIN_TYPE : SUI_COIN_TYPE;
-        const unit = BigInt(Math.pow(10, opt.decimals));
-        const q = await fetchCetusQuote({
-          fromCoinType: opt.coinType,
-          toCoinType: baseType,
-          amountInAtomic: unit,
-          feeRate: 0,
-        });
-        const baseDec = opt.basePayCoin === 'USDC' ? 6 : 9;
-        return Number(q.amountOutAtomic) / Math.pow(10, baseDec);
-      })
-    ),
-  ]);
-
-  let llamaSui: any[] = [];
-  if (llamaRes?.ok) {
-    const j = await llamaRes.json().catch(() => ({}));
-    llamaSui = (j?.data || []).filter((p: any) => p?.chain === 'Sui');
-  }
-
-  let voloApy = 0;
-  let voloTvlSui = 0;
-  if (voloRes?.ok) {
-    const vj = await voloRes.json().catch(() => ({}));
-    voloApy = Number(vj?.data?.apy || 0) * 100;
-    voloTvlSui = Number(vj?.data?.totalStaked || 0);
-  }
-
-  const findLlama = (sym: string, projHint?: string) => {
-    return llamaSui
-      .filter((p: any) => {
-        const s = String(p.symbol || '').toUpperCase();
-        const pr = String(p.project || '').toLowerCase();
-        if (s !== sym.toUpperCase()) return false;
-        if (projHint && !pr.includes(projHint)) return false;
-        return true;
-      })
-      .sort((a: any, b: any) => Number(b.tvlUsd || 0) - Number(a.tvlUsd || 0))[0];
-  };
-
-  return LST_VAULT_OPTIONS.map((opt, idx) => {
-    const match =
-      opt.symbol === 'USDY'
-        ? findLlama('USDY', 'ondo')
-        : findLlama(opt.symbol);
-    let apyPct = Number(match?.apy || opt.defaultApyPct);
-    let tvlUsd = Number(match?.tvlUsd || 0);
-
-    const liveSuiPx =
-      suiPriceUsd && suiPriceUsd > 0 ? suiPriceUsd : (pricesMap?.SUI ?? 0);
-    if (opt.symbol === 'vSUI' && voloApy > 0) {
-      apyPct = Math.max(apyPct, voloApy);
-      if (tvlUsd <= 0 && voloTvlSui > 0 && liveSuiPx > 0) tvlUsd = voloTvlSui * liveSuiPx;
-    }
-
-    const qRes = rateQuotes[idx];
-    const exchangeRateToBase =
-      qRes && qRes.status === 'fulfilled' && Number.isFinite(qRes.value) && qRes.value > 0
-        ? qRes.value
-        : null;
-
-    return {
-      ...opt,
-      apyPct: apyPct > 0 ? apyPct : opt.defaultApyPct,
-      tvlUsd,
-      exchangeRateToBase,
-    };
-  });
-}
-
-/**
- * Builds a single-PTB Cetus Aggregator route acquiring OR redeeming yield-bearing
- * Sui tokens (`haSUI`, `afSUI`, `vSUI`, `sSUI`, `USDY`, `BUCK`) with Volt tier fee
- * + atomic referral split directly inside VoltSwap.
- */
-export async function buildEarnZapTx(params: {
-  sender: string;
-  inputCoinType: string;
-  targetCoinType: string;
-  amountInAtomic: bigint;
-  slippage?: number;
-  feeRate: number;
-  refSharePct?: number;
-}): Promise<{ tx: Transaction; expectedOutAtomic: string }> {
-  const quote = await fetchCetusQuote({
-    fromCoinType: params.inputCoinType,
-    toCoinType: params.targetCoinType,
-    amountInAtomic: params.amountInAtomic,
-    feeRate: params.feeRate,
-  });
-
-  const tx = await buildCetusSwapTx({
-    sender: params.sender,
-    fromCoinType: params.inputCoinType,
-    amountInAtomic: params.amountInAtomic,
-    quote,
-    slippage: params.slippage ?? 0.012,
-    refSharePct: params.refSharePct ?? 0.25,
-  });
-
-  return {
-    tx,
-    expectedOutAtomic: quote.amountOutAtomic.toString(),
-  };
 }
 
 export { USDC_COIN_TYPE };

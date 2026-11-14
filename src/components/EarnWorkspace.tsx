@@ -7,22 +7,18 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
-  Zap,
 } from 'lucide-react';
 import { useCurrentAccount, useDAppKit } from '@mysten/dapp-kit-react';
+import { usdcToRaw } from '@mysten/deepbook-v3/predict';
 import {
   buildDeepBookMarginSupplyTx,
   buildDeepBookMarginWithdrawTx,
-  buildEarnZapTx,
   fetchDeepBookMarginVaults,
-  fetchLstVaultStats,
   fetchUserDeepBookMarginPositions,
   fetchVoltMarginSupplyReferrals,
-  LST_VAULT_OPTIONS,
   USDC_COIN_TYPE,
   type DeepBookMarginVault,
   type EarnFilterTab,
-  type LstVaultLiveStat,
   type UserMarginPosition,
   type VoltMarginSupplyReferral,
 } from '../earnPools';
@@ -33,16 +29,9 @@ import {
   fetchPredictProtocolStatus,
   type PredictPlpVaultState,
 } from '../deepbookPredict';
-import { usdcToRaw } from '@mysten/deepbook-v3/predict';
 import { extractTxDigest, fetchWalletBalances, readBalanceFromMap, SUI_COIN_TYPE } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
-import {
-  addWalletVolumeUsd,
-  getValidReferrerForSender,
-  resolveReferralTier,
-  resolveTraderTier,
-} from '../voltFee';
-import { useSyncedWalletVolume } from '../onChainVolume';
+import { addWalletVolumeUsd } from '../voltFee';
 import type { PnlTradeData } from '../PnlShareModal';
 
 interface EarnWorkspaceProps {
@@ -58,9 +47,28 @@ interface EarnWorkspaceProps {
 }
 
 type SelectedAction =
-  | { kind: 'margin'; op: 'supply' | 'withdraw'; coinKey: string }
-  | { kind: 'lst'; op: 'stake' | 'unstake'; symbol: string }
+  | { kind: 'lending'; op: 'supply' | 'withdraw'; coinKey: string }
   | { kind: 'plp'; op: 'supply' | 'withdraw' };
+
+const fmtUsd = (v: number): string => {
+  if (!Number.isFinite(v) || v <= 0) return '$0.00';
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000) return `$${(v / 1_000).toFixed(2)}K`;
+  return `$${v.toFixed(2)}`;
+};
+
+const fmtUnits = (v: number, maxDecimals = 4): string => {
+  if (!Number.isFinite(v) || v <= 0) return '0';
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return v.toLocaleString(undefined, { maximumFractionDigits: maxDecimals });
+};
+
+const floorToDecimals = (val: number, decimals: number): number => {
+  if (!Number.isFinite(val) || val <= 0) return 0;
+  const factor = Math.pow(10, Math.min(9, Math.max(0, decimals)));
+  return Math.floor(val * factor) / factor;
+};
 
 export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
   onNotify,
@@ -69,862 +77,605 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
 }) => {
   const account = useCurrentAccount();
   const dAppKit = useDAppKit();
-  const ticketRef = useRef<HTMLDivElement | null>(null);
 
-  const [tab, setTab] = useState<EarnFilterTab>('onsite');
+  const [tab, setTab] = useState<EarnFilterTab>('all');
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'tvl' | 'apy'>('tvl');
-
-  const [marginVaults, setMarginVaults] = useState<DeepBookMarginVault[]>([]);
-  const [lstStats, setLstStats] = useState<LstVaultLiveStat[]>([]);
-  const [plpVault, setPlpVault] = useState<PredictPlpVaultState | null>(null);
-  const [plpReferrerId, setPlpReferrerId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [balances, setBalances] = useState<Record<string, bigint>>({});
-  const [supplierCapIds, setSupplierCapIds] = useState<string[]>([]);
-  const [marginPositions, setMarginPositions] = useState<Record<string, UserMarginPosition>>({});
-  const [marginReferrals, setMarginReferrals] = useState<
-    Record<string, VoltMarginSupplyReferral | undefined>
+  const [lendingVaults, setLendingVaults] = useState<DeepBookMarginVault[]>([]);
+  const [lendingPositions, setLendingPositions] = useState<Record<string, UserMarginPosition>>({});
+  const [lendingReferrals, setLendingReferrals] = useState<
+    Record<string, VoltMarginSupplyReferral>
   >({});
+  const [plpVault, setPlpVault] = useState<PredictPlpVaultState | null>(null);
+  const [predictReferrerId, setPredictReferrerId] = useState<string | undefined>(undefined);
+  const [balances, setBalances] = useState<Record<string, bigint>>({});
 
-  // Interactive Ticket State
   const [selected, setSelected] = useState<SelectedAction>({
-    kind: 'margin',
+    kind: 'lending',
     op: 'supply',
-    coinKey: 'USDC',
+    coinKey: 'SUI',
   });
-  const [lstSettlementCoin, setLstSettlementCoin] = useState<'SUI' | 'USDC'>('SUI');
-  const [amountInput, setAmountInput] = useState<string>('1');
-  const [isExecuting, setIsExecuting] = useState(false);
+  const [amountInput, setAmountInput] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { volumeUsd: volUsd } = useSyncedWalletVolume(account?.address);
-  const activeReferrer = useMemo(
-    () => getValidReferrerForSender(account?.address),
-    [account?.address]
-  );
-  const traderTier = useMemo(
-    () => resolveTraderTier(volUsd, Boolean(activeReferrer)),
-    [volUsd, activeReferrer]
-  );
-  const refTier = useMemo(() => resolveReferralTier(volUsd), [volUsd]);
+  const requestIdRef = useRef(0);
 
-  const loadAllYieldData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [margins, lsts, refs, plp, proto] = await Promise.all([
-        fetchDeepBookMarginVaults().catch(() => []),
-        fetchLstVaultStats().catch(() => []),
-        fetchVoltMarginSupplyReferrals().catch(() => ({})),
-        fetchPredictPlpVault(account?.address).catch(() => null),
-        fetchPredictProtocolStatus().catch(() => null),
-      ]);
-      setMarginVaults(margins);
-      setLstStats(lsts);
-      setMarginReferrals(refs);
-      setPlpVault(plp);
-      if (proto?.referrerWrapperExists) {
-        setPlpReferrerId(proto.referrerWrapperId);
+  const loadData = useCallback(
+    async (silent = false) => {
+      const reqId = ++requestIdRef.current;
+      if (silent) setIsRefreshing(true);
+      else setIsLoading(true);
+
+      try {
+        const [vaults, refs, plp, proto, posRes, balMap] = await Promise.all([
+          fetchDeepBookMarginVaults().catch(() => [] as DeepBookMarginVault[]),
+          fetchVoltMarginSupplyReferrals().catch(
+            () => ({} as Record<string, VoltMarginSupplyReferral>)
+          ),
+          fetchPredictPlpVault(account?.address).catch(() => null),
+          fetchPredictProtocolStatus().catch(() => null),
+          account?.address
+            ? fetchUserDeepBookMarginPositions(account.address).catch(() => ({
+                supplierCapIds: [] as string[],
+                positions: {} as Record<string, UserMarginPosition>,
+              }))
+            : Promise.resolve({
+                supplierCapIds: [] as string[],
+                positions: {} as Record<string, UserMarginPosition>,
+              }),
+          account?.address
+            ? fetchWalletBalances(account.address).catch(() => ({} as Record<string, bigint>))
+            : Promise.resolve({} as Record<string, bigint>),
+        ]);
+
+        if (reqId !== requestIdRef.current) return;
+        setLendingVaults(vaults);
+        setLendingReferrals(refs);
+        setPlpVault(plp);
+        setPredictReferrerId(
+          proto?.referrerWrapperExists ? proto.referrerWrapperId : undefined
+        );
+        setLendingPositions(posRes.positions || {});
+        setBalances(balMap);
+
+        if (
+          selected.kind === 'lending' &&
+          vaults.length > 0 &&
+          !vaults.some((v) => v.coinKey === selected.coinKey)
+        ) {
+          setSelected({ kind: 'lending', op: 'supply', coinKey: vaults[0].coinKey });
+        }
+      } finally {
+        if (reqId === requestIdRef.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [account?.address]);
-
-  const refreshUserPortfolio = useCallback(async () => {
-    if (!account?.address) {
-      setBalances({});
-      setSupplierCapIds([]);
-      setMarginPositions({});
-      return;
-    }
-    const [balMap, posData, plp] = await Promise.all([
-      fetchWalletBalances(account.address).catch(() => ({})),
-      fetchUserDeepBookMarginPositions(account.address).catch(() => ({
-        supplierCapIds: [],
-        positions: {},
-      })),
-      fetchPredictPlpVault(account.address).catch(() => null),
-    ]);
-    setBalances(balMap);
-    setSupplierCapIds(posData.supplierCapIds);
-    setMarginPositions(posData.positions);
-    if (plp) setPlpVault(plp);
-  }, [account?.address]);
+    },
+    [account?.address, selected]
+  );
 
   useEffect(() => {
-    loadAllYieldData();
-  }, [loadAllYieldData]);
+    loadData(false);
+  }, [account?.address]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    refreshUserPortfolio();
-  }, [refreshUserPortfolio]);
-
-  const selectVaultAction = (next: SelectedAction) => {
-    setSelected(next);
-    if (next.kind === 'lst') {
-      const meta = LST_VAULT_OPTIONS.find((x) => x.symbol === next.symbol);
-      if (meta) setLstSettlementCoin(meta.basePayCoin);
-    }
-    if (next.kind === 'margin' && next.op === 'withdraw') {
-      const pos = marginPositions[next.coinKey];
-      setAmountInput(pos && pos.suppliedAmount > 0 ? String(pos.suppliedAmount) : '');
-    } else if (next.kind === 'plp' && next.op === 'withdraw') {
-      setAmountInput(plpVault && plpVault.userPlpShares > 0 ? String(plpVault.userPlpShares) : '');
-    } else if (next.kind === 'plp' && next.op === 'supply') {
-      setAmountInput('10');
-    } else if (next.kind === 'lst' && next.op === 'unstake') {
-      const meta = LST_VAULT_OPTIONS.find((x) => x.symbol === next.symbol);
-      const held =
-        meta && account?.address ? readBalanceFromMap(balances, meta.coinType, meta.decimals) : 0;
-      setAmountInput(held > 0 ? held.toFixed(4) : '');
-    } else {
-      setAmountInput('1');
-    }
-    ticketRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  };
-
-  // Resolve currently focused vault details
-  const activeMarginVault = useMemo(() => {
-    if (selected.kind !== 'margin') return null;
-    return marginVaults.find((v) => v.coinKey === selected.coinKey) || marginVaults[0] || null;
-  }, [selected, marginVaults]);
-
-  const activeLstVault = useMemo(() => {
-    if (selected.kind !== 'lst') return null;
-    return (
-      lstStats.find((l) => l.symbol === selected.symbol) ||
-      lstStats[0] || {
-        ...LST_VAULT_OPTIONS[0],
-        apyPct: LST_VAULT_OPTIONS[0].defaultApyPct,
-        tvlUsd: 0,
-        exchangeRateToBase: null,
-      }
+  const filteredLendingVaults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return lendingVaults.filter(
+      (v) =>
+        !q ||
+        v.symbol.toLowerCase().includes(q) ||
+        v.name.toLowerCase().includes(q) ||
+        String(v.coinKey).toLowerCase().includes(q)
     );
-  }, [selected, lstStats]);
+  }, [lendingVaults, search]);
 
-  // Compute available balance for active operation
+  const activeLendingVault = useMemo(() => {
+    if (selected.kind !== 'lending') return null;
+    return lendingVaults.find((v) => v.coinKey === selected.coinKey) || lendingVaults[0] || null;
+  }, [lendingVaults, selected]);
+
+  const activeLendingPos = useMemo(() => {
+    if (!activeLendingVault) return null;
+    return lendingPositions[String(activeLendingVault.coinKey)] || null;
+  }, [activeLendingVault, lendingPositions]);
+
+  const walletUsdc = useMemo(() => readBalanceFromMap(balances, USDC_COIN_TYPE, 6), [balances]);
+
+  const activeDecimals = useMemo(() => {
+    if (selected.kind === 'plp') return 6;
+    return activeLendingVault?.decimals ?? 9;
+  }, [selected.kind, activeLendingVault]);
+
   const availableActionBalance = useMemo(() => {
-    if (!account?.address) return 0;
-    if (selected.kind === 'margin' && activeMarginVault) {
-      if (selected.op === 'supply') {
-        return readBalanceFromMap(balances, activeMarginVault.coinType, activeMarginVault.decimals);
-      }
-      return marginPositions[activeMarginVault.coinKey]?.suppliedAmount ?? 0;
-    }
     if (selected.kind === 'plp') {
-      if (selected.op === 'supply') {
-        const walletUsdc = readBalanceFromMap(balances, USDC_COIN_TYPE, 6);
-        return walletUsdc + (plpVault?.vaultAvailableUsdc ?? 0);
-      }
-      return plpVault?.userPlpShares ?? 0;
+      if (selected.op === 'withdraw') return plpVault?.userPlpShares ?? 0;
+      return walletUsdc + (plpVault?.vaultAvailableUsdc ?? 0);
     }
-    if (selected.kind === 'lst' && activeLstVault) {
-      if (selected.op === 'stake') {
-        const payCoinType = lstSettlementCoin === 'USDC' ? USDC_COIN_TYPE : SUI_COIN_TYPE;
-        const payDec = lstSettlementCoin === 'USDC' ? 6 : 9;
-        return readBalanceFromMap(balances, payCoinType, payDec);
-      }
-      return readBalanceFromMap(balances, activeLstVault.coinType, activeLstVault.decimals);
+    if (!activeLendingVault) return 0;
+    if (selected.op === 'withdraw') return activeLendingPos?.suppliedAmount ?? 0;
+    const rawBal = readBalanceFromMap(
+      balances,
+      activeLendingVault.coinType,
+      activeLendingVault.decimals
+    );
+    if (activeLendingVault.coinType === SUI_COIN_TYPE) {
+      return Math.max(0, rawBal - 0.02);
     }
-    return 0;
+    return rawBal;
+  }, [selected, plpVault, walletUsdc, activeLendingVault, activeLendingPos, balances]);
+
+  const parsedAmount = useMemo(() => {
+    const n = Number(amountInput);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }, [amountInput]);
+
+  const capLeft = useMemo(() => {
+    if (selected.kind !== 'lending' || !activeLendingVault || activeLendingVault.supplyCap <= 0) {
+      return null;
+    }
+    return Math.max(0, activeLendingVault.supplyCap - activeLendingVault.totalSupply);
+  }, [selected.kind, activeLendingVault]);
+
+  const poolAvailLiquidity = useMemo(() => {
+    if (selected.kind !== 'lending' || !activeLendingVault) return null;
+    return Math.max(0, activeLendingVault.totalSupply - activeLendingVault.totalBorrow);
+  }, [selected.kind, activeLendingVault]);
+
+  const validationError = useMemo(() => {
+    if (parsedAmount <= 0) return null;
+    if (parsedAmount > availableActionBalance + 1e-9) {
+      return 'Amount exceeds your available balance.';
+    }
+    if (
+      selected.kind === 'lending' &&
+      selected.op === 'supply' &&
+      capLeft !== null &&
+      parsedAmount > capLeft
+    ) {
+      return `Exceeds pool supply cap (${fmtUnits(capLeft)} ${activeLendingVault?.symbol ?? ''} left).`;
+    }
+    if (
+      selected.kind === 'lending' &&
+      selected.op === 'withdraw' &&
+      poolAvailLiquidity !== null &&
+      parsedAmount > poolAvailLiquidity
+    ) {
+      return `Exceeds unborrowed pool liquidity (${fmtUnits(poolAvailLiquidity)} ${activeLendingVault?.symbol ?? ''} free).`;
+    }
+    if (
+      selected.kind === 'plp' &&
+      selected.op === 'withdraw' &&
+      plpVault &&
+      parsedAmount > plpVault.idleUsdc &&
+      plpVault.idleUsdc > 0
+    ) {
+      return `Pool idle USDC is $${plpVault.idleUsdc.toFixed(2)} — excess enters withdrawal queue.`;
+    }
+    return null;
   }, [
-    account?.address,
+    parsedAmount,
+    availableActionBalance,
     selected,
-    activeMarginVault,
-    activeLstVault,
-    balances,
-    marginPositions,
-    lstSettlementCoin,
+    capLeft,
+    poolAvailLiquidity,
+    activeLendingVault,
     plpVault,
   ]);
 
-  const suiPriceUsd = marginVaults.find((m) => m.symbol === 'SUI')?.priceUsd ?? 0;
+  const hardBlocked = useMemo(() => {
+    if (parsedAmount <= 0) return true;
+    if (parsedAmount > availableActionBalance + 1e-9) return true;
+    if (
+      selected.kind === 'lending' &&
+      selected.op === 'supply' &&
+      capLeft !== null &&
+      parsedAmount > capLeft
+    ) {
+      return true;
+    }
+    if (
+      selected.kind === 'lending' &&
+      selected.op === 'withdraw' &&
+      poolAvailLiquidity !== null &&
+      parsedAmount > poolAvailLiquidity
+    ) {
+      return true;
+    }
+    return false;
+  }, [parsedAmount, availableActionBalance, selected, capLeft, poolAvailLiquidity]);
 
-  const summaryMetrics = useMemo(() => {
-    const marginTvl = marginVaults.reduce((s, v) => s + v.tvlUsd, 0) + (plpVault?.idleUsdc ?? 0);
-    const topMarginApr = marginVaults.reduce((m, v) => Math.max(m, v.supplyAprPct), 0);
-    const topLstApy = lstStats.reduce((m, l) => Math.max(m, l.apyPct), 0);
-    const userMarginUsd = marginVaults.reduce((s, v) => {
-      const pos = marginPositions[v.coinKey];
-      return s + (pos ? pos.suppliedAmount * v.priceUsd : 0);
+  const totalTvlUsd = useMemo(() => {
+    const lendingTvl = lendingVaults.reduce((sum, v) => sum + (v.tvlUsd || 0), 0);
+    return lendingTvl + (plpVault?.idleUsdc ?? 0);
+  }, [lendingVaults, plpVault]);
+
+  const topLendingApr = useMemo(
+    () => lendingVaults.reduce((m, v) => Math.max(m, v.supplyAprPct || 0), 0),
+    [lendingVaults]
+  );
+
+  const userTotalSuppliedUsd = useMemo(() => {
+    return lendingVaults.reduce((sum, v) => {
+      const pos = lendingPositions[String(v.coinKey)];
+      if (!pos) return sum;
+      return sum + pos.suppliedAmount * (v.priceUsd || 0);
     }, 0);
-    const userLstUsd = account?.address
-      ? lstStats.reduce((s, l) => {
-          const bal = readBalanceFromMap(balances, l.coinType, l.decimals);
-          const unitUsd = l.category === 'rwa' ? 1 : suiPriceUsd;
-          return s + bal * (l.exchangeRateToBase ?? 1) * unitUsd;
-        }, 0)
-      : 0;
-    const userPlpUsd = plpVault?.userPlpShares ?? 0;
-    return {
-      marginTvl,
-      topMarginApr,
-      topLstApy,
-      userTotalUsd: userMarginUsd + userLstUsd + userPlpUsd,
-    };
-  }, [marginVaults, lstStats, marginPositions, balances, account?.address, suiPriceUsd, plpVault]);
-
-  const filteredMargins = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const list = q
-      ? marginVaults.filter(
-          (v) => v.symbol.toLowerCase().includes(q) || v.name.toLowerCase().includes(q)
-        )
-      : marginVaults;
-    return [...list].sort((a, b) =>
-      sortBy === 'apy' ? b.supplyAprPct - a.supplyAprPct : b.tvlUsd - a.tvlUsd
-    );
-  }, [marginVaults, search, sortBy]);
-
-  const filteredLsts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const base =
-      lstStats.length > 0
-        ? lstStats
-        : LST_VAULT_OPTIONS.map((o) => ({
-            ...o,
-            apyPct: o.defaultApyPct,
-            tvlUsd: 0,
-            exchangeRateToBase: null,
-          }));
-    const list = q
-      ? base.filter(
-          (l) =>
-            l.symbol.toLowerCase().includes(q) ||
-            l.protocol.toLowerCase().includes(q) ||
-            l.name.toLowerCase().includes(q)
-        )
-      : base;
-    return [...list].sort((a, b) => (sortBy === 'apy' ? b.apyPct - a.apyPct : b.tvlUsd - a.tvlUsd));
-  }, [lstStats, search, sortBy]);
+  }, [lendingVaults, lendingPositions]);
 
   const handleSetPct = (pct: number) => {
-    if (availableActionBalance <= 0) return;
-    let target = availableActionBalance * pct;
-    const isGasAsset =
-      selected.kind === 'margin'
-        ? selected.op === 'supply' && activeMarginVault?.symbol === 'SUI'
-        : selected.op === 'stake' && lstSettlementCoin === 'SUI';
-    if (pct >= 0.99 && isGasAsset) {
-      target = Math.max(0, availableActionBalance - 0.05);
-    }
-    setAmountInput(target > 0 ? target.toFixed(target >= 100 ? 2 : 4) : '0');
+    const raw = availableActionBalance * pct;
+    const floored = floorToDecimals(raw, activeDecimals);
+    setAmountInput(floored > 0 ? String(floored) : '0');
   };
 
-  const executeOnSiteAction = async () => {
+  const handleExecute = async () => {
     if (!account?.address) {
-      onNotify('info', 'Wallet Required', 'Connect your Sui wallet to deposit or stake.');
+      onNotify('warning', 'Wallet Required', 'Connect your Sui wallet to continue.');
       return;
     }
-    const amtNum = Number(amountInput);
-    if (!Number.isFinite(amtNum) || amtNum <= 0) {
-      onNotify('warning', 'Invalid Amount', 'Enter a valid positive amount.');
-      return;
-    }
+    if (hardBlocked) return;
 
-    setIsExecuting(true);
+    const safeAmount = floorToDecimals(parsedAmount, activeDecimals);
+    if (safeAmount <= 0) return;
+
+    setIsSubmitting(true);
     try {
-      if (selected.kind === 'margin' && activeMarginVault) {
-        if (selected.op === 'supply') {
-          const { tx, netDepositHuman } = buildDeepBookMarginSupplyTx({
-            sender: account.address,
-            coinKey: activeMarginVault.coinKey,
-            coinType: activeMarginVault.coinType,
-            decimals: activeMarginVault.decimals,
-            amountHuman: amtNum,
-            existingSupplierCapId:
-              marginPositions[activeMarginVault.coinKey]?.supplierCapId ||
-              supplierCapIds[0] ||
-              null,
-            referralId: marginReferrals[activeMarginVault.coinKey]?.referralId || null,
-          });
-
-          const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
-          if (!sim.ok) {
-            onNotify('error', 'Preflight Check Failed', sim.errorMessage || 'Supply aborted.');
-            return;
-          }
-
-          const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
-          const digest = extractTxDigest(res);
-          const estUsd = amtNum * activeMarginVault.priceUsd;
-          const nextVol = addWalletVolumeUsd(account.address, estUsd);
-          onVolumeUpdated?.(nextVol);
-
-          fetch('/api/record-swap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              digest,
-              address: account.address,
-              fromToken: activeMarginVault.symbol,
-              toToken: `dbMargin-${activeMarginVault.symbol}`,
-              fromAmount: amtNum,
-              toAmount: netDepositHuman,
-              volumeUsd: estUsd,
-              feeRate: traderTier.feeRate,
-              tierName: traderTier.name,
-              swapMode: 'DEEPBOOK_MARGIN_SUPPLY',
-              referrer: activeReferrer,
-            }),
-          }).catch(() => {});
-
-          onNotify(
-            'success',
-            `Supplied ${netDepositHuman.toFixed(4)} ${activeMarginVault.symbol}`,
-            `Earning ${activeMarginVault.supplyAprPct.toFixed(2)}% APR in DeepBook v3 Vault.`,
-            'Suiscan',
-            `https://suiscan.xyz/mainnet/tx/${digest}`
-          );
-          onTradeRecorded({
-            fromToken: activeMarginVault.symbol,
-            toToken: `${activeMarginVault.symbol} Vault`,
-            fromAmount: amtNum.toFixed(4),
-            toAmount: netDepositHuman.toFixed(4),
-            volumeUsd: estUsd,
-            digest,
-            orderType: 'SWAP',
-          });
-        } else {
-          const pos = marginPositions[activeMarginVault.coinKey];
-          if (!pos || pos.suppliedAmount <= 0) {
-            onNotify(
-              'warning',
-              'No Active Deposit',
-              `You have no supplied ${activeMarginVault.symbol} position to withdraw.`
-            );
-            return;
-          }
-          const withdrawAll = amtNum >= pos.suppliedAmount * 0.995;
-          const tx = buildDeepBookMarginWithdrawTx({
-            sender: account.address,
-            coinKey: activeMarginVault.coinKey,
-            supplierCapId: pos.supplierCapId,
-            amountHuman: withdrawAll ? undefined : amtNum,
-            withdrawAll,
-          });
-
-          const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
-          if (!sim.ok) {
-            onNotify('error', 'Preflight Check Failed', sim.errorMessage || 'Withdraw aborted.');
-            return;
-          }
-
-          const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
-          const digest = extractTxDigest(res);
-          onNotify(
-            'success',
-            `Withdrew ${amtNum.toFixed(4)} ${activeMarginVault.symbol}`,
-            'Principal + accrued interest returned directly to your wallet.',
-            'Suiscan',
-            `https://suiscan.xyz/mainnet/tx/${digest}`
-          );
-        }
-      } else if (selected.kind === 'plp') {
+      if (selected.kind === 'plp') {
         if (selected.op === 'supply') {
           const tx = buildPredictPlpSupplyTx({
             sender: account.address,
-            amountUsdc: amtNum,
+            amountUsdc: safeAmount,
             hasAccount: Boolean(plpVault?.hasAccount),
             vaultAvailableUsdc: plpVault?.vaultAvailableUsdc ?? 0,
-            referrerWrapperId: plpReferrerId,
+            referrerWrapperId: predictReferrerId,
           });
           const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
           if (!sim.ok) {
-            onNotify('error', 'PLP Preflight Failed', sim.errorMessage || 'PLP supply aborted.');
+            onNotify('error', 'PLP Supply Preflight Failed', sim.errorMessage || 'Simulation failed.');
             return;
           }
           const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
           const digest = extractTxDigest(res);
-          const nextVol = addWalletVolumeUsd(account.address, amtNum);
+          const nextVol = addWalletVolumeUsd(account.address, safeAmount);
           onVolumeUpdated?.(nextVol);
-          fetch('/api/record-swap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              digest,
-              address: account.address,
-              fromToken: 'USDC',
-              toToken: 'PLP',
-              fromAmount: amtNum,
-              toAmount: amtNum,
-              volumeUsd: amtNum,
-              feeRate: 0,
-              tierName: traderTier.name,
-              swapMode: 'DEEPBOOK_PLP_SUPPLY',
-              referrer: activeReferrer,
-            }),
-          }).catch(() => {});
           onNotify(
             'success',
-            `PLP Supply Queued (${amtNum.toFixed(2)} USDC)`,
-            'Your PLP shares will mint on the next DeepBook Predict pool flush.',
+            'Supplied to DeepBook PLP',
+            `Deposited ${safeAmount.toFixed(2)} USDC into DeepBook Predict Liquidity Pool.`,
             'Suiscan',
             `https://suiscan.xyz/mainnet/tx/${digest}`
           );
           onTradeRecorded({
             fromToken: 'USDC',
-            toToken: 'Predict PLP',
-            fromAmount: amtNum.toFixed(2),
-            toAmount: 'Queued',
-            volumeUsd: amtNum,
+            toToken: 'PLP',
+            fromAmount: safeAmount.toFixed(2),
+            toAmount: `${safeAmount.toFixed(2)} USDC LP`,
+            volumeUsd: safeAmount,
+            feeSavedUsd: 0,
             digest,
-            orderType: 'SWAP',
           });
+          fetch('/api/record-swap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sender: account.address,
+              fromSymbol: 'USDC',
+              toSymbol: 'PLP',
+              amountIn: safeAmount.toFixed(2),
+              notionalUsd: safeAmount,
+              feeRate: 0,
+              digest,
+              swapMode: 'DEEPBOOK_PLP_SUPPLY',
+            }),
+          }).catch(() => {});
         } else {
-          const sharesRaw =
-            amtNum >= (plpVault?.userPlpShares ?? 0) * 0.995 && plpVault?.userPlpSharesRaw
-              ? plpVault.userPlpSharesRaw
-              : usdcToRaw(amtNum);
-          if (sharesRaw <= 0n) {
-            onNotify('warning', 'No PLP Shares', 'You have no PLP shares to withdraw.');
-            return;
-          }
+          const sharesRaw = usdcToRaw(safeAmount);
           const tx = buildPredictPlpWithdrawTx({
             sender: account.address,
             sharesRaw,
           });
           const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
           if (!sim.ok) {
-            onNotify('error', 'PLP Withdraw Failed', sim.errorMessage || 'PLP withdraw aborted.');
+            onNotify(
+              'error',
+              'PLP Withdraw Preflight Failed',
+              sim.errorMessage || 'Simulation failed.'
+            );
             return;
           }
           const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
           const digest = extractTxDigest(res);
           onNotify(
             'success',
-            'PLP Withdraw Queued',
-            `Requested withdrawal of ${amtNum.toFixed(4)} PLP shares on next pool flush.`,
+            'PLP Withdrawal Submitted',
+            `Requested withdrawal of ${safeAmount.toFixed(2)} PLP shares to Predict Vault.`,
             'Suiscan',
             `https://suiscan.xyz/mainnet/tx/${digest}`
           );
         }
-      } else if (selected.kind === 'lst' && activeLstVault) {
-        const baseType = lstSettlementCoin === 'USDC' ? USDC_COIN_TYPE : SUI_COIN_TYPE;
-        const baseDec = lstSettlementCoin === 'USDC' ? 6 : 9;
-        const fromType = selected.op === 'stake' ? baseType : activeLstVault.coinType;
-        const toType = selected.op === 'stake' ? activeLstVault.coinType : baseType;
-        const inDec = selected.op === 'stake' ? baseDec : activeLstVault.decimals;
-        const outDec = selected.op === 'stake' ? activeLstVault.decimals : baseDec;
-        const outSym = selected.op === 'stake' ? activeLstVault.symbol : lstSettlementCoin;
-        const inSym = selected.op === 'stake' ? lstSettlementCoin : activeLstVault.symbol;
-
-        const atomic = BigInt(Math.floor(amtNum * Math.pow(10, inDec)));
-        const { tx, expectedOutAtomic } = await buildEarnZapTx({
-          sender: account.address,
-          inputCoinType: fromType,
-          targetCoinType: toType,
-          amountInAtomic: atomic,
-          feeRate: traderTier.feeRate,
-          refSharePct: refTier.revSharePct,
-        });
-
-        const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
-        if (!sim.ok) {
-          onNotify('error', 'Preflight Check Failed', sim.errorMessage || 'Transaction aborted.');
-          return;
-        }
-
-        const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
-        const digest = extractTxDigest(res);
-        const outHuman = (Number(expectedOutAtomic) / Math.pow(10, outDec)).toFixed(4);
-        const estUsd =
-          inSym === 'USDC' || inSym === 'USDY' || inSym === 'BUCK'
-            ? amtNum
-            : amtNum * (suiPriceUsd > 0 ? suiPriceUsd : 1);
-
-        const nextVol = addWalletVolumeUsd(account.address, estUsd);
-        onVolumeUpdated?.(nextVol);
-
-        fetch('/api/record-swap', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+      } else if (activeLendingVault) {
+        if (selected.op === 'supply') {
+          const ref = lendingReferrals[String(activeLendingVault.coinKey)];
+          const { tx } = buildDeepBookMarginSupplyTx({
+            sender: account.address,
+            coinKey: activeLendingVault.coinKey,
+            amountHuman: safeAmount,
+            existingSupplierCapId: activeLendingPos?.supplierCapId ?? null,
+            referralId: ref?.referralId ?? null,
+          });
+          const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+          if (!sim.ok) {
+            onNotify(
+              'error',
+              'Lending Supply Preflight Failed',
+              sim.errorMessage || 'Simulation failed.'
+            );
+            return;
+          }
+          const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+          const digest = extractTxDigest(res);
+          const notionalUsd = safeAmount * (activeLendingVault.priceUsd || 0);
+          if (notionalUsd > 0) {
+            const nextVol = addWalletVolumeUsd(account.address, notionalUsd);
+            onVolumeUpdated?.(nextVol);
+          }
+          onNotify(
+            'success',
+            `Supplied ${activeLendingVault.symbol}`,
+            `Deposited ${fmtUnits(safeAmount)} ${activeLendingVault.symbol} at ${activeLendingVault.supplyAprPct.toFixed(2)}% APR.`,
+            'Suiscan',
+            `https://suiscan.xyz/mainnet/tx/${digest}`
+          );
+          onTradeRecorded({
+            fromToken: activeLendingVault.symbol,
+            toToken: `db${activeLendingVault.symbol}`,
+            fromAmount: fmtUnits(safeAmount),
+            toAmount: `${activeLendingVault.supplyAprPct.toFixed(2)}% APR`,
+            volumeUsd: notionalUsd,
+            feeSavedUsd: 0,
             digest,
-            address: account.address,
-            fromToken: inSym,
-            toToken: outSym,
-            fromAmount: amtNum,
-            toAmount: Number(outHuman),
-            volumeUsd: estUsd,
-            feeRate: traderTier.feeRate,
-            tierName: traderTier.name,
-            swapMode: 'EARN_LST_ZAP',
-            referrer: activeReferrer,
-          }),
-        }).catch(() => {});
-
-        onNotify(
-          'success',
-          selected.op === 'stake'
-            ? `Staked ${outHuman} ${outSym}`
-            : `Redeemed ${outHuman} ${outSym}`,
-          `Executed ${inSym} -> ${outSym} atomically inside VoltSwap PTB.`,
-          'Suiscan',
-          `https://suiscan.xyz/mainnet/tx/${digest}`
-        );
-        onTradeRecorded({
-          fromToken: inSym,
-          toToken: outSym,
-          fromAmount: amtNum.toFixed(4),
-          toAmount: outHuman,
-          volumeUsd: estUsd,
-          digest,
-          orderType: 'SWAP',
-        });
+          });
+          fetch('/api/record-swap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sender: account.address,
+              fromSymbol: activeLendingVault.symbol,
+              toSymbol: `db${activeLendingVault.symbol}`,
+              amountIn: fmtUnits(safeAmount),
+              notionalUsd,
+              feeRate: 0,
+              digest,
+              swapMode: 'DEEPBOOK_MARGIN_SUPPLY',
+            }),
+          }).catch(() => {});
+        } else {
+          if (!activeLendingPos?.supplierCapId) {
+            onNotify(
+              'warning',
+              'No Active Position',
+              `You have no supplied ${activeLendingVault.symbol} position to withdraw.`
+            );
+            return;
+          }
+          const withdrawAll = safeAmount >= activeLendingPos.suppliedAmount * 0.9999;
+          const tx = buildDeepBookMarginWithdrawTx({
+            sender: account.address,
+            coinKey: activeLendingVault.coinKey,
+            supplierCapId: activeLendingPos.supplierCapId,
+            amountHuman: safeAmount,
+            withdrawAll,
+          });
+          const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+          if (!sim.ok) {
+            onNotify(
+              'error',
+              'Lending Withdraw Preflight Failed',
+              sim.errorMessage || 'Simulation failed.'
+            );
+            return;
+          }
+          const res = await dAppKit.signAndExecuteTransaction({ transaction: tx });
+          const digest = extractTxDigest(res);
+          onNotify(
+            'success',
+            `Withdrew ${activeLendingVault.symbol}`,
+            `Returned ${fmtUnits(safeAmount)} ${activeLendingVault.symbol} to your wallet.`,
+            'Suiscan',
+            `https://suiscan.xyz/mainnet/tx/${digest}`
+          );
+        }
       }
 
-      await Promise.all([loadAllYieldData(), refreshUserPortfolio()]);
+      setAmountInput('');
+      await loadData(true);
     } catch (err: any) {
-      onNotify('error', 'Action Failed', err?.message || 'Transaction rejected.');
+      onNotify('error', 'Transaction Cancelled', err?.message || 'Wallet rejected transaction.');
     } finally {
-      setIsExecuting(false);
+      setIsSubmitting(false);
     }
   };
 
-  const estYieldPerYear = useMemo(() => {
-    const amt = Number(amountInput) || 0;
-    if (amt <= 0) return null;
-    if (selected.kind === 'margin' && activeMarginVault) {
-      return {
-        apr: activeMarginVault.supplyAprPct,
-        estUsdYr: amt * activeMarginVault.priceUsd * (activeMarginVault.supplyAprPct / 100),
-      };
-    }
-    if (selected.kind === 'lst' && activeLstVault) {
-      const baseUsd =
-        lstSettlementCoin === 'USDC' || activeLstVault.category === 'rwa'
-          ? amt
-          : amt * (suiPriceUsd > 0 ? suiPriceUsd : 0);
-      return {
-        apr: activeLstVault.apyPct,
-        estUsdYr: baseUsd * (activeLstVault.apyPct / 100),
-      };
-    }
-    return null;
-  }, [amountInput, selected, activeMarginVault, activeLstVault, lstSettlementCoin, suiPriceUsd]);
+  const showPlpSection = tab === 'all' || tab === 'plp';
+  const showLendingSection = tab === 'all' || tab === 'lending';
 
   return (
-    <div className="w-full space-y-4 animate-panel-in">
-      {/* Top Joined Institutional 4-Cell KPI Strip */}
-      <div className="bg-[#06070A] border border-[#2E384C] rounded-xl grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[#2D374B] overflow-hidden">
-        <div className="p-4">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">DeepBook On-Site Vault TVL</div>
-          <div className="text-2xl font-mono tabular-nums font-bold text-white mt-1">
-            ${summaryMetrics.marginTvl >= 1e6
-              ? `${(summaryMetrics.marginTvl / 1e6).toFixed(2)}M`
-              : `${(summaryMetrics.marginTvl / 1e3).toFixed(1)}K`}
+    <div className="space-y-4">
+      {/* Header Summary Strip */}
+      <div className="panel-carbon rounded-xl p-4 sm:p-5 border border-[#2D374B]">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-[#2B7FFF]/15 border border-[#2B7FFF]/40 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-[#60A5FA]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                  DeepBook Native Earn
+                </h1>
+                <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 border border-[#2B7FFF]/35 text-[10px] font-mono text-[#60A5FA]">
+                  @mysten/deepbook-v3
+                </span>
+              </div>
+              <p className="text-xs text-[#8E98A8]">
+                Direct on-chain DeepBook Lending pools &amp; DeepBook Predict Liquidity Pool (PLP). Zero Volt fee.
+              </p>
+            </div>
           </div>
-          <div className="text-xs font-mono text-[#60A5FA] mt-0.5">
-            {marginVaults.length} Native On-Chain Vaults
-          </div>
+
+          <button
+            type="button"
+            onClick={() => loadData(true)}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0C0E13] border border-[#2D374B] hover:border-[#2B7FFF]/50 text-xs font-mono text-slate-300 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
         </div>
 
-        <div className="p-4">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Top Lending Supply APR</div>
-          <div className="text-2xl font-mono tabular-nums font-bold text-[#08D189] mt-1">
-            {summaryMetrics.topMarginApr > 0 ? `${summaryMetrics.topMarginApr.toFixed(2)}%` : '—'}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="panel-carbon-sub rounded-lg p-3 border border-[#232B3B]">
+            <div className="text-[11px] font-mono text-[#7B8494]">DeepBook Earn TVL</div>
+            <div className="text-base font-mono font-bold text-white mt-0.5 tabular-nums">
+              {fmtUsd(totalTvlUsd)}
+            </div>
           </div>
-          <div className="text-xs font-mono text-slate-400 mt-0.5">Real Borrower Interest</div>
-        </div>
-
-        <div className="p-4">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Top Staking &amp; RWA Yield</div>
-          <div className="text-2xl font-mono tabular-nums font-bold text-[#08D189] mt-1">
-            {summaryMetrics.topLstApy > 0 ? `${summaryMetrics.topLstApy.toFixed(2)}%` : '—'}
+          <div className="panel-carbon-sub rounded-lg p-3 border border-[#232B3B]">
+            <div className="text-[11px] font-mono text-[#7B8494]">Top Lending APR</div>
+            <div className="text-base font-mono font-bold text-[#08D189] mt-0.5 tabular-nums">
+              {topLendingApr > 0 ? `${topLendingApr.toFixed(2)}%` : '—'}
+            </div>
           </div>
-          <div className="text-xs font-mono text-slate-400 mt-0.5">
-            haSUI · afSUI · vSUI · sSUI · USDY
+          <div className="panel-carbon-sub rounded-lg p-3 border border-[#232B3B]">
+            <div className="text-[11px] font-mono text-[#7B8494]">My Lending Supplied</div>
+            <div className="text-base font-mono font-bold text-white mt-0.5 tabular-nums">
+              {fmtUsd(userTotalSuppliedUsd)}
+            </div>
           </div>
-        </div>
-
-        <div className="p-4">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Your On-Site Deposits</div>
-          <div className="text-2xl font-mono tabular-nums font-bold text-white mt-1">
-            ${summaryMetrics.userTotalUsd.toFixed(2)}
-          </div>
-          <div className="text-xs font-mono text-[#60A5FA] mt-0.5">
-            {supplierCapIds.length > 0
-              ? `SupplierCap Active (${supplierCapIds.length})`
-              : account
-                ? 'Zero-custody Sui PTB'
-                : 'Connect wallet to view'}
+          <div className="panel-carbon-sub rounded-lg p-3 border border-[#232B3B]">
+            <div className="text-[11px] font-mono text-[#7B8494]">My PLP Shares</div>
+            <div className="text-base font-mono font-bold text-[#60A5FA] mt-0.5 tabular-nums">
+              {plpVault ? fmtUnits(plpVault.userPlpShares, 2) : '0.00'} PLP
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Layout: Left Interactive Pools Table (8 cols) + Right On-Site Execution Ticket (4 cols) */}
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#090B10] border border-[#2D374B]">
+          {(
+            [
+              { id: 'all', label: 'All DeepBook' },
+              { id: 'lending', label: `DeepBook Lending (${lendingVaults.length})` },
+              { id: 'plp', label: 'Predict PLP' },
+            ] as { id: EarnFilterTab; label: string }[]
+          ).map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                tab === item.id
+                  ? 'bg-[#2B7FFF]/20 text-[#60A5FA] border border-[#2B7FFF]/45'
+                  : 'text-[#8E98A8] hover:text-white border border-transparent'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {showLendingSection && (
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-[#7B8494] absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter Lending asset..."
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#090B10] border border-[#2D374B] text-xs font-mono text-white placeholder-[#5A6475] outline-none focus:border-[#2B7FFF]"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Main Grid: Pools Left + Execution Card Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         <div className="lg:col-span-8 space-y-4">
-          {/* Sub-Tabs & Filter Bar */}
-          <div className="bg-[#06070A] border border-[#2E384C] rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-1">
-              {(
-                [
-                  { id: 'onsite', label: 'All On-Site Vaults' },
-                  { id: 'margin', label: 'DeepBook Lending' },
-                  { id: 'lst', label: 'Staking & RWA' },
-                ] as const
-              ).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTab(item.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    tab === item.id
-                      ? 'bg-[#2B7FFF] text-white font-bold shadow-[0_0_12px_rgba(43,127,255,0.28)]'
-                      : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search asset..."
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[#000000] border border-[#2D374B] text-xs text-white placeholder:text-slate-500 outline-none focus:border-[#2B7FFF] w-36 sm:w-44"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={loadAllYieldData}
-                className="p-2 rounded-lg bg-[#000000] border border-[#2D374B] text-slate-400 hover:text-white hover:border-[#2B7FFF]/50 transition-colors"
-                title="Refresh live rates"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {/* SECTION 1: DeepBook v3 Margin Lending Vaults (On-Site Supply & Withdraw) */}
-          {(tab === 'onsite' || tab === 'margin') && (
-            <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#2D374B] flex flex-wrap items-center justify-between gap-2 bg-[#000000]">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#60A5FA]" />
-                  <span className="text-sm font-bold text-white">
-                    DeepBook v3 Margin Lending Vaults
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#08D189]/12 text-[#08D189] border border-[#08D189]/30 text-[11px] font-mono font-semibold">
-                    ON-SITE EXECUTION
-                  </span>
-                </div>
-                <span className="text-xs font-mono text-slate-400">
-                  Direct Supply &amp; Withdraw on VoltSwap
-                </span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-slate-400 border-b border-[#2D374B] bg-[#000000]">
-                      <th className="text-left px-4 py-2.5 font-semibold">Vault Asset</th>
-                      <th className="text-right px-3 py-2.5 font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => setSortBy('tvl')}
-                          className={sortBy === 'tvl' ? 'text-[#60A5FA]' : 'hover:text-white'}
-                        >
-                          Supplied TVL
-                        </button>
-                      </th>
-                      <th className="text-right px-3 py-2.5 font-semibold hidden sm:table-cell">
-                        Utilization
-                      </th>
-                      <th className="text-right px-3 py-2.5 font-semibold">
-                        <button
-                          type="button"
-                          onClick={() => setSortBy('apy')}
-                          className={sortBy === 'apy' ? 'text-[#60A5FA]' : 'hover:text-white'}
-                        >
-                          Supply APR
-                        </button>
-                      </th>
-                      <th className="text-right px-3 py-2.5 font-semibold hidden md:table-cell">
-                        My Deposit
-                      </th>
-                      <th className="text-right px-4 py-2.5 font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="font-mono tabular-nums divide-y divide-[#2D374B]/70">
-                    {filteredMargins.map((v) => {
-                      const pos = marginPositions[v.coinKey];
-                      const hasDep = Boolean(pos && pos.suppliedAmount > 0.000001);
-                      const isRowFocused =
-                        selected.kind === 'margin' && selected.coinKey === v.coinKey;
-                      return (
-                        <tr
-                          key={v.coinKey}
-                          className={`transition-colors ${
-                            isRowFocused ? 'bg-[#2B7FFF]/10' : 'hover:bg-white/[0.02]'
-                          }`}
-                        >
-                          <td className="px-4 py-3 font-sans">
-                            <div className="flex items-center gap-2.5">
-                              <img src={v.logo} alt={v.symbol} className="w-6 h-6 rounded-full" />
-                              <div>
-                                <div className="font-bold text-white">{v.symbol}</div>
-                                <div className="text-[11px] text-slate-400">
-                                  Borrow {v.borrowAprPct.toFixed(2)}%
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            <div className="text-white font-semibold">
-                              ${v.tvlUsd >= 1e6
-                                ? `${(v.tvlUsd / 1e6).toFixed(2)}M`
-                                : v.tvlUsd >= 1000
-                                  ? `${(v.tvlUsd / 1e3).toFixed(1)}K`
-                                  : v.tvlUsd.toFixed(0)}
-                            </div>
-                            <div className="text-[11px] text-slate-400">
-                              {v.totalSupply >= 1e6
-                                ? `${(v.totalSupply / 1e6).toFixed(2)}M`
-                                : v.totalSupply >= 1000
-                                  ? `${(v.totalSupply / 1e3).toFixed(1)}K`
-                                  : v.totalSupply.toFixed(3)}{' '}
-                              {v.symbol}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-right hidden sm:table-cell">
-                            <div className="text-white">{v.utilizationPct.toFixed(1)}%</div>
-                            <div className="w-16 h-1.5 rounded-full bg-white/[0.08] ml-auto mt-1 overflow-hidden">
-                              <div
-                                className="h-full bg-[#2B7FFF]"
-                                style={{ width: `${Math.min(100, v.utilizationPct)}%` }}
-                              />
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 text-right font-bold text-[#08D189] text-sm">
-                            {v.supplyAprPct.toFixed(2)}%
-                          </td>
-                          <td className="px-3 py-3 text-right hidden md:table-cell">
-                            {hasDep ? (
-                              <span className="text-[#08D189] font-semibold">
-                                {pos!.suppliedAmount.toFixed(4)} {v.symbol}
-                              </span>
-                            ) : (
-                              <span className="text-slate-500">0.00</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right font-sans">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  selectVaultAction({
-                                    kind: 'margin',
-                                    op: 'supply',
-                                    coinKey: v.coinKey,
-                                  })
-                                }
-                                className="px-3 py-1.5 rounded-md btn-deepbook font-bold text-xs transition-colors"
-                              >
-                                Supply
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  selectVaultAction({
-                                    kind: 'margin',
-                                    op: 'withdraw',
-                                    coinKey: v.coinKey,
-                                  })
-                                }
-                                className={`px-2.5 py-1.5 rounded-md border text-xs font-semibold transition-colors ${
-                                  hasDep
-                                    ? 'border-[#08D189]/45 text-[#08D189] hover:bg-[#08D189]/15'
-                                    : 'border-[#323D52] text-slate-300 hover:text-white hover:bg-white/[0.05]'
-                                }`}
-                              >
-                                Withdraw
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 1B: DeepBook Predict Liquidity Pool (PLP) */}
-          {(tab === 'onsite' || tab === 'margin') && (
-            <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#2D374B] flex flex-wrap items-center justify-between gap-2 bg-[#000000]">
+          {/* Predict PLP Card */}
+          {showPlpSection && (
+            <div
+              className={`panel-carbon rounded-xl p-4 border transition-colors ${
+                selected.kind === 'plp'
+                  ? 'border-[#2B7FFF]/70 shadow-[0_0_20px_rgba(43,127,255,0.12)]'
+                  : 'border-[#2D374B]'
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#232B3B]">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-[#60A5FA]" />
                   <span className="text-sm font-bold text-white">
                     DeepBook Predict Liquidity Pool (PLP)
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 text-[11px] font-mono font-semibold">
+                  <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 border border-[#2B7FFF]/35 text-[10px] font-mono text-[#60A5FA]">
                     OPTIONS MARKET MAKING
                   </span>
                 </div>
-                <span className="text-xs font-mono text-slate-400">
+                <span className="text-[11px] font-mono text-[#8E98A8]">
                   Earn Spread &amp; Binary Option Fees (USDC)
                 </span>
               </div>
 
-              <div className="p-4 flex flex-wrap items-center justify-between gap-4">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 min-w-[260px] font-mono tabular-nums text-xs">
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">Pool Idle USDC</div>
-                    <div className="text-sm font-bold text-white mt-0.5">
-                      ${plpVault ? plpVault.idleUsdc.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">Total PLP Supply</div>
-                    <div className="text-sm font-bold text-white mt-0.5">
-                      {plpVault ? plpVault.plpTotalSupply.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">Pending Queue</div>
-                    <div className="text-sm font-bold text-[#60A5FA] mt-0.5">
-                      {plpVault
-                        ? `${plpVault.supplyRequestsPending} in / ${plpVault.withdrawRequestsPending} out`
-                        : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">My PLP Shares</div>
-                    <div className="text-sm font-bold text-[#08D189] mt-0.5">
-                      {plpVault && plpVault.userPlpShares > 0.0001
-                        ? `${plpVault.userPlpShares.toFixed(4)} PLP`
-                        : '0.00'}
-                    </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-3 items-center">
+                <div>
+                  <div className="text-[11px] text-[#7B8494] font-mono">Pool Idle USDC</div>
+                  <div className="text-sm font-mono font-bold text-white tabular-nums mt-0.5">
+                    {plpVault ? fmtUsd(plpVault.idleUsdc) : '—'}
                   </div>
                 </div>
-
-                <div className="inline-flex items-center gap-1.5">
+                <div>
+                  <div className="text-[11px] text-[#7B8494] font-mono">Total PLP Supply</div>
+                  <div className="text-sm font-mono font-bold text-white tabular-nums mt-0.5">
+                    {plpVault ? fmtUnits(plpVault.plpTotalSupply, 2) : '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-[#7B8494] font-mono">Pending Queue</div>
+                  <div className="text-sm font-mono font-bold text-[#60A5FA] tabular-nums mt-0.5">
+                    {plpVault
+                      ? `${plpVault.supplyRequestsPending} in / ${plpVault.withdrawRequestsPending} out`
+                      : '0 in / 0 out'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-[#7B8494] font-mono">My PLP Shares</div>
+                  <div className="text-sm font-mono font-bold text-[#08D189] tabular-nums mt-0.5">
+                    {plpVault ? plpVault.userPlpShares.toFixed(2) : '0.00'}
+                  </div>
+                </div>
+                <div className="col-span-2 sm:col-span-1 flex items-center justify-end gap-1.5">
                   <button
                     type="button"
-                    onClick={() => selectVaultAction({ kind: 'plp', op: 'supply' })}
-                    className="px-3 py-1.5 rounded-md btn-deepbook font-bold text-xs transition-colors"
+                    onClick={() => {
+                      setSelected({ kind: 'plp', op: 'supply' });
+                      setAmountInput('');
+                    }}
+                    className="px-3 py-1.5 rounded-lg btn-deepbook text-xs font-bold"
                   >
                     Supply USDC
                   </button>
                   <button
                     type="button"
-                    onClick={() => selectVaultAction({ kind: 'plp', op: 'withdraw' })}
-                    className={`px-2.5 py-1.5 rounded-md border text-xs font-semibold transition-colors ${
-                      plpVault && plpVault.userPlpShares > 0.0001
-                        ? 'border-[#08D189]/45 text-[#08D189] hover:bg-[#08D189]/15'
-                        : 'border-[#323D52] text-slate-300 hover:text-white hover:bg-white/[0.05]'
-                    }`}
+                    onClick={() => {
+                      setSelected({ kind: 'plp', op: 'withdraw' });
+                      setAmountInput('');
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#0C0E13] border border-[#2D374B] hover:border-[#2B7FFF]/50 text-xs font-semibold text-slate-200"
                   >
                     Withdraw
                   </button>
@@ -933,603 +684,308 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
             </div>
           )}
 
-          {/* SECTION 2: Liquid Staking & RWA Yield Vaults (On-Site Stake & Unstake) */}
-          {(tab === 'onsite' || tab === 'lst') && (
-            <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#2D374B] flex flex-wrap items-center justify-between gap-2 bg-[#000000]">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-[#08D189]" />
-                  <span className="text-sm font-bold text-white">
-                    Sui Liquid Staking &amp; Treasury Yield
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#08D189]/12 text-[#08D189] border border-[#08D189]/30 text-[11px] font-mono font-semibold">
-                    1-CLICK STAKE &amp; REDEEM
-                  </span>
+          {/* DeepBook Lending Pools */}
+          {showLendingSection && (
+            <div className="panel-carbon rounded-xl border border-[#2D374B] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#232B3B] flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-white">
+                    DeepBook Lending (Margin Pools)
+                  </h2>
+                  <p className="text-[11px] text-[#8E98A8]">
+                    On-chain interest-bearing pools backed by DeepBook v3 borrowers.
+                  </p>
                 </div>
-                <span className="text-xs font-mono text-slate-400">
-                  Cetus Aggregator PTB
+                <span className="text-[11px] font-mono text-[#60A5FA]">
+                  {filteredLendingVaults.length} Pools
                 </span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-slate-400 border-b border-[#2D374B] bg-[#000000]">
-                      <th className="text-left px-4 py-2.5 font-semibold">Yield Token</th>
-                      <th className="text-left px-3 py-2.5 font-semibold hidden sm:table-cell">
-                        Protocol
-                      </th>
-                      <th className="text-right px-3 py-2.5 font-semibold">Live Rate</th>
-                      <th className="text-right px-3 py-2.5 font-semibold">Est. APY</th>
-                      <th className="text-right px-3 py-2.5 font-semibold hidden md:table-cell">
-                        My Balance
-                      </th>
-                      <th className="text-right px-4 py-2.5 font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="font-mono tabular-nums divide-y divide-[#2D374B]/70">
-                    {filteredLsts.map((item) => {
-                      const held = account?.address
-                        ? readBalanceFromMap(balances, item.coinType, item.decimals)
-                        : 0;
-                      const isRowFocused =
-                        selected.kind === 'lst' && selected.symbol === item.symbol;
-                      return (
-                        <tr
-                          key={item.symbol}
-                          className={`transition-colors ${
-                            isRowFocused ? 'bg-[#2B7FFF]/10' : 'hover:bg-white/[0.02]'
-                          }`}
-                        >
-                          <td className="px-4 py-3 font-sans">
-                            <div className="flex items-center gap-2.5">
-                              <img src={item.logo} alt={item.symbol} className="w-6 h-6 rounded-full" />
-                              <div>
-                                <div className="font-bold text-white">{item.symbol}</div>
-                                <div className="text-xs text-slate-400 sm:hidden">
-                                  {item.protocol}
-                                </div>
+              {isLoading && lendingVaults.length === 0 ? (
+                <div className="p-8 flex items-center justify-center gap-2 text-xs font-mono text-[#7B8494]">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#2B7FFF]" />
+                  <span>Loading DeepBook Lending pools...</span>
+                </div>
+              ) : filteredLendingVaults.length === 0 ? (
+                <div className="p-8 text-center text-xs font-mono text-[#7B8494]">
+                  No DeepBook Lending pools match "{search}".
+                </div>
+              ) : (
+                <div className="divide-y divide-[#1E2533]">
+                  {filteredLendingVaults.map((v) => {
+                    const pos = lendingPositions[String(v.coinKey)];
+                    const isSelected =
+                      selected.kind === 'lending' && selected.coinKey === String(v.coinKey);
+                    const availLiq = Math.max(0, v.totalSupply - v.totalBorrow);
+
+                    return (
+                      <div
+                        key={String(v.coinKey)}
+                        className={`p-3.5 sm:p-4 transition-colors ${
+                          isSelected ? 'bg-[#2B7FFF]/8' : 'hover:bg-white/[0.02]'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-[160px]">
+                            <img
+                              src={v.logo}
+                              alt={v.symbol}
+                              className="w-8 h-8 rounded-full bg-[#0C0E13] border border-[#2D374B] object-cover"
+                            />
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-bold text-white">{v.symbol}</span>
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#0C0E13] border border-[#2D374B] text-[#8E98A8]">
+                                  DeepBook
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-[#7B8494]">{v.name}</div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 flex-1 min-w-[240px]">
+                            <div>
+                              <div className="text-[10px] font-mono text-[#7B8494]">Supply APR</div>
+                              <div className="text-sm font-mono font-bold text-[#08D189] tabular-nums">
+                                {v.supplyAprPct.toFixed(2)}%
                               </div>
                             </div>
-                          </td>
-                          <td className="px-3 py-3 font-sans text-slate-300 hidden sm:table-cell">
-                            {item.protocol}
-                          </td>
-                          <td className="px-3 py-3 text-right text-slate-300">
-                            {item.exchangeRateToBase
-                              ? `1 = ${item.exchangeRateToBase.toFixed(4)} ${item.basePayCoin}`
-                              : '—'}
-                          </td>
-                          <td className="px-3 py-3 text-right font-bold text-[#08D189] text-sm">
-                            {item.apyPct.toFixed(2)}%
-                          </td>
-                          <td className="px-3 py-3 text-right hidden md:table-cell">
-                            <span className={held > 0.0001 ? 'text-white font-semibold' : 'text-slate-500'}>
-                              {held > 0.0001 ? held.toFixed(4) : '0.00'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right font-sans">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  selectVaultAction({
-                                    kind: 'lst',
-                                    op: 'stake',
-                                    symbol: item.symbol,
-                                  })
-                                }
-                                className="px-3 py-1.5 rounded-md btn-deepbook font-bold text-xs transition-colors"
-                              >
-                                {item.category === 'rwa' ? 'Deposit' : 'Stake'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  selectVaultAction({
-                                    kind: 'lst',
-                                    op: 'unstake',
-                                    symbol: item.symbol,
-                                  })
-                                }
-                                className={`px-2.5 py-1.5 rounded-md border text-xs font-semibold transition-colors ${
-                                  held > 0.0001
-                                    ? 'border-[#08D189]/45 text-[#08D189] hover:bg-[#08D189]/15'
-                                    : 'border-[#323D52] text-slate-300 hover:text-white hover:bg-white/[0.05]'
-                                }`}
-                              >
-                                {item.category === 'rwa' ? 'Redeem' : 'Unstake'}
-                              </button>
+                            <div>
+                              <div className="text-[10px] font-mono text-[#7B8494]">TVL</div>
+                              <div className="text-sm font-mono font-semibold text-white tabular-nums">
+                                {fmtUsd(v.tvlUsd)}
+                              </div>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                            <div>
+                              <div className="text-[10px] font-mono text-[#7B8494]">Util / Free</div>
+                              <div className="text-xs font-mono text-slate-300 tabular-nums">
+                                {v.utilizationPct.toFixed(1)}% · {fmtUnits(availLiq, 2)}
+                              </div>
+                            </div>
+                            <div className="hidden sm:block">
+                              <div className="text-[10px] font-mono text-[#7B8494]">My Supplied</div>
+                              <div className="text-sm font-mono font-bold text-[#60A5FA] tabular-nums">
+                                {pos ? `${fmtUnits(pos.suppliedAmount, 4)} ${v.symbol}` : '0'}
+                              </div>
+                            </div>
+                          </div>
 
-          {/* SECTION 1B: DeepBook Predict Liquidity Pool (PLP) */}
-          {(tab === 'onsite' || tab === 'margin') && (
-            <div className="bg-[#06070A] border border-[#2E384C] rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#2D374B] flex flex-wrap items-center justify-between gap-2 bg-[#000000]">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#60A5FA]" />
-                  <span className="text-sm font-bold text-white">
-                    DeepBook Predict Liquidity Pool (PLP)
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 text-[11px] font-mono font-semibold">
-                    OPTIONS MARKET MAKING
-                  </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelected({
+                                  kind: 'lending',
+                                  op: 'supply',
+                                  coinKey: String(v.coinKey),
+                                });
+                                setAmountInput('');
+                              }}
+                              className="px-3 py-1.5 rounded-lg btn-deepbook text-xs font-bold inline-flex items-center gap-1"
+                            >
+                              <ArrowDownToLine className="w-3 h-3" />
+                              <span>Supply</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelected({
+                                  kind: 'lending',
+                                  op: 'withdraw',
+                                  coinKey: String(v.coinKey),
+                                });
+                                setAmountInput('');
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-[#0C0E13] border border-[#2D374B] hover:border-[#2B7FFF]/50 text-xs font-semibold text-slate-200 inline-flex items-center gap-1"
+                            >
+                              <ArrowUpFromLine className="w-3 h-3" />
+                              <span>Withdraw</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <span className="text-xs font-mono text-slate-400">
-                  Earn Spread &amp; Binary Option Fees (USDC)
-                </span>
-              </div>
-
-              <div className="p-4 flex flex-wrap items-center justify-between gap-4">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 min-w-[260px] font-mono tabular-nums text-xs">
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">Pool Idle USDC</div>
-                    <div className="text-sm font-bold text-white mt-0.5">
-                      ${plpVault ? plpVault.idleUsdc.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">Total PLP Supply</div>
-                    <div className="text-sm font-bold text-white mt-0.5">
-                      {plpVault ? plpVault.plpTotalSupply.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">Pending Queue</div>
-                    <div className="text-sm font-bold text-[#60A5FA] mt-0.5">
-                      {plpVault
-                        ? `${plpVault.supplyRequestsPending} in / ${plpVault.withdrawRequestsPending} out`
-                        : '—'}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-400 font-sans">My PLP Shares</div>
-                    <div className="text-sm font-bold text-[#08D189] mt-0.5">
-                      {plpVault && plpVault.userPlpShares > 0.0001
-                        ? `${plpVault.userPlpShares.toFixed(4)} PLP`
-                        : '0.00'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="inline-flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => selectVaultAction({ kind: 'plp', op: 'supply' })}
-                    className="px-3 py-1.5 rounded-md btn-deepbook font-bold text-xs transition-colors"
-                  >
-                    Supply USDC
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectVaultAction({ kind: 'plp', op: 'withdraw' })}
-                    className={`px-2.5 py-1.5 rounded-md border text-xs font-semibold transition-colors ${
-                      plpVault && plpVault.userPlpShares > 0.0001
-                        ? 'border-[#08D189]/45 text-[#08D189] hover:bg-[#08D189]/15'
-                        : 'border-[#323D52] text-slate-300 hover:text-white hover:bg-white/[0.05]'
-                    }`}
-                  >
-                    Withdraw
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Right Sticky Execution Ticket (Always Interactive On-Site) */}
-        <div
-          ref={ticketRef}
-          className="lg:col-span-4 bg-[#06070A] border border-[#2E384C] rounded-xl p-4 space-y-4 lg:sticky lg:top-16"
-        >
-          {/* Mode Switcher */}
-          {selected.kind === 'plp' ? (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-[#2B7FFF]/20 border border-[#2B7FFF]/50 flex items-center justify-center text-xs font-bold text-[#60A5FA]">
-                    PLP
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold text-white">Predict Liquidity Pool</div>
-                    <div className="text-xs font-mono text-[#60A5FA]">
-                      DeepBook Predict Market Maker Vault
-                    </div>
-                  </div>
+        {/* Sticky Execution Panel */}
+        <div className="lg:col-span-4 lg:sticky lg:top-20">
+          <div className="panel-carbon rounded-xl p-4 border border-[#2D374B] space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-wider text-[#60A5FA]">
+                  {selected.kind === 'plp' ? 'DeepBook Predict PLP' : 'DeepBook Lending'}
                 </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/40">
-                  Predict PLP
+                <h3 className="text-base font-bold text-white">
+                  {selected.kind === 'plp'
+                    ? selected.op === 'supply'
+                      ? 'Supply USDC to PLP'
+                      : 'Withdraw PLP Shares'
+                    : `${selected.op === 'supply' ? 'Supply' : 'Withdraw'} ${
+                        activeLendingVault?.symbol ?? ''
+                      }`}
+                </h3>
+              </div>
+
+              <div className="inline-flex rounded-lg bg-[#0C0E13] border border-[#2D374B] p-0.5">
+                {(['supply', 'withdraw'] as const).map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onClick={() => {
+                      setSelected((prev) => ({ ...prev, op }));
+                      setAmountInput('');
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-colors ${
+                      selected.op === op
+                        ? 'bg-[#2B7FFF]/20 text-[#60A5FA]'
+                        : 'text-[#7B8494] hover:text-white'
+                    }`}
+                  >
+                    {op}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel-carbon-sub rounded-xl p-3 border border-[#232B3B] space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono text-[#8E98A8]">
+                <span>
+                  {selected.kind === 'plp'
+                    ? selected.op === 'withdraw'
+                      ? 'My PLP Shares'
+                      : 'Wallet + Predict Vault'
+                    : selected.op === 'withdraw'
+                      ? 'Supplied Balance'
+                      : 'Wallet Available'}
+                </span>
+                <span className="text-white font-semibold tabular-nums">
+                  {fmtUnits(availableActionBalance, 4)}{' '}
+                  {selected.kind === 'plp'
+                    ? selected.op === 'withdraw'
+                      ? 'PLP'
+                      : 'USDC'
+                    : activeLendingVault?.symbol ?? ''}
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#000000] border border-[#2D374B]">
-                <button
-                  type="button"
-                  onClick={() => selectVaultAction({ kind: 'plp', op: 'supply' })}
-                  className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    selected.op === 'supply'
-                      ? 'bg-[#2B7FFF] text-white font-bold'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowDownToLine className="w-3.5 h-3.5" />
-                  <span>Supply USDC</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectVaultAction({ kind: 'plp', op: 'withdraw' })}
-                  className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    selected.op === 'withdraw'
-                      ? 'bg-[#08D189] text-[#02060A]'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowUpFromLine className="w-3.5 h-3.5" />
-                  <span>Withdraw PLP</span>
-                </button>
-              </div>
-            </>
-          ) : selected.kind === 'margin' && activeMarginVault ? (
-            <>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <img
-                    src={activeMarginVault.logo}
-                    alt={activeMarginVault.symbol}
-                    className="w-7 h-7 rounded-full"
-                  />
-                  <div>
-                    <div className="text-sm font-bold text-white">{activeMarginVault.name}</div>
-                    <div className="text-xs font-mono text-[#08D189]">
-                      {activeMarginVault.supplyAprPct.toFixed(2)}% Live Supply APR
-                    </div>
-                  </div>
-                </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/40">
-                  DeepBook v3
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={amountInput}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                    const parts = clean.split('.');
+                    setAmountInput(
+                      parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean
+                    );
+                  }}
+                  placeholder="0.00"
+                  className="flex-1 min-w-0 bg-transparent text-2xl font-mono font-bold text-white outline-none"
+                />
+                <span className="px-2.5 py-1 rounded bg-[#0C0E13] border border-[#2D374B] text-xs font-mono font-bold text-white">
+                  {selected.kind === 'plp'
+                    ? selected.op === 'withdraw'
+                      ? 'PLP'
+                      : 'USDC'
+                    : activeLendingVault?.symbol ?? '—'}
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#000000] border border-[#2D374B]">
-                <button
-                  type="button"
-                  onClick={() =>
-                    selectVaultAction({
-                      kind: 'margin',
-                      op: 'supply',
-                      coinKey: activeMarginVault.coinKey,
-                    })
-                  }
-                  className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    selected.op === 'supply'
-                      ? 'bg-[#2B7FFF] text-white font-bold'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowDownToLine className="w-3.5 h-3.5" />
-                  <span>Supply</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    selectVaultAction({
-                      kind: 'margin',
-                      op: 'withdraw',
-                      coinKey: activeMarginVault.coinKey,
-                    })
-                  }
-                  className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    selected.op === 'withdraw'
-                      ? 'bg-[#08D189] text-[#02060A]'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <ArrowUpFromLine className="w-3.5 h-3.5" />
-                  <span>Withdraw</span>
-                </button>
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {[0.25, 0.5, 0.75, 1].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => handleSetPct(pct)}
+                    className="py-1 rounded bg-[#0C0E13] border border-[#2D374B] hover:border-[#2B7FFF]/60 text-[11px] font-mono text-slate-300 hover:text-white transition-colors"
+                  >
+                    {pct === 1 ? 'MAX' : `${pct * 100}%`}
+                  </button>
+                ))}
               </div>
-            </>
-          ) : (
-            activeLstVault && (
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <img
-                      src={activeLstVault.logo}
-                      alt={activeLstVault.symbol}
-                      className="w-7 h-7 rounded-full"
-                    />
-                    <div>
-                      <div className="text-sm font-bold text-white">{activeLstVault.name}</div>
-                      <div className="text-xs font-mono text-[#08D189]">
-                        {activeLstVault.apyPct.toFixed(2)}% Est. APY
-                      </div>
+            </div>
+
+            {/* Pool Details */}
+            <div className="space-y-1.5 text-xs font-mono bg-[#0C0E13] rounded-lg p-3 border border-[#232B3B]">
+              {selected.kind === 'lending' && activeLendingVault ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-[#7B8494]">Live Supply APR</span>
+                    <span className="text-[#08D189] font-bold">
+                      {activeLendingVault.supplyAprPct.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#7B8494]">Utilization</span>
+                    <span className="text-white">{activeLendingVault.utilizationPct.toFixed(1)}%</span>
+                  </div>
+                  {capLeft !== null && (
+                    <div className="flex justify-between">
+                      <span className="text-[#7B8494]">Supply Cap Left</span>
+                      <span className="text-white">
+                        {fmtUnits(capLeft, 2)} {activeLendingVault.symbol}
+                      </span>
                     </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-[#7B8494]">Volt Protocol Fee</span>
+                    <span className="text-[#08D189]">0.00% (Native Referral)</span>
                   </div>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#08D189]/12 text-[#08D189] border border-[#08D189]/30">
-                    On-Site PTB
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-[#000000] border border-[#2D374B]">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      selectVaultAction({
-                        kind: 'lst',
-                        op: 'stake',
-                        symbol: activeLstVault.symbol,
-                      })
-                    }
-                    className={`py-2 rounded text-xs font-bold transition-all ${
-                      selected.op === 'stake'
-                        ? 'bg-[#2B7FFF] text-white font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {activeLstVault.category === 'rwa' ? 'Deposit' : 'Stake'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      selectVaultAction({
-                        kind: 'lst',
-                        op: 'unstake',
-                        symbol: activeLstVault.symbol,
-                      })
-                    }
-                    className={`py-2 rounded text-xs font-bold transition-all ${
-                      selected.op === 'unstake'
-                        ? 'bg-[#08D189] text-[#02060A]'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {activeLstVault.category === 'rwa' ? 'Redeem' : 'Unstake'}
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400">
-                    {selected.op === 'stake' ? 'Pay With:' : 'Redeem Into:'}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {(['SUI', 'USDC'] as const).map((sym) => (
-                      <button
-                        key={sym}
-                        type="button"
-                        onClick={() => setLstSettlementCoin(sym)}
-                        className={`px-2.5 py-1 rounded font-mono text-xs font-semibold ${
-                          lstSettlementCoin === sym
-                            ? 'bg-[#2B7FFF] text-white'
-                            : 'bg-[#000000] text-slate-300 border border-[#2D374B]'
-                        }`}
-                      >
-                        {sym}
-                      </button>
-                    ))}
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-[#7B8494]">Pool Idle USDC</span>
+                    <span className="text-white">
+                      {plpVault ? fmtUsd(plpVault.idleUsdc) : '—'}
+                    </span>
                   </div>
-                </div>
-              </>
-            )
-          )}
-
-          {/* Amount Input Card */}
-          <div className="bg-[#000000] border border-[#2D374B] focus-within:border-[#2B7FFF]/60 rounded-lg p-3.5 space-y-2 transition-colors">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-400">
-                {selected.kind === 'margin' && selected.op === 'withdraw'
-                  ? 'Deposited Balance'
-                  : selected.kind === 'plp' && selected.op === 'withdraw'
-                    ? 'My PLP Shares'
-                    : selected.kind === 'plp'
-                      ? 'Wallet + Predict Vault'
-                      : 'Wallet Balance'}
-              </span>
-              <span className="text-white font-semibold tabular-nums">
-                {availableActionBalance.toFixed(4)}
-              </span>
+                  <div className="flex justify-between">
+                    <span className="text-[#7B8494]">My PLP Shares</span>
+                    <span className="text-[#60A5FA]">
+                      {plpVault ? plpVault.userPlpShares.toFixed(2) : '0.00'} PLP
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#7B8494]">Volt Protocol Fee</span>
+                    <span className="text-[#08D189]">0.00% (Native Referrer)</span>
+                  </div>
+                </>
+              )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={amountInput}
-                onChange={(e) => setAmountInput(e.target.value)}
-                placeholder="0.00"
-                className="flex-1 min-w-0 bg-transparent text-2xl font-mono font-bold text-white outline-none"
-              />
-              <span className="px-2.5 py-1 rounded bg-[#0C0E13] border border-[#2D374B] text-xs font-mono font-bold text-white">
-                {selected.kind === 'plp'
-                  ? selected.op === 'supply'
-                    ? 'USDC'
-                    : 'PLP'
-                  : selected.kind === 'margin'
-                    ? activeMarginVault?.symbol || 'USDC'
-                    : selected.op === 'stake'
-                      ? lstSettlementCoin
-                      : activeLstVault?.symbol || 'haSUI'}
-              </span>
-            </div>
+            {validationError && (
+              <div className="rounded-lg bg-[#F0525E]/10 border border-[#F0525E]/35 px-3 py-2 text-[11px] text-[#F0525E]">
+                {validationError}
+              </div>
+            )}
 
-            <div className="grid grid-cols-4 gap-1.5 pt-1">
-              {[0.25, 0.5, 0.75, 1].map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => handleSetPct(p)}
-                  className="py-1 rounded bg-[#0C0E13] hover:bg-[#2B7FFF]/20 border border-[#2D374B] text-xs font-mono font-semibold text-slate-300 hover:text-white transition-colors"
-                >
-                  {p === 1 ? 'MAX' : `${p * 100}%`}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              disabled={isSubmitting || (Boolean(account) && hardBlocked)}
+              onClick={handleExecute}
+              className="w-full py-2.5 rounded-xl btn-deepbook font-bold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-45 disabled:cursor-not-allowed"
+            >
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>
+                {!account
+                  ? 'Connect Sui Wallet'
+                  : selected.kind === 'plp'
+                    ? selected.op === 'supply'
+                      ? 'Supply USDC to PLP'
+                      : 'Withdraw PLP Shares'
+                    : `${selected.op === 'supply' ? 'Supply' : 'Withdraw'} ${
+                        activeLendingVault?.symbol ?? ''
+                      }`}
+              </span>
+            </button>
           </div>
-
-          {(() => {
-            const parsedAmt = Number(amountInput) || 0;
-            const insufficientBalance = Boolean(account && parsedAmt > availableActionBalance + 1e-6);
-            const capLeft =
-              selected.kind === 'margin' && activeMarginVault && activeMarginVault.supplyCap > 0
-                ? Math.max(0, activeMarginVault.supplyCap - activeMarginVault.totalSupply)
-                : null;
-            const capExceeded = Boolean(
-              selected.kind === 'margin' &&
-                selected.op === 'supply' &&
-                capLeft !== null &&
-                parsedAmt > capLeft + 1e-6
-            );
-            const poolAvailLiq =
-              selected.kind === 'margin' && activeMarginVault
-                ? Math.max(0, activeMarginVault.totalSupply - activeMarginVault.totalBorrow)
-                : null;
-            const liqExceeded = Boolean(
-              selected.kind === 'margin' &&
-                selected.op === 'withdraw' &&
-                poolAvailLiq !== null &&
-                parsedAmt > poolAvailLiq + 1e-6
-            );
-
-            let estLstReceive: number | null = null;
-            if (selected.kind === 'lst' && activeLstVault && parsedAmt > 0 && activeLstVault.exchangeRateToBase) {
-              const rate = activeLstVault.exchangeRateToBase; // 1 LST = rate baseCoin
-              if (selected.op === 'stake') {
-                const baseIn =
-                  lstSettlementCoin === 'USDC' && activeLstVault.category === 'lst' && suiPriceUsd > 0
-                    ? parsedAmt / suiPriceUsd
-                    : parsedAmt;
-                estLstReceive = baseIn / rate;
-              } else {
-                const baseOut = parsedAmt * rate;
-                estLstReceive =
-                  lstSettlementCoin === 'USDC' && activeLstVault.category === 'lst' && suiPriceUsd > 0
-                    ? baseOut * suiPriceUsd
-                    : baseOut;
-              }
-            }
-
-            const blocked = Boolean(
-              account && (parsedAmt <= 0 || insufficientBalance || capExceeded || liqExceeded)
-            );
-
-            return (
-              <>
-                {/* Transparent Estimates & Volt Fee Breakdown */}
-                <div className="bg-[#000000] border border-[#2D374B] rounded-lg p-3 space-y-2 text-xs font-mono">
-                  {estLstReceive !== null && activeLstVault && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Est. You Receive</span>
-                      <span className="text-white font-bold">
-                        ~{estLstReceive.toFixed(4)}{' '}
-                        {selected.op === 'stake' ? activeLstVault.symbol : lstSettlementCoin}
-                      </span>
-                    </div>
-                  )}
-                  {estYieldPerYear && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Est. Yield / Year</span>
-                      <span className="text-[#08D189] font-bold">
-                        +${estYieldPerYear.estUsdYr.toFixed(2)} ({estYieldPerYear.apr.toFixed(2)}%)
-                      </span>
-                    </div>
-                  )}
-                  {selected.kind === 'margin' && selected.op === 'supply' && capLeft !== null && activeMarginVault && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Vault Cap Remaining</span>
-                      <span className={capExceeded ? 'text-[#F0525E] font-bold' : 'text-slate-200'}>
-                        {capLeft.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
-                        {activeMarginVault.symbol}
-                      </span>
-                    </div>
-                  )}
-                  {selected.kind === 'margin' && selected.op === 'withdraw' && poolAvailLiq !== null && activeMarginVault && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Pool Free Liquidity</span>
-                      <span className={liqExceeded ? 'text-[#F0525E] font-bold' : 'text-slate-200'}>
-                        {poolAvailLiq.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
-                        {activeMarginVault.symbol}
-                      </span>
-                    </div>
-                  )}
-                  {selected.kind === 'plp' && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400">Settlement</span>
-                      <span className="text-[#60A5FA]">Queued · Next Pool Flush</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">
-                      {selected.kind === 'margin' || selected.kind === 'plp'
-                        ? 'Vault Deposit Fee'
-                        : `Volt Tier Fee (${traderTier.name})`}
-                    </span>
-                    <span className="text-[#60A5FA] font-semibold">
-                      {selected.kind === 'margin' || selected.kind === 'plp'
-                        ? selected.op === 'withdraw'
-                          ? '0.00% (Protocol Terms)'
-                          : '0.00% (100% Principal · DeepBook Ref)'
-                        : `${(traderTier.feeRate * 100).toFixed(2)}%`}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Custody Model</span>
-                    <span className="text-[#08D189] inline-flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      {selected.kind === 'plp' ? 'AccountWrapper / PLP' : 'Wallet / SupplierCap'}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={isExecuting || blocked}
-                  onClick={executeOnSiteAction}
-                  className={`w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-45 disabled:cursor-not-allowed ${
-                    (selected.kind === 'margin' && selected.op === 'withdraw') ||
-                    (selected.kind === 'lst' && selected.op === 'unstake') ||
-                    (selected.kind === 'plp' && selected.op === 'withdraw')
-                      ? 'bg-[#08D189] hover:bg-[#0DE295] text-[#02060A]'
-                      : 'btn-deepbook'
-                  }`}
-                >
-                  {isExecuting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>
-                    {!account
-                      ? 'Connect Sui Wallet'
-                      : isExecuting
-                        ? 'Confirm in Wallet...'
-                        : insufficientBalance
-                          ? 'Insufficient Balance'
-                          : capExceeded
-                            ? 'Exceeds Pool Supply Cap'
-                            : liqExceeded
-                              ? 'Exceeds Pool Free Liquidity'
-                              : selected.kind === 'plp'
-                                ? selected.op === 'supply'
-                                  ? 'Supply USDC to Predict PLP'
-                                  : 'Withdraw Predict PLP Shares'
-                                : selected.kind === 'margin'
-                                  ? selected.op === 'supply'
-                                    ? `Supply ${activeMarginVault?.symbol || ''} to Vault`
-                                    : `Withdraw ${activeMarginVault?.symbol || ''}`
-                                  : selected.op === 'stake'
-                                    ? `Stake ${lstSettlementCoin} -> ${activeLstVault?.symbol || ''}`
-                                    : `Redeem ${activeLstVault?.symbol || ''} -> ${lstSettlementCoin}`}
-                  </span>
-                </button>
-              </>
-            );
-          })()}
         </div>
       </div>
     </div>
