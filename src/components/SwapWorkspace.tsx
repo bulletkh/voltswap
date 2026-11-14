@@ -242,7 +242,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [limitSide, setLimitSide] = useState<'buy' | 'sell'>('buy');
   const [limitPrice, setLimitPrice] = useState<string>('');
   const [limitQty, setLimitQty] = useState<string>('1');
+  const [qtyCurrency, setQtyCurrency] = useState<'base' | 'quote'>('base');
   const [postOnly, setPostOnly] = useState(false);
+  const [spotTif, setSpotTif] = useState<'GTC' | 'IOC' | 'FOK' | 'POST_ONLY'>('GTC');
+  const [payFeesWithDeep, setPayFeesWithDeep] = useState<boolean>(false);
+  const [bookTickMult, setBookTickMult] = useState<number>(1);
+  const [bookSizeUnit, setBookSizeUnit] = useState<'base' | 'quote'>('base');
   const [isPlacingLimit, setIsPlacingLimit] = useState(false);
   const [depositCoinSide, setDepositCoinSide] = useState<'base' | 'quote'>('quote');
   const [depositAmt, setDepositAmt] = useState<string>('');
@@ -253,7 +258,21 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   const [showPoolDropdown, setShowPoolDropdown] = useState(false);
   const [poolSearch, setPoolSearch] = useState('');
   const [poolQuoteFilter, setPoolQuoteFilter] = useState<'all' | 'usdc' | 'sui' | 'bluechip'>('all');
-  const [spotDockTab, setSpotDockTab] = useState<'orders' | 'vault'>('orders');
+  const [spotDockTab, setSpotDockTab] = useState<'orders' | 'history' | 'vault'>('orders');
+  const [spotHistory, setSpotHistory] = useState<
+    Array<{
+      id: string;
+      poolName: string;
+      side: 'buy' | 'sell';
+      style: string;
+      price: number;
+      qty: number;
+      baseSymbol: string;
+      quoteSymbol: string;
+      digest: string;
+      ts: number;
+    }>
+  >([]);
   const [showSpotVaultModal, setShowSpotVaultModal] = useState<'deposit' | 'withdraw' | null>(null);
   const poolDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -418,8 +437,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     const loadBook = async () => {
       try {
         const [ob, tr] = await Promise.all([
-          fetchDeepBookOrderbook(activePool.poolName, 14),
-          fetchDeepBookTrades(activePool.poolName, 20),
+          fetchDeepBookOrderbook(activePool.poolName, 24),
+          fetchDeepBookTrades(activePool.poolName, 25),
         ]);
         if (!cancelled) {
           setOrderbook(ob);
@@ -437,6 +456,79 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       clearInterval(id);
     };
   }, [mode, activePool.poolName]);
+
+  // Spot History (local per-wallet order execution log)
+  useEffect(() => {
+    if (!account?.address) {
+      setSpotHistory([]);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(`volt_spot_hist_${account.address}`);
+      setSpotHistory(raw ? JSON.parse(raw) : []);
+    } catch {
+      setSpotHistory([]);
+    }
+  }, [account?.address]);
+
+  const recordSpotHistory = useCallback(
+    (entry: {
+      poolName: string;
+      side: 'buy' | 'sell';
+      style: string;
+      price: number;
+      qty: number;
+      baseSymbol: string;
+      quoteSymbol: string;
+      digest: string;
+    }) => {
+      if (!account?.address) return;
+      const item = { ...entry, id: `${entry.digest}_${Date.now()}`, ts: Date.now() };
+      setSpotHistory((prev) => {
+        const next = [item, ...prev].slice(0, 40);
+        try {
+          localStorage.setItem(`volt_spot_hist_${account.address}`, JSON.stringify(next));
+        } catch {
+          // ignore storage quota
+        }
+        return next;
+      });
+    },
+    [account?.address]
+  );
+
+  // Grouped Order Book by selected Tick multiplier
+  const groupedOrderbook = useMemo(() => {
+    if (bookTickMult <= 1) return orderbook;
+    const step = Math.max(1e-8, (activePool.tickSize || 0.0001) * bookTickMult);
+    const groupSide = (
+      levels: typeof orderbook.asks,
+      isAsk: boolean
+    ): typeof orderbook.asks => {
+      const buckets = new Map<number, number>();
+      for (const lv of levels) {
+        const bucket = isAsk
+          ? Math.ceil(lv.price / step) * step
+          : Math.floor(lv.price / step) * step;
+        const key = Number(bucket.toFixed(8));
+        buckets.set(key, (buckets.get(key) || 0) + lv.size);
+      }
+      const sorted = Array.from(buckets.entries())
+        .map(([price, size]) => ({ price, size, totalSize: 0 }))
+        .sort((a, b) => (isAsk ? a.price - b.price : b.price - a.price));
+      let running = 0;
+      for (const row of sorted) {
+        running += row.size;
+        row.totalSize = running;
+      }
+      return isAsk ? sorted.reverse() : sorted;
+    };
+    return {
+      ...orderbook,
+      asks: groupSide(orderbook.asks, true),
+      bids: groupSide(orderbook.bids, false),
+    };
+  }, [orderbook, bookTickMult, activePool.tickSize]);
 
 
   // Discover & sync DeepBook v3 BalanceManagers + Open Orders
@@ -741,7 +833,8 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       return;
     }
     const p = Number(limitPrice);
-    const q = Number(limitQty);
+    const rawQ = Number(limitQty);
+    const q = qtyCurrency === 'quote' && p > 0 ? rawQ / p : rawQ;
     if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(q) || q < activePool.minSize) {
       onNotify(
         'warning',
@@ -775,9 +868,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         price: p,
         quantity: q,
         isBid: limitSide === 'buy',
-        postOnly,
+        postOnly: spotTif === 'POST_ONLY' || postOnly,
+        orderType: spotTif,
         existingManagerDepositCoin: existingDep,
-        payWithDeep: (managerState?.deepBalance ?? 0) >= 0.5,
+        payWithDeep: payFeesWithDeep,
         feeMist,
         refSharePct: refTier.revSharePct,
         spotReferralId: spotReferrals[activePool.poolName]?.referralId || null,
@@ -830,6 +924,16 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         digest,
         orderType: 'LIMIT',
       });
+      recordSpotHistory({
+        poolName: activePool.poolName,
+        side: limitSide,
+        style: `LIMIT (${spotTif})`,
+        price: p,
+        qty: q,
+        baseSymbol: activePool.baseSymbol,
+        quoteSymbol: activePool.quoteSymbol,
+        digest,
+      });
       await Promise.all([refreshDeepBookAccount(), refreshBalances()]);
     } catch (err: any) {
       onNotify('error', 'Order Failed', err?.message || 'Failed to place DeepBook v3 order.');
@@ -874,11 +978,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       onNotify('info', 'Wallet Required', 'Connect your Sui wallet to trade DeepBook v3 Spot CLOB.');
       return;
     }
-    const q = Number(limitQty);
+    const rawQ = Number(limitQty);
     const estPrice =
       limitSide === 'buy'
         ? orderbook.asks[0]?.price || orderbook.midPrice
         : orderbook.bids[0]?.price || orderbook.midPrice;
+    const q = qtyCurrency === 'quote' && estPrice > 0 ? rawQ / estPrice : rawQ;
 
     if (!Number.isFinite(q) || q < activePool.minSize || !Number.isFinite(estPrice) || estPrice <= 0) {
       onNotify(
@@ -910,7 +1015,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         estPrice,
         slippagePct: spotMarketSlippage,
         isBid: limitSide === 'buy',
-        payWithDeep: false,
+        payWithDeep: payFeesWithDeep,
         settleToWallet: true,
         feeBps,
         spotReferralId: spotReferrals[activePool.poolName]?.referralId || null,
@@ -948,6 +1053,16 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         volumeUsd: notionalUsd,
         digest,
         orderType: 'SWAP',
+      });
+      recordSpotHistory({
+        poolName: activePool.poolName,
+        side: limitSide,
+        style: 'MARKET',
+        price: estPrice,
+        qty: q,
+        baseSymbol: activePool.baseSymbol,
+        quoteSymbol: activePool.quoteSymbol,
+        digest,
       });
       await Promise.all([refreshDeepBookAccount(), refreshBalances()]);
     } catch (err: any) {
@@ -1972,22 +2087,54 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                 >
                   Trades
                 </button>
+                {bookTab === 'book' && (
+                  <div className="ml-auto flex items-center gap-1">
+                    <select
+                      value={bookTickMult}
+                      onChange={(e) => setBookTickMult(Number(e.target.value))}
+                      className="bg-[#06070A] border border-[#2D374B] rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-300 outline-none cursor-pointer"
+                      title="Order Book price grouping"
+                    >
+                      {[1, 10, 50, 100].map((m) => (
+                        <option key={m} value={m} className="bg-[#06070A]">
+                          {((activePool.tickSize || 0.0001) * m).toFixed(
+                            m >= 100 ? 2 : m >= 10 ? 3 : 4
+                          )}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setBookSizeUnit((u) => (u === 'base' ? 'quote' : 'base'))}
+                      className="px-1.5 py-0.5 rounded bg-[#06070A] border border-[#2D374B] text-[10px] font-mono text-[#60A5FA] hover:border-[#2B7FFF]/60 transition-colors"
+                      title="Toggle size display unit"
+                    >
+                      {bookSizeUnit === 'base' ? activePool.baseSymbol : activePool.quoteSymbol}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {bookTab === 'book' ? (
                 <div className="flex-1 min-h-0 flex flex-col justify-between p-2 text-[11px] font-mono tabular-nums overflow-hidden">
-                  <div className="grid grid-cols-3 text-slate-500 px-1.5 pb-1 text-[11px]">
+                  <div className="grid grid-cols-3 text-slate-500 px-1.5 pb-1 text-[10px]">
                     <span>Price</span>
-                    <span className="text-right">Size</span>
+                    <span className="text-right">
+                      Size ({bookSizeUnit === 'base' ? activePool.baseSymbol : activePool.quoteSymbol})
+                    </span>
                     <span className="text-right">Total</span>
                   </div>
 
-                  {/* Asks */}
+                  {/* Asks (13 dense levels) */}
                   <div className="space-y-0.5 overflow-hidden">
-                    {orderbook.asks.slice(-11).map((lv, idx) => {
+                    {groupedOrderbook.asks.slice(-13).map((lv, idx) => {
                       const maxTotal =
-                        orderbook.asks[0]?.totalSize || orderbook.asks[orderbook.asks.length - 1]?.totalSize || 1;
+                        groupedOrderbook.asks[0]?.totalSize ||
+                        groupedOrderbook.asks[groupedOrderbook.asks.length - 1]?.totalSize ||
+                        1;
                       const pct = Math.min(100, (lv.totalSize / Math.max(1e-9, maxTotal)) * 100);
+                      const dispSize = bookSizeUnit === 'base' ? lv.size : lv.size * lv.price;
+                      const dispTotal = bookSizeUnit === 'base' ? lv.totalSize : lv.totalSize * lv.price;
                       return (
                         <button
                           key={`ask-${idx}`}
@@ -1995,16 +2142,16 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           onClick={() => {
                             setLimitPrice(lv.price.toString());
                           }}
-                          className="relative w-full grid grid-cols-3 px-1.5 py-[2.5px] rounded hover:bg-white/[0.04] text-left transition-colors"
+                          className="relative w-full grid grid-cols-3 px-1.5 py-[2px] rounded hover:bg-white/[0.04] text-left transition-colors"
                         >
                           <div
                             className="absolute inset-y-0 right-0 bg-[#F0525E]/15 pointer-events-none"
                             style={{ width: `${pct}%` }}
                           />
                           <span className="relative text-[#F0525E] font-medium">{fmtClobPrice(lv.price)}</span>
-                          <span className="relative text-right text-slate-200">{lv.size.toFixed(1)}</span>
+                          <span className="relative text-right text-slate-200">{dispSize.toFixed(1)}</span>
                           <span className="relative text-right text-slate-400">
-                            {lv.totalSize.toFixed(0)}
+                            {dispTotal.toFixed(0)}
                           </span>
                         </button>
                       );
@@ -2017,15 +2164,18 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       {orderbook.midPrice > 0 ? fmtClobPrice(orderbook.midPrice) : '—'}
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      Spread {orderbook.spreadPct.toFixed(2)}%
+                      Spread {orderbook.spreadPct.toFixed(3)}%
                     </span>
                   </div>
 
-                  {/* Bids */}
+                  {/* Bids (13 dense levels) */}
                   <div className="space-y-0.5 overflow-hidden">
-                    {orderbook.bids.slice(0, 11).map((lv, idx) => {
-                      const maxTotal = orderbook.bids[Math.min(10, orderbook.bids.length - 1)]?.totalSize || 1;
+                    {groupedOrderbook.bids.slice(0, 13).map((lv, idx) => {
+                      const maxTotal =
+                        groupedOrderbook.bids[Math.min(12, groupedOrderbook.bids.length - 1)]?.totalSize || 1;
                       const pct = Math.min(100, (lv.totalSize / Math.max(1e-9, maxTotal)) * 100);
+                      const dispSize = bookSizeUnit === 'base' ? lv.size : lv.size * lv.price;
+                      const dispTotal = bookSizeUnit === 'base' ? lv.totalSize : lv.totalSize * lv.price;
                       return (
                         <button
                           key={`bid-${idx}`}
@@ -2033,16 +2183,16 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           onClick={() => {
                             setLimitPrice(lv.price.toString());
                           }}
-                          className="relative w-full grid grid-cols-3 px-1.5 py-[2.5px] rounded hover:bg-white/[0.04] text-left transition-colors"
+                          className="relative w-full grid grid-cols-3 px-1.5 py-[2px] rounded hover:bg-white/[0.04] text-left transition-colors"
                         >
                           <div
                             className="absolute inset-y-0 right-0 bg-[#08D189]/15 pointer-events-none"
                             style={{ width: `${pct}%` }}
                           />
                           <span className="relative text-[#08D189] font-medium">{fmtClobPrice(lv.price)}</span>
-                          <span className="relative text-right text-slate-200">{lv.size.toFixed(1)}</span>
+                          <span className="relative text-right text-slate-200">{dispSize.toFixed(1)}</span>
                           <span className="relative text-right text-slate-400">
-                            {lv.totalSize.toFixed(0)}
+                            {dispTotal.toFixed(0)}
                           </span>
                         </button>
                       );
@@ -2187,10 +2337,60 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       </div>
                     )}
 
-                    {/* Quantity */}
+                    {/* Quantity with Base/Quote Toggle */}
                     <div className="bg-[#06070A] border border-[#2D374B] focus-within:border-[#2B7FFF]/60 rounded-lg p-2.5 space-y-2 transition-colors">
-                      <div className="flex justify-between text-xs text-slate-400">
-                        <span>Amount</span>
+                      <div className="flex justify-between items-center text-xs text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <span>Size</span>
+                          <div className="inline-flex rounded bg-[#0C0E13] border border-[#263246] p-0.5 text-[10px] font-mono">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (qtyCurrency === 'quote') {
+                                  const refPx =
+                                    spotOrderStyle === 'limit'
+                                      ? Number(limitPrice) || orderbook.midPrice || 1
+                                      : orderbook.midPrice || 1;
+                                  const cur = Number(limitQty);
+                                  if (Number.isFinite(cur) && cur > 0 && refPx > 0) {
+                                    setLimitQty((cur / refPx).toFixed(3));
+                                  }
+                                  setQtyCurrency('base');
+                                }
+                              }}
+                              className={`px-1.5 py-0.5 rounded font-semibold transition-colors ${
+                                qtyCurrency === 'base'
+                                  ? 'bg-[#2B7FFF] text-white'
+                                  : 'text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              {activePool.baseSymbol}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (qtyCurrency === 'base') {
+                                  const refPx =
+                                    spotOrderStyle === 'limit'
+                                      ? Number(limitPrice) || orderbook.midPrice || 1
+                                      : orderbook.midPrice || 1;
+                                  const cur = Number(limitQty);
+                                  if (Number.isFinite(cur) && cur > 0 && refPx > 0) {
+                                    setLimitQty((cur * refPx).toFixed(2));
+                                  }
+                                  setQtyCurrency('quote');
+                                }
+                              }}
+                              className={`px-1.5 py-0.5 rounded font-semibold transition-colors ${
+                                qtyCurrency === 'quote'
+                                  ? 'bg-[#2B7FFF] text-white'
+                                  : 'text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              {activePool.quoteSymbol}
+                            </button>
+                          </div>
+                        </div>
                         <span className="font-mono tabular-nums">
                           Wallet:{' '}
                           {limitSide === 'buy'
@@ -2208,7 +2408,9 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                           placeholder="0.0"
                           className="w-full bg-transparent text-lg font-mono font-bold tabular-nums text-white outline-none"
                         />
-                        <span className="text-xs font-mono text-slate-400">{activePool.baseSymbol}</span>
+                        <span className="text-xs font-mono text-slate-400">
+                          {qtyCurrency === 'base' ? activePool.baseSymbol : activePool.quoteSymbol}
+                        </span>
                       </div>
                       <div className="grid grid-cols-4 gap-1 pt-0.5">
                         {[0.25, 0.5, 0.75, 1].map((pct) => (
@@ -2223,12 +2425,22 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                               if (limitSide === 'buy') {
                                 const totalQuote =
                                   limitWalletQuoteBal + (managerState?.quoteBalance ?? 0);
-                                setLimitQty(((totalQuote * pct * 0.97) / px).toFixed(2));
+                                const quoteAmt = totalQuote * pct * 0.97;
+                                setLimitQty(
+                                  qtyCurrency === 'quote'
+                                    ? quoteAmt.toFixed(2)
+                                    : (quoteAmt / px).toFixed(2)
+                                );
                               } else {
                                 const totalBase =
                                   Math.max(0, limitWalletBaseBal - (activePool.baseSymbol === 'SUI' ? 0.08 : 0)) +
                                   (managerState?.baseBalance ?? 0);
-                                setLimitQty((totalBase * pct * 0.98).toFixed(2));
+                                const baseAmt = totalBase * pct * 0.98;
+                                setLimitQty(
+                                  qtyCurrency === 'quote'
+                                    ? (baseAmt * px).toFixed(2)
+                                    : baseAmt.toFixed(2)
+                                );
                               }
                             }}
                             className="py-1 rounded bg-[#0C0E13] hover:bg-[#141821] border border-[#2D374B] text-[11px] font-mono text-slate-300 transition-colors"
@@ -2240,36 +2452,87 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                     </div>
 
                     {spotOrderStyle === 'limit' && (
-                      <label className="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
-                        <span>Post-Only (Maker Rebate)</span>
-                        <input
-                          type="checkbox"
-                          checked={postOnly}
-                          onChange={(e) => setPostOnly(e.target.checked)}
-                          className="accent-[#2B7FFF] w-4 h-4"
-                        />
-                      </label>
+                      <div className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="text-slate-400 font-mono">TIF</span>
+                        <div className="flex items-center gap-1">
+                          {(
+                            [
+                              { id: 'GTC', label: 'GTC' },
+                              { id: 'IOC', label: 'IOC' },
+                              { id: 'FOK', label: 'FOK' },
+                              { id: 'POST_ONLY', label: 'Post-Only' },
+                            ] as const
+                          ).map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                setSpotTif(opt.id);
+                                setPostOnly(opt.id === 'POST_ONLY');
+                              }}
+                              className={`px-2 py-1 rounded font-mono border transition-colors ${
+                                spotTif === opt.id
+                                  ? 'bg-[#2B7FFF]/20 border-[#2B7FFF]/60 text-[#60A5FA] font-semibold'
+                                  : 'bg-[#0C0E13] border-[#2D374B] text-slate-400 hover:text-white'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
-                    <div className="text-xs font-mono space-y-1.5 text-slate-400 pt-1 border-t border-[#2D374B]">
-                      <div className="flex justify-between pt-1">
-                        <span>{spotOrderStyle === 'limit' ? 'Order Total' : 'Est. Total'}</span>
-                        <span className="text-white font-semibold tabular-nums">
-                          {((spotOrderStyle === 'limit'
-                            ? Number(limitPrice) || 0
-                            : limitSide === 'buy'
-                              ? orderbook.asks[0]?.price || orderbook.midPrice
-                              : orderbook.bids[0]?.price || orderbook.midPrice) *
-                            (Number(limitQty) || 0)
-                          ).toFixed(4)}{' '}
-                          {activePool.quoteSymbol}
+                    <label className="flex items-center justify-between text-xs text-slate-300 cursor-pointer">
+                      <span className="flex items-center gap-1.5">
+                        <span>Pay fees with DEEP</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#08D189]/10 border border-[#08D189]/30 text-[#08D189]">
+                          Fee Discount
                         </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Volt Fee ({traderTier.name})</span>
-                        <span className="text-[#60A5FA] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
-                      </div>
-                    </div>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={payFeesWithDeep}
+                        onChange={(e) => setPayFeesWithDeep(e.target.checked)}
+                        className="accent-[#2B7FFF] w-4 h-4"
+                      />
+                    </label>
+
+                    {(() => {
+                      const activePx =
+                        spotOrderStyle === 'limit'
+                          ? Number(limitPrice) || 0
+                          : limitSide === 'buy'
+                            ? orderbook.asks[0]?.price || orderbook.midPrice
+                            : orderbook.bids[0]?.price || orderbook.midPrice;
+                      const rawInput = Number(limitQty) || 0;
+                      const baseQty = qtyCurrency === 'quote' && activePx > 0 ? rawInput / activePx : rawInput;
+                      const quoteTotal = activePx * baseQty;
+                      return (
+                        <div className="text-xs font-mono space-y-1.5 text-slate-400 pt-1 border-t border-[#2D374B]">
+                          <div className="flex justify-between pt-1">
+                            <span>You pay</span>
+                            <span className="text-white font-semibold tabular-nums">
+                              {limitSide === 'buy'
+                                ? `${quoteTotal.toFixed(4)} ${activePool.quoteSymbol}`
+                                : `${baseQty.toFixed(4)} ${activePool.baseSymbol}`}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>You receive</span>
+                            <span className="text-[#08D189] font-semibold tabular-nums">
+                              {limitSide === 'buy'
+                                ? `${baseQty.toFixed(4)} ${activePool.baseSymbol}`
+                                : `${quoteTotal.toFixed(4)} ${activePool.quoteSymbol}`}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-[11px]">
+                            <span>Volt Fee ({traderTier.name})</span>
+                            <span className="text-[#60A5FA] font-semibold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <button
                       type="button"
@@ -2348,6 +2611,17 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         }`}
                       >
                         Open Limit Orders ({vaultSummary.openOrders.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSpotDockTab('history')}
+                        className={`pb-1 text-xs font-mono border-b-2 -mb-[9px] transition-colors ${
+                          spotDockTab === 'history'
+                            ? 'border-[#2B7FFF] text-white font-semibold'
+                            : 'border-transparent text-[#8E98A8] hover:text-white'
+                        }`}
+                      >
+                        History ({spotHistory.length})
                       </button>
                       <button
                         type="button"
@@ -2450,6 +2724,62 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                         </button>
                       </div>
                     </div>
+                  ) : spotDockTab === 'history' ? (
+                    !account ? (
+                      <div className="text-xs text-[#8E98A8] py-8 text-center font-mono">
+                        Connect your Sui wallet to view your Spot CLOB order &amp; fill history.
+                      </div>
+                    ) : spotHistory.length === 0 ? (
+                      <div className="text-xs text-[#8E98A8] py-8 text-center font-mono">
+                        No Spot CLOB executions recorded in this session yet. Place a Market or Limit order to populate history.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs font-mono tabular-nums">
+                          <thead>
+                            <tr className="text-[#8E98A8] border-b border-[#2D374B]">
+                              <th className="text-left py-2">Market</th>
+                              <th className="text-left py-2">Type</th>
+                              <th className="text-left py-2">Side</th>
+                              <th className="text-right py-2">Price</th>
+                              <th className="text-right py-2">Size</th>
+                              <th className="text-right py-2">Time</th>
+                              <th className="text-right py-2">Tx</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {spotHistory.map((item) => (
+                              <tr key={item.id} className="border-b border-[#2D374B]/60">
+                                <td className="py-2 text-white font-semibold">
+                                  {item.baseSymbol}/{item.quoteSymbol}
+                                </td>
+                                <td className="py-2 text-slate-300">{item.style}</td>
+                                <td className={`py-2 font-semibold ${item.side === 'buy' ? 'text-[#08D189]' : 'text-[#F0525E]'}`}>
+                                  {item.side.toUpperCase()}
+                                </td>
+                                <td className="text-right py-2 text-white">{fmtClobPrice(item.price)}</td>
+                                <td className="text-right py-2 text-slate-200">
+                                  {item.qty.toFixed(4)} {item.baseSymbol}
+                                </td>
+                                <td className="text-right py-2 text-slate-400">
+                                  {new Date(item.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td className="text-right py-2">
+                                  <a
+                                    href={`https://suiscan.xyz/mainnet/tx/${item.digest}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#60A5FA] hover:underline"
+                                  >
+                                    Suiscan ↗
+                                  </a>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
                   ) : !account ? (
                     <div className="text-xs text-[#8E98A8] py-8 text-center font-mono">
                       Connect your Sui wallet to view open DeepBook v3 limit orders across {pools.length} live pairs.

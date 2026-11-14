@@ -948,6 +948,7 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
   quantity: number;
   isBid: boolean;
   postOnly?: boolean;
+  orderType?: 'GTC' | 'IOC' | 'FOK' | 'POST_ONLY';
   existingManagerDepositCoin?: number; // current balance inside manager for the paying side
   payWithDeep?: boolean;
   feeMist?: bigint;
@@ -960,7 +961,15 @@ export function buildPlaceDeepBookLimitOrderTx(params: {
   tx.setSender(params.owner);
 
   const clientOrderId = Date.now().toString();
-  const orderType = params.postOnly ? OrderType.POST_ONLY : OrderType.NO_RESTRICTION;
+  const resolvedOrderType =
+    params.orderType === 'POST_ONLY' || params.postOnly
+      ? OrderType.POST_ONLY
+      : params.orderType === 'IOC'
+        ? OrderType.IMMEDIATE_OR_CANCEL
+        : params.orderType === 'FOK'
+          ? OrderType.FILL_OR_KILL
+          : OrderType.NO_RESTRICTION;
+  const orderType = resolvedOrderType;
   const selfMatching = SelfMatchingOptions.SELF_MATCHING_ALLOWED;
 
   // Input side & fee cushion (DeepBook v3 input fee ~0.20% max when payWithDeep is false)
