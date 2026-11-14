@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Activity,
   Award,
@@ -21,16 +21,42 @@ import { captureReferralFromUrl } from './voltFee';
 import { fetchSessionStatus, type SessionStatusSnapshot } from './deepbookSessions';
 import { useSyncedWalletVolume } from './onChainVolume';
 import { SwapWorkspace } from './components/SwapWorkspace';
-import { PerpsWorkspace } from './components/PerpsWorkspace';
-import { PredictWorkspace } from './components/PredictWorkspace';
-import { EarnWorkspace } from './components/EarnWorkspace';
-import { TiersReferralsWorkspace } from './components/TiersReferralsWorkspace';
-import { PortfolioDrawer } from './components/PortfolioDrawer';
-import { ActivitySessionsModal } from './components/ActivitySessionsModal';
-import { TreasuryDashboard } from './TreasuryDashboard';
 import { PnlShareModal, type PnlTradeData } from './PnlShareModal';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { VoltLogo } from './components/VoltLogo';
+
+const PerpsWorkspace = lazy(() =>
+  import('./components/PerpsWorkspace').then((m) => ({ default: m.PerpsWorkspace }))
+);
+const PredictWorkspace = lazy(() =>
+  import('./components/PredictWorkspace').then((m) => ({ default: m.PredictWorkspace }))
+);
+const EarnWorkspace = lazy(() =>
+  import('./components/EarnWorkspace').then((m) => ({ default: m.EarnWorkspace }))
+);
+const TiersReferralsWorkspace = lazy(() =>
+  import('./components/TiersReferralsWorkspace').then((m) => ({
+    default: m.TiersReferralsWorkspace,
+  }))
+);
+const TreasuryDashboard = lazy(() =>
+  import('./TreasuryDashboard').then((m) => ({ default: m.TreasuryDashboard }))
+);
+const PortfolioDrawer = lazy(() =>
+  import('./components/PortfolioDrawer').then((m) => ({ default: m.PortfolioDrawer }))
+);
+const ActivitySessionsModal = lazy(() =>
+  import('./components/ActivitySessionsModal').then((m) => ({ default: m.ActivitySessionsModal }))
+);
+
+const WorkspaceFallback: React.FC = () => (
+  <div className="flex-1 flex items-center justify-center py-20">
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-[#090B10] border border-[#2D374B] text-xs font-mono text-[#7B8494]">
+      <span className="w-2 h-2 rounded-full bg-[#2B7FFF] animate-pulse" />
+      <span>Loading workspace module…</span>
+    </div>
+  </div>
+);
 
 type ActiveTab = 'swap' | 'perps' | 'predict' | 'earn' | 'tiers' | 'treasury';
 
@@ -252,45 +278,47 @@ export function App() {
         }`}
       >
         <div key={activeTab} className="animate-panel-in flex-1 flex flex-col min-w-0">
-          {activeTab === 'swap' && (
-            <SwapWorkspace
-              onNotify={notify}
-              onTradeRecorded={(t) => setPnlTrade(t)}
-              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-            />
-          )}
+          <Suspense fallback={<WorkspaceFallback />}>
+            {activeTab === 'swap' && (
+              <SwapWorkspace
+                onNotify={notify}
+                onTradeRecorded={(t) => setPnlTrade(t)}
+                onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+              />
+            )}
 
-          {activeTab === 'perps' && (
-            <PerpsWorkspace
-              onNotify={notify}
-              onTradeRecorded={(t) => setPnlTrade(t)}
-              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-            />
-          )}
+            {activeTab === 'perps' && (
+              <PerpsWorkspace
+                onNotify={notify}
+                onTradeRecorded={(t) => setPnlTrade(t)}
+                onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+              />
+            )}
 
-          {activeTab === 'predict' && (
-            <PredictWorkspace
-              onNotify={notify}
-              onTradeRecorded={(t) => setPnlTrade(t)}
-              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-            />
-          )}
+            {activeTab === 'predict' && (
+              <PredictWorkspace
+                onNotify={notify}
+                onTradeRecorded={(t) => setPnlTrade(t)}
+                onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+              />
+            )}
 
-          {activeTab === 'earn' && (
-            <EarnWorkspace
-              onNotify={notify}
-              onTradeRecorded={(t) => setPnlTrade(t)}
-              onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
-            />
-          )}
+            {activeTab === 'earn' && (
+              <EarnWorkspace
+                onNotify={notify}
+                onTradeRecorded={(t) => setPnlTrade(t)}
+                onVolumeUpdated={(v) => setTrackedVolumeUsd(v)}
+              />
+            )}
 
-          {activeTab === 'tiers' && (
-            <TiersReferralsWorkspace externalVolumeUsd={trackedVolumeUsd} />
-          )}
+            {activeTab === 'tiers' && (
+              <TiersReferralsWorkspace externalVolumeUsd={trackedVolumeUsd} />
+            )}
 
-          {activeTab === 'treasury' && isCreatorWallet && (
-            <TreasuryDashboard currentAccount={account} showNotification={notify} />
-          )}
+            {activeTab === 'treasury' && isCreatorWallet && (
+              <TreasuryDashboard currentAccount={account} showNotification={notify} />
+            )}
+          </Suspense>
         </div>
       </main>
 
@@ -345,17 +373,25 @@ export function App() {
         </div>
       )}
 
-      <PortfolioDrawer isOpen={portfolioOpen} onClose={() => setPortfolioOpen(false)} />
+      {portfolioOpen && (
+        <Suspense fallback={null}>
+          <PortfolioDrawer isOpen={portfolioOpen} onClose={() => setPortfolioOpen(false)} />
+        </Suspense>
+      )}
 
-      <ActivitySessionsModal
-        isOpen={activityOpen}
-        onClose={() => setActivityOpen(false)}
-        sessionStatus={sessionStatus}
-        onRefreshSession={refreshSessionStatus}
-        onNavigateTab={(tab) => setActiveTab(tab)}
-        onOpenPortfolio={() => setPortfolioOpen(true)}
-        onNotify={notify}
-      />
+      {activityOpen && (
+        <Suspense fallback={null}>
+          <ActivitySessionsModal
+            isOpen={activityOpen}
+            onClose={() => setActivityOpen(false)}
+            sessionStatus={sessionStatus}
+            onRefreshSession={refreshSessionStatus}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+            onOpenPortfolio={() => setPortfolioOpen(true)}
+            onNotify={notify}
+          />
+        </Suspense>
+      )}
 
       <PnlShareModal
         isOpen={Boolean(pnlTrade)}
