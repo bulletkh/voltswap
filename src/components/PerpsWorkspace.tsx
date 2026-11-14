@@ -194,10 +194,13 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
   const [orderMode, setOrderMode] = useState<OrderMode>('market');
   const [side, setSide] = useState<'long' | 'short'>('long');
   const [leverage, setLeverage] = useState<number>(10);
+  const [openSizeMode, setOpenSizeMode] = useState<'margin' | 'contracts' | 'notional'>('margin');
   const [marginUsdc, setMarginUsdc] = useState<string>('0.5');
   const [reduceContracts, setReduceContracts] = useState<string>('');
   const [reduceOnly, setReduceOnly] = useState<boolean>(false);
   const [slippagePct, setSlippagePct] = useState<number>(1.5);
+  const [bookTickMult, setBookTickMult] = useState<number>(1);
+  const [fundingCountdown, setFundingCountdown] = useState<string>('');
 
   // Limit / Scale / Stop / TWAP specifics
   const [limitPrice, setLimitPrice] = useState<string>('');
@@ -481,14 +484,81 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
     return markPrice;
   }, [orderMode, limitPrice, scaleStartPrice, scaleEndPrice, stopTriggerPrice, markPrice]);
 
-  const marginNum = reduceOnly ? 0 : Math.max(0, Number(marginUsdc) || 0);
-  const openNotionalUsd = marginNum * effectiveOrderLev;
+  const rawOpenInput = reduceOnly ? 0 : Math.max(0, Number(marginUsdc) || 0);
+  const marginNum = reduceOnly
+    ? 0
+    : openSizeMode === 'margin'
+      ? rawOpenInput
+      : openSizeMode === 'notional'
+        ? effectiveOrderLev > 0
+          ? rawOpenInput / effectiveOrderLev
+          : 0
+        : executionPriceEst > 0 && effectiveOrderLev > 0
+          ? (rawOpenInput * executionPriceEst) / effectiveOrderLev
+          : 0;
+  const openNotionalUsd =
+    openSizeMode === 'notional'
+      ? rawOpenInput
+      : openSizeMode === 'contracts'
+        ? rawOpenInput * executionPriceEst
+        : marginNum * effectiveOrderLev;
   const estContracts = reduceOnly
     ? Math.max(0, Number(reduceContracts) || 0)
-    : executionPriceEst > 0
-      ? openNotionalUsd / executionPriceEst
-      : 0;
+    : openSizeMode === 'contracts'
+      ? rawOpenInput
+      : executionPriceEst > 0
+        ? openNotionalUsd / executionPriceEst
+        : 0;
   const effectiveNotionalUsd = estContracts * executionPriceEst;
+
+  // Live 1h Funding Countdown (Aftermath settles hourly on UTC hour)
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const mins = 59 - now.getUTCMinutes();
+      const secs = 59 - now.getUTCSeconds();
+      setFundingCountdown(`${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+    };
+    updateCountdown();
+    const id = setInterval(updateCountdown, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Grouped Order Book by selected Tick multiplier
+  const groupedOrderbook = useMemo(() => {
+    if (bookTickMult <= 1) return orderbook;
+    const baseTickUsd =
+      activeMarket?.tickSize && Number(activeMarket.tickSize) > 0
+        ? Number(activeMarket.tickSize) / 1e9
+        : markPrice >= 1000
+          ? 1
+          : markPrice >= 10
+            ? 0.01
+            : 0.0001;
+    const step = Math.max(1e-6, baseTickUsd * bookTickMult);
+    const groupSide = (levels: typeof orderbook.asks, isAsk: boolean): typeof orderbook.asks => {
+      const buckets = new Map<number, number>();
+      for (const lv of levels) {
+        const bucket = isAsk ? Math.ceil(lv.price / step) * step : Math.floor(lv.price / step) * step;
+        const key = Number(bucket.toFixed(6));
+        buckets.set(key, (buckets.get(key) || 0) + lv.size);
+      }
+      const sorted = Array.from(buckets.entries())
+        .map(([price, size]) => ({ price, size, totalSize: 0 }))
+        .sort((a, b) => (isAsk ? a.price - b.price : b.price - a.price));
+      let running = 0;
+      for (const row of sorted) {
+        running += row.size;
+        row.totalSize = running;
+      }
+      return isAsk ? sorted.reverse() : sorted;
+    };
+    return {
+      ...orderbook,
+      asks: groupSide(orderbook.asks, true),
+      bids: groupSide(orderbook.bids, false),
+    };
+  }, [orderbook, bookTickMult, activeMarket?.tickSize, markPrice]);
 
   const estLiqPrice =
     markPrice > 0 && !reduceOnly
@@ -1176,9 +1246,12 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-[#7B8494]">Funding / 1h</div>
-                <div className="text-[#60A5FA]">
-                  {(activeMarket.estimatedFundingRate * 100).toFixed(4)}%
+                <div className="text-[10px] text-[#7B8494]">Funding / Countdown</div>
+                <div className="text-[#60A5FA] flex items-center gap-1.5">
+                  <span>{(activeMarket.estimatedFundingRate * 100).toFixed(4)}%</span>
+                  {fundingCountdown && (
+                    <span className="text-[10px] text-slate-400">{fundingCountdown}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1287,9 +1360,25 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 Trades
               </button>
             </div>
-            <span className="text-[10px] font-mono text-[#7B8494]">
-              {bookTab === 'book' ? 'Click → price' : `${marketTrades.length}`}
-            </span>
+            {bookTab === 'book' ? (
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={bookTickMult}
+                  onChange={(e) => setBookTickMult(Number(e.target.value))}
+                  className="bg-[#06070A] border border-[#2D374B] rounded px-1.5 py-0.5 text-[10px] font-mono text-slate-300 outline-none cursor-pointer"
+                  title="Order Book price grouping"
+                >
+                  {[1, 10, 50, 100].map((m) => (
+                    <option key={m} value={m} className="bg-[#06070A]">
+                      {m === 1 ? 'Tick 1x' : `${m}x`}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] font-mono text-[#7B8494]">Click → price</span>
+              </div>
+            ) : (
+              <span className="text-[10px] font-mono text-[#7B8494]">{marketTrades.length}</span>
+            )}
           </div>
 
           {bookTab === 'book' ? (
@@ -1301,7 +1390,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
               </div>
               <div className="flex-1 min-h-0 flex flex-col justify-between px-1.5 py-1 text-[11px] font-mono tabular-nums overflow-hidden">
                 <div className="flex-1 min-h-0 flex flex-col justify-end space-y-[2px] overflow-hidden">
-                  {orderbook.asks.slice(-11).map((lv, i) => (
+                  {groupedOrderbook.asks.slice(-12).map((lv, i) => (
                     <button
                       key={`a-${i}`}
                       type="button"
@@ -1311,7 +1400,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       <span
                         className="absolute right-0 top-0 bottom-0 bg-[#F0525E]/18"
                         style={{
-                          width: `${Math.min(100, (lv.totalSize / Math.max(1, orderbook.asks[0]?.totalSize || 1)) * 100)}%`,
+                          width: `${Math.min(100, (lv.totalSize / Math.max(1, groupedOrderbook.asks[0]?.totalSize || 1)) * 100)}%`,
                         }}
                       />
                       <span className="relative text-[#F0525E] font-medium">{fmtPrice(lv.price)}</span>
@@ -1327,7 +1416,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                 </div>
 
                 <div className="flex-1 min-h-0 flex flex-col justify-start space-y-[2px] overflow-hidden">
-                  {orderbook.bids.slice(0, 11).map((lv, i) => (
+                  {groupedOrderbook.bids.slice(0, 12).map((lv, i) => (
                     <button
                       key={`b-${i}`}
                       type="button"
@@ -1337,7 +1426,7 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                       <span
                         className="absolute right-0 top-0 bottom-0 bg-[#08D189]/18"
                         style={{
-                          width: `${Math.min(100, (lv.totalSize / Math.max(1, orderbook.bids.slice(-1)[0]?.totalSize || 1)) * 100)}%`,
+                          width: `${Math.min(100, (lv.totalSize / Math.max(1, groupedOrderbook.bids.slice(-1)[0]?.totalSize || 1)) * 100)}%`,
                         }}
                       />
                       <span className="relative text-[#08D189] font-medium">{fmtPrice(lv.price)}</span>
@@ -1785,26 +1874,72 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             </div>
           )}
 
-          {/* Margin / Reduce Size Input */}
+          {/* Margin / Size / Notional Input */}
           <div className="panel-carbon-sub rounded-md p-2.5 space-y-1.5">
-            <div className="flex justify-between text-xs text-slate-300">
-              <span>{reduceOnly ? `Close Size (${activeMarket?.symbol || 'PERP'})` : 'Margin (USDC)'}</span>
-              <span className="font-mono text-white">
+            <div className="flex justify-between items-center gap-2 text-xs text-slate-300">
+              {reduceOnly ? (
+                <span>Close Size ({activeMarket?.symbol || 'PERP'})</span>
+              ) : (
+                <div className="inline-flex rounded bg-[#07090D] border border-[#2D374B] p-0.5 text-[10px] font-mono">
+                  {(
+                    [
+                      ['margin', 'Margin'],
+                      ['contracts', activeMarket?.symbol || 'Size'],
+                      ['notional', 'USD'],
+                    ] as const
+                  ).map(([mId, mLbl]) => (
+                    <button
+                      key={mId}
+                      type="button"
+                      onClick={() => {
+                        if (openSizeMode === mId) return;
+                        if (mId === 'margin') {
+                          setMarginUsdc(marginNum > 0 ? marginNum.toFixed(2) : '0.5');
+                        } else if (mId === 'contracts') {
+                          setMarginUsdc(estContracts > 0 ? estContracts.toFixed(3) : '1');
+                        } else {
+                          setMarginUsdc(openNotionalUsd > 0 ? openNotionalUsd.toFixed(2) : '5');
+                        }
+                        setOpenSizeMode(mId);
+                      }}
+                      className={`px-1.5 py-0.5 rounded font-semibold transition-colors ${
+                        openSizeMode === mId
+                          ? 'bg-[#2B7FFF] text-white'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {mLbl}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <span className="font-mono text-white text-[11px]">
                 {reduceOnly && activePosition
                   ? `Pos: ${Math.abs(activePosition.baseAssetAmount).toFixed(3)}`
-                  : `Size: ${estContracts.toFixed(3)} ${activeMarket?.symbol || ''}`}
+                  : openSizeMode === 'contracts'
+                    ? `Margin: $${marginNum.toFixed(2)}`
+                    : `Size: ${estContracts.toFixed(3)} ${activeMarket?.symbol || ''}`}
               </span>
             </div>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={reduceOnly ? reduceContracts : marginUsdc}
-              onChange={(e) =>
-                reduceOnly ? setReduceContracts(e.target.value) : setMarginUsdc(e.target.value)
-              }
-              className="w-full bg-transparent text-lg font-mono tabular-nums font-bold text-white outline-none"
-            />
+            <div className="flex items-center justify-between gap-2">
+              <input
+                type="number"
+                min="0"
+                step="any"
+                value={reduceOnly ? reduceContracts : marginUsdc}
+                onChange={(e) =>
+                  reduceOnly ? setReduceContracts(e.target.value) : setMarginUsdc(e.target.value)
+                }
+                className="w-full bg-transparent text-lg font-mono tabular-nums font-bold text-white outline-none"
+              />
+              <span className="text-[11px] font-mono text-slate-400 shrink-0">
+                {reduceOnly
+                  ? activeMarket?.symbol || 'PERP'
+                  : openSizeMode === 'contracts'
+                    ? activeMarket?.symbol || 'PERP'
+                    : 'USDC'}
+              </span>
+            </div>
             <div className="grid grid-cols-4 gap-1">
               {[0.25, 0.5, 0.75, 1].map((pct) => (
                 <button
@@ -1814,11 +1949,21 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
                     if (reduceOnly && activePosition) {
                       setReduceContracts((Math.abs(activePosition.baseAssetAmount) * pct).toFixed(4));
                     } else {
-                      const usable = Math.max(
+                      const usableMargin = Math.max(
                         0,
                         (afState?.availableCollateralUsd || 0) * (pct === 1 ? 0.94 : pct)
                       );
-                      setMarginUsdc(usable.toFixed(2));
+                      if (openSizeMode === 'margin') {
+                        setMarginUsdc(usableMargin.toFixed(2));
+                      } else if (openSizeMode === 'notional') {
+                        setMarginUsdc((usableMargin * effectiveOrderLev).toFixed(2));
+                      } else {
+                        const contracts =
+                          executionPriceEst > 0
+                            ? (usableMargin * effectiveOrderLev) / executionPriceEst
+                            : 0;
+                        setMarginUsdc(contracts.toFixed(3));
+                      }
                     }
                   }}
                   className="py-1 rounded bg-[#07090D] border border-[#2D374B] hover:border-[#2B7FFF]/60 text-[11px] font-mono text-slate-200 transition-colors"
@@ -1940,8 +2085,10 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
           {/* Cost & Fee Summary */}
           <div className="panel-carbon-sub rounded-md p-2.5 space-y-1 text-xs font-mono tabular-nums">
             <div className="flex justify-between text-slate-300">
-              <span>Notional Value</span>
-              <span className="text-white font-semibold">${effectiveNotionalUsd.toFixed(2)}</span>
+              <span>Notional / Req. Margin</span>
+              <span className="text-white font-semibold">
+                ${effectiveNotionalUsd.toFixed(2)} / ${marginNum.toFixed(2)}
+              </span>
             </div>
             <div className="flex justify-between text-slate-300">
               <span>Est. Liq Price</span>
@@ -1955,27 +2102,51 @@ export const PerpsWorkspace: React.FC<PerpsWorkspaceProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={executePerpOrder}
-            className={`w-full py-2.5 rounded font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${
-              side === 'long'
-                ? 'bg-[#2B7FFF] hover:bg-[#3C8BFF] text-white'
-                : 'bg-[#F0525E] hover:bg-[#FF6370] text-white'
-            } disabled:opacity-50`}
-          >
-            {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            <span>
-              {!account
-                ? 'Connect Wallet'
-                : !afState?.accountId
-                  ? 'Create Perp Account'
-                  : isSubmitting
-                    ? 'Confirming...'
-                    : `${orderMode.toUpperCase()} ${side === 'long' ? 'BUY / LONG' : 'SELL / SHORT'} ${activeMarket?.symbol || 'PERP'}`}
-            </span>
-          </button>
+          {(() => {
+            const hasAccount = Boolean(account && afState?.accountId);
+            const isZero = estContracts <= 0;
+            const isBelowMin = Boolean(
+              activeMarket && !isZero && effectiveNotionalUsd < activeMarket.minOrderUsdValue
+            );
+            const isInsufficientMargin = Boolean(
+              hasAccount && !reduceOnly && !isZero && marginNum > (afState?.availableCollateralUsd || 0) * 0.995
+            );
+            const isMissingLimitPx = orderMode === 'limit' && !(Number(limitPrice) > 0);
+            const btnDisabled =
+              isSubmitting ||
+              (hasAccount && (isZero || isBelowMin || isInsufficientMargin || isMissingLimitPx));
+            const btnLabel = !account
+              ? 'Connect Wallet'
+              : !afState?.accountId
+                ? 'Create Perp Account'
+                : isSubmitting
+                  ? 'Confirming...'
+                  : isZero
+                    ? 'Enter an amount'
+                    : isMissingLimitPx
+                      ? 'Enter Limit Price'
+                      : isBelowMin && activeMarket
+                        ? `Min $${activeMarket.minOrderUsdValue} Notional`
+                        : isInsufficientMargin
+                          ? 'Insufficient Free Margin'
+                          : `${orderMode.toUpperCase()} ${side === 'long' ? 'BUY / LONG' : 'SELL / SHORT'} ${activeMarket?.symbol || 'PERP'}`;
+
+            return (
+              <button
+                type="button"
+                disabled={btnDisabled}
+                onClick={executePerpOrder}
+                className={`w-full py-2.5 rounded font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 ${
+                  side === 'long'
+                    ? 'bg-[#2B7FFF] hover:bg-[#3C8BFF] text-white'
+                    : 'bg-[#F0525E] hover:bg-[#FF6370] text-white'
+                } disabled:opacity-50`}
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{btnLabel}</span>
+              </button>
+            );
+          })()}
         </div>
 
         {/* 5. Bottom Account Dock (Row 3, Cols 1-2 directly below Chart & Orderbook!) */}
