@@ -474,6 +474,55 @@ export async function fetchDeepBookTrades(
   }));
 }
 
+const PYTH_FEED_IDS: Record<string, string> = {
+  SUI: '23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744',
+  USDC: 'eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a',
+  SUIUSDC: 'eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a',
+  USDT: '2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b',
+  SUIUSDT: '2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b',
+  DEEP: '29bdd5248234e33bd93d3b81100b5fa32eaa5997843847e2c2cb16d7c6d975ff',
+  WAL: 'eba0732395fae9dec4bae12e52760b35fc1c5671e2da8b449c9af4efe5d54341',
+  BTC: 'e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43',
+  WBTC: 'e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43',
+  XBTC: 'e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43',
+  LBTC: 'e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43',
+  ETH: 'ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace',
+  WETH: 'ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace',
+  SOL: 'ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d',
+  CETUS: 'e5b274b2611143df055d6e7cd8d93fe1961716bcd4dca1cad87a83bc1e78c1ef',
+  NS: '6c42466a5f6f7664fb8425e34398732d896815fb2e954f6c4aa97d426c762683',
+};
+
+export async function fetchPythOraclePrice(
+  baseSymbol: string,
+  quoteSymbol: string
+): Promise<number | null> {
+  const baseId = PYTH_FEED_IDS[baseSymbol.toUpperCase()];
+  const quoteId = PYTH_FEED_IDS[quoteSymbol.toUpperCase()];
+  if (!baseId || !quoteId) return null;
+
+  try {
+    const uniqueIds = Array.from(new Set([baseId, quoteId]));
+    const qs = uniqueIds.map((id) => `ids[]=0x${id}`).join('&');
+    const res = await fetch(`https://hermes.pyth.network/v2/updates/price/latest?${qs}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parsed: any[] = Array.isArray(data?.parsed) ? data.parsed : [];
+    const readUsd = (id: string): number | null => {
+      const hit = parsed.find((p) => String(p?.id || '').toLowerCase() === id.toLowerCase());
+      if (!hit?.price) return null;
+      const val = Number(hit.price.price) * Math.pow(10, Number(hit.price.expo || 0));
+      return Number.isFinite(val) && val > 0 ? val : null;
+    };
+    const baseUsd = readUsd(baseId);
+    const quoteUsd = readUsd(quoteId);
+    if (!baseUsd || !quoteUsd) return null;
+    return baseUsd / quoteUsd;
+  } catch {
+    return null;
+  }
+}
+
 export function createDeepBookClient(owner: string, managerId?: string) {
   return suiGrpcClient.$extend(
     deepbook({

@@ -50,6 +50,7 @@ import {
   fetchDeepBookOrderbook,
   fetchDeepBookPools,
   fetchDeepBookTrades,
+  fetchPythOraclePrice,
   fetchVoltSpotReferrals,
   type DeepBookCandle,
   type DeepBookManagerState,
@@ -232,6 +233,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     spreadPct: 0,
   });
   const [trades, setTrades] = useState<DeepBookTrade[]>([]);
+  const [oraclePrice, setOraclePrice] = useState<number | null>(null);
   const [bookTab, setBookTab] = useState<'book' | 'trades'>('book');
 
   const [managerIds, setManagerIds] = useState<string[]>([]);
@@ -434,15 +436,18 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
   useEffect(() => {
     if (mode === 'market') return;
     let cancelled = false;
+    setOraclePrice(null);
     const loadBook = async () => {
       try {
-        const [ob, tr] = await Promise.all([
+        const [ob, tr, pythPx] = await Promise.all([
           fetchDeepBookOrderbook(activePool.poolName, 24),
           fetchDeepBookTrades(activePool.poolName, 25),
+          fetchPythOraclePrice(activePool.baseSymbol, activePool.quoteSymbol),
         ]);
         if (!cancelled) {
           setOrderbook(ob);
           setTrades(tr);
+          setOraclePrice(pythPx);
           setLimitPrice((prev) => (prev === '' && ob.midPrice > 0 ? ob.midPrice.toFixed(4) : prev));
         }
       } catch {
@@ -455,7 +460,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       cancelled = true;
       clearInterval(id);
     };
-  }, [mode, activePool.poolName]);
+  }, [mode, activePool.poolName, activePool.baseSymbol, activePool.quoteSymbol]);
 
   // Spot History (local per-wallet order execution log)
   useEffect(() => {
@@ -2016,6 +2021,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       : activePool.lastPrice
                         ? fmtClobPrice(activePool.lastPrice)
                         : '—'}
+                  </div>
+                </div>
+                <div title="Live Pyth Hermes Oracle Price">
+                  <div className="text-[10px] text-[#8E98A8]">Oracle Price</div>
+                  <div className="text-[#60A5FA] font-bold">
+                    {oraclePrice && oraclePrice > 0 ? fmtClobPrice(oraclePrice) : '—'}
                   </div>
                 </div>
                 {activePool.change24hPct !== undefined && (
