@@ -766,7 +766,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
     setIsSwapping(true);
     try {
-      const tx = await buildBestSwapTx({
+      let tx = await buildBestSwapTx({
         sender: account.address,
         fromCoinType: fromToken.address,
         amountInAtomic: atomic,
@@ -775,7 +775,26 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         refSharePct: refTier.revSharePct,
       });
 
-      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      let sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+      if (!sim.ok) {
+        const fallbackQuote: SmartSwapQuote | null =
+          quote.provider === 'Cetus' && quote.aftermathRoute
+            ? { ...quote, provider: 'Aftermath' }
+            : quote.provider === 'Aftermath' && quote.cetusQuote
+              ? { ...quote, provider: 'Cetus' }
+              : null;
+        if (fallbackQuote) {
+          tx = await buildBestSwapTx({
+            sender: account.address,
+            fromCoinType: fromToken.address,
+            amountInAtomic: atomic,
+            quote: fallbackQuote,
+            slippage: slippagePct / 100,
+            refSharePct: refTier.revSharePct,
+          });
+          sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+        }
+      }
       if (!sim.ok) {
         onNotify('error', 'Preflight Check Failed', sim.errorMessage || 'Transaction aborted.');
         return;
@@ -1617,16 +1636,28 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       </span>
                     </div>
                     {quote && (
-                      <div className="flex justify-between text-slate-400">
-                        <span>Price Impact</span>
-                        <span
-                          className={`tabular-nums font-semibold ${
-                            quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-[#08D189]'
-                          }`}
-                        >
-                          {quote.priceImpactPct.toFixed(2)}%
-                        </span>
-                      </div>
+                      <>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Minimum Received ({slippagePct}% slip)</span>
+                          <span className="text-slate-200 font-semibold tabular-nums">
+                            {(() => {
+                              const outVal = Number(quote.amountOutAtomic) / Math.pow(10, toToken.decimals);
+                              const minOut = outVal * Math.max(0, 1 - slippagePct / 100);
+                              return `${minOut >= 1 ? minOut.toFixed(4) : minOut.toFixed(6)} ${toToken.symbol}`;
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-slate-400">
+                          <span>Price Impact</span>
+                          <span
+                            className={`tabular-nums font-semibold ${
+                              quote.priceImpactPct > 2 ? 'text-amber-400' : 'text-[#08D189]'
+                            }`}
+                          >
+                            {quote.priceImpactPct.toFixed(2)}%
+                          </span>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1637,21 +1668,32 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  disabled={isSwapping || isQuoting || !quote}
-                  onClick={executeMarketSwap}
-                  className="w-full py-3.5 rounded-lg btn-deepbook disabled:bg-[#121620] disabled:text-slate-500 disabled:shadow-none font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2"
-                >
-                  {isSwapping && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>
-                    {!account
-                      ? 'Connect Wallet to Swap'
-                      : isSwapping
-                        ? 'Confirm in Wallet...'
-                        : `Swap ${fromToken.symbol} for ${toToken.symbol}`}
-                  </span>
-                </button>
+                {(() => {
+                  const payNum = Number(amountIn) || 0;
+                  const isSamePair = fromToken.address === toToken.address;
+                  const isInsufficientBal = Boolean(account?.address) && payNum > 0 && payNum > fromBal * 1.0001;
+                  const swapDisabled = isSwapping || isQuoting || !quote || isSamePair || isInsufficientBal;
+                  const swapLabel = !account
+                    ? 'Connect Wallet to Swap'
+                    : isSamePair
+                      ? 'Select different tokens'
+                      : isInsufficientBal
+                        ? `Insufficient ${fromToken.symbol} Balance`
+                        : isSwapping
+                          ? 'Confirm in Wallet...'
+                          : `Swap ${fromToken.symbol} for ${toToken.symbol}`;
+                  return (
+                    <button
+                      type="button"
+                      disabled={swapDisabled}
+                      onClick={executeMarketSwap}
+                      className="w-full py-3.5 rounded-lg btn-deepbook disabled:bg-[#121620] disabled:text-slate-500 disabled:shadow-none font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2"
+                    >
+                      {isSwapping && <Loader2 className="w-4 h-4 animate-spin" />}
+                      <span>{swapLabel}</span>
+                    </button>
+                  );
+                })()}
                   </>
                 ) : (
                   <div className="space-y-3 animate-panel-in">
@@ -1755,23 +1797,42 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      disabled={isPlacingLiteLimit || !matchedLitePool || !amountIn || Number(amountIn) <= 0 || litePoolPriceNum <= 0}
-                      onClick={executePlaceLiteLimit}
-                      className="w-full py-3.5 rounded-lg btn-deepbook disabled:bg-[#121620] disabled:text-slate-500 disabled:shadow-none font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2"
-                    >
-                      {isPlacingLiteLimit && <Loader2 className="w-4 h-4 animate-spin" />}
-                      <span>
-                        {!account
-                          ? 'Connect Wallet to Place Limit'
-                          : !amountIn || Number(amountIn) <= 0
-                            ? 'Enter an amount'
-                            : isPlacingLiteLimit
-                              ? 'Confirm in Wallet...'
-                              : `Place Limit ${matchedLitePool?.isBid ? 'Buy' : 'Sell'} Order`}
-                      </span>
-                    </button>
+                    {(() => {
+                      const payNum = Number(amountIn) || 0;
+                      const estBaseQty =
+                        matchedLitePool && litePoolPriceNum > 0
+                          ? matchedLitePool.isBid
+                            ? payNum / litePoolPriceNum
+                            : payNum
+                          : 0;
+                      const isZero = !amountIn || payNum <= 0 || litePoolPriceNum <= 0;
+                      const isBelowMin = Boolean(matchedLitePool && !isZero && estBaseQty < matchedLitePool.pool.minSize);
+                      const isInsufficient = Boolean(account?.address && !isZero && payNum > fromBal * 1.0001);
+                      const liteDisabled =
+                        isPlacingLiteLimit || !matchedLitePool || isZero || isBelowMin || isInsufficient;
+                      const liteLabel = !account
+                        ? 'Connect Wallet to Place Limit'
+                        : isZero
+                          ? 'Enter an amount'
+                          : isBelowMin && matchedLitePool
+                            ? `Min ${matchedLitePool.pool.minSize} ${matchedLitePool.pool.baseSymbol}`
+                            : isInsufficient
+                              ? `Insufficient ${fromToken.symbol} Balance`
+                              : isPlacingLiteLimit
+                                ? 'Confirm in Wallet...'
+                                : `Place Limit ${matchedLitePool?.isBid ? 'Buy' : 'Sell'} Order`;
+                      return (
+                        <button
+                          type="button"
+                          disabled={liteDisabled}
+                          onClick={executePlaceLiteLimit}
+                          className="w-full py-3.5 rounded-lg btn-deepbook disabled:bg-[#121620] disabled:text-slate-500 disabled:shadow-none font-bold text-sm tracking-wide transition-all flex items-center justify-center gap-2"
+                        >
+                          {isPlacingLiteLimit && <Loader2 className="w-4 h-4 animate-spin" />}
+                          <span>{liteLabel}</span>
+                        </button>
+                      );
+                    })()}
 
                     {/* Compact Active Limit Orders List */}
                     {account && vaultSummary.openOrders.length > 0 && (
