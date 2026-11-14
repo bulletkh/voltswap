@@ -649,11 +649,22 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
 
   const handleDepositUsdc = async (amtNum: number) => {
     if (!account?.address || !board || !(amtNum > 0)) return;
+    const maxDeposit = Math.floor(walletUsdc * 1_000_000) / 1_000_000;
+    const safeAmt = Math.floor(amtNum * 1_000_000) / 1_000_000;
+    if (safeAmt <= 0) return;
+    if (safeAmt > maxDeposit) {
+      onNotify(
+        'warning',
+        'Insufficient Wallet USDC',
+        `Requested ${safeAmt.toFixed(4)} USDC exceeds your wallet balance (${maxDeposit.toFixed(6)} USDC).`
+      );
+      return;
+    }
     setIsDepositing(true);
     try {
       const tx = buildPredictDepositTx({
         sender: account.address,
-        amountUsdc: amtNum,
+        amountUsdc: safeAmt,
         hasAccount: Boolean(board.account?.hasAccount),
         protocol: board.protocol,
       });
@@ -1800,27 +1811,33 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
               </button>
             </div>
             <div className="panel-carbon-sub rounded-xl p-3 space-y-2">
-              <div className="flex justify-between text-xs text-slate-300 font-mono">
-                <span>{vaultModal === 'deposit' ? 'Wallet USDC' : 'Available Predict Vault'}</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setVaultAmt(
-                      (vaultModal === 'deposit' ? walletUsdc : availableUsdc).toFixed(2)
-                    )
-                  }
-                  className="inline-flex items-center gap-1 text-[#60A5FA] hover:underline"
-                >
-                  <Wallet className="w-3 h-3" />
-                  MAX {(vaultModal === 'deposit' ? walletUsdc : availableUsdc).toFixed(2)} USDC
-                </button>
-              </div>
+              {(() => {
+                const rawMax = vaultModal === 'deposit' ? walletUsdc : availableUsdc;
+                const flooredMax = Math.floor(rawMax * 1_000_000) / 1_000_000;
+                const displayMax = (Math.floor(rawMax * 100) / 100).toFixed(2);
+                return (
+                  <div className="flex justify-between text-xs text-slate-300 font-mono">
+                    <span>{vaultModal === 'deposit' ? 'Wallet USDC' : 'Available Predict Vault'}</span>
+                    <button
+                      type="button"
+                      onClick={() => setVaultAmt(flooredMax > 0 ? String(flooredMax) : '0')}
+                      className="inline-flex items-center gap-1 text-[#60A5FA] hover:underline"
+                    >
+                      <Wallet className="w-3 h-3" />
+                      MAX {displayMax} USDC
+                    </button>
+                  </div>
+                );
+              })()}
               <input
-                type="number"
-                step="any"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={vaultAmt}
-                onChange={(e) => setVaultAmt(e.target.value)}
+                onChange={(e) => {
+                  const clean = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                  const parts = clean.split('.');
+                  setVaultAmt(parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : clean);
+                }}
                 placeholder="0.00"
                 className="w-full bg-transparent text-2xl font-mono font-bold text-white outline-none"
               />
