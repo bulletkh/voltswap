@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       hasKvStore() ? kvCommand(['HGETALL', 'volt:leaderboard:traders:v1']) : Promise.resolve(null),
     ]);
 
-    const chainTotal = Number(chainLedger.totalProtocolVolume || 0);
+    const chainTotal = Number(chainLedger.totalVolumeUsd || 0);
     let kvTotal = 0;
     if (Array.isArray(kvTradersRaw)) {
       for (let i = 1; i < kvTradersRaw.length; i += 2) {

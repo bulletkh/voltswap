@@ -1051,7 +1051,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
         existingManagerReferralId: managerState?.referralId || null,
       });
 
-      const sim = await simulateTxBeforeWallet(tx);
+      const sim = await simulateTxBeforeWallet(tx, { sender: account.address });
       if (!sim.ok) {
         onNotify(
           'error',
