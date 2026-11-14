@@ -227,14 +227,23 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
   const clmmWalletBalA = useMemo(() => {
     if (!activePool) return 0;
     const raw = readBalanceFromMap(balances, activePool.pool.coin_type_a, activePool.decimalsA);
-    return activePool.pool.coin_type_a.endsWith('::sui::SUI') ? Math.max(0, raw - 0.03) : raw;
+    return activePool.pool.coin_type_a.endsWith('::sui::SUI') ? Math.max(0, raw - 0.02) : raw;
   }, [activePool, balances]);
 
   const clmmWalletBalB = useMemo(() => {
     if (!activePool) return 0;
     const raw = readBalanceFromMap(balances, activePool.pool.coin_type_b, activePool.decimalsB);
-    return activePool.pool.coin_type_b.endsWith('::sui::SUI') ? Math.max(0, raw - 0.03) : raw;
+    return activePool.pool.coin_type_b.endsWith('::sui::SUI') ? Math.max(0, raw - 0.02) : raw;
   }, [activePool, balances]);
+
+  useEffect(() => {
+    if (!activePool) return;
+    if (fixedCoin === 'b' && clmmWalletBalB <= 0 && clmmWalletBalA > 0) {
+      setFixedCoin('a');
+    } else if (fixedCoin === 'a' && clmmWalletBalA <= 0 && clmmWalletBalB > 0) {
+      setFixedCoin('b');
+    }
+  }, [activePool?.poolId, clmmWalletBalA, clmmWalletBalB]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clmmValidationError = useMemo(() => {
     if (!activePool || !clmmQuote) return null;
@@ -823,6 +832,29 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                   className="w-full bg-transparent text-2xl font-mono font-bold text-white outline-none"
                 />
 
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[0.25, 0.5, 0.75, 1].map((pct) => {
+                    const avail = fixedCoin === 'a' ? clmmWalletBalA : clmmWalletBalB;
+                    const dec =
+                      fixedCoin === 'a' ? (activePool?.decimalsA ?? 6) : (activePool?.decimalsB ?? 9);
+                    return (
+                      <button
+                        key={pct}
+                        type="button"
+                        disabled={!activePool || avail <= 0}
+                        onClick={() => {
+                          const factor = Math.pow(10, Math.min(dec, 6));
+                          const val = Math.floor(avail * pct * factor) / factor;
+                          setClmmAmountInput(val > 0 ? String(val) : '');
+                        }}
+                        className="py-1 rounded bg-[#0C0E13] border border-[#2D374B] hover:border-[#2B7FFF]/50 text-[11px] font-mono text-slate-300 disabled:opacity-40"
+                      >
+                        {pct === 1 ? 'MAX' : `${pct * 100}%`}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div className="flex justify-between text-[11px] font-mono text-[#7B8494]">
                   <span>
                     {activePool?.symbolA}: {fmtUnits(clmmWalletBalA, 4)}
@@ -832,6 +864,14 @@ export const EarnWorkspace: React.FC<EarnWorkspaceProps> = ({
                   </span>
                 </div>
               </div>
+
+              {account?.address &&
+                activePool &&
+                (clmmWalletBalA <= 0 || clmmWalletBalB <= 0) && (
+                  <div className="rounded-lg bg-[#2B7FFF]/10 border border-[#2B7FFF]/30 px-3 py-2 text-[11px] text-[#93C5FD]">
+                    CLMM in-range liquidity requires both {activePool.symbolA} and {activePool.symbolB}. Swap into the missing token in the Swap tab or select a pair you hold both sides of (e.g. USDC / SUI).
+                  </div>
+                )}
 
               {/* Required Pair Quote */}
               <div className="bg-[#0C0E13] rounded-lg p-3 border border-[#232B3B] space-y-1.5 text-xs font-mono">

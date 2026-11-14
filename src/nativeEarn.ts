@@ -5,6 +5,7 @@ import {
   LENDING_MARKET_TYPE,
   calculateDepositAprPercent,
   calculateUtilizationPercent,
+  decimalToBigNumber,
 } from '@suilend/sdk';
 import { Transaction } from '@mysten/sui/transactions';
 import { normalizeStructTag } from '@mysten/sui/utils';
@@ -78,6 +79,13 @@ const TOKEN_LOGO_FALLBACK: Record<string, string> = {
   SCA: '/tokens/sca.svg',
   NS: '/tokens/ns.svg',
   SEND: '/tokens/send.svg',
+  USDSUI: '/tokens/usdc.svg',
+  ETH: '/tokens/eth.svg',
+  WETH: '/tokens/eth.svg',
+  WBTC: '/tokens/btc.svg',
+  XBTC: '/tokens/btc.svg',
+  LBTC: '/tokens/btc.svg',
+  USDT: '/tokens/usdt.svg',
 };
 
 function resolveTokenDisplay(coinType: string): {
@@ -100,6 +108,42 @@ function resolveTokenDisplay(coinType: string): {
 
 export const CURATED_CETUS_POOLS: CetusClmmPoolMeta[] = [
   {
+    poolId: '0x440e5e3b13b8220c5c338bb5a4291cab5c58064eaf3654c77f3e9aed5147689c',
+    name: 'USDSUI / SUI (0.2%)',
+    symbolA: 'USDSUI',
+    symbolB: 'SUI',
+    decimalsA: 6,
+    decimalsB: 9,
+    feePct: 0.2,
+    priceBaseCoin: 'coin_b',
+    logoA: '/tokens/usdc.svg',
+    logoB: '/tokens/sui.svg',
+  },
+  {
+    poolId: '0xf4238fa592c9ed7f148fd091cb2c4147cb15ad81b797115ce42971923ebf6e4c',
+    name: 'WAL / SUI (0.05%)',
+    symbolA: 'WAL',
+    symbolB: 'SUI',
+    decimalsA: 9,
+    decimalsB: 9,
+    feePct: 0.05,
+    priceBaseCoin: 'coin_a',
+    logoA: '/tokens/wal.svg',
+    logoB: '/tokens/sui.svg',
+  },
+  {
+    poolId: '0x72f5c6eef73d77de271886219a2543e7c29a33de19a6c69c5cf1899f729c3f17',
+    name: 'WAL / SUI (0.25%)',
+    symbolA: 'WAL',
+    symbolB: 'SUI',
+    decimalsA: 9,
+    decimalsB: 9,
+    feePct: 0.25,
+    priceBaseCoin: 'coin_a',
+    logoA: '/tokens/wal.svg',
+    logoB: '/tokens/sui.svg',
+  },
+  {
     poolId: '0xb8d7d9e66a60c239e7a60110efcf8de6c705580ed924d0dde141f4a0e2c90105',
     name: 'USDC / SUI (0.25%)',
     symbolA: 'USDC',
@@ -112,15 +156,15 @@ export const CURATED_CETUS_POOLS: CetusClmmPoolMeta[] = [
     logoB: '/tokens/sui.svg',
   },
   {
-    poolId: '0x51e883ba7c0b566a26cbc8a94cd33eb0abd418a77cc1e60ad22fd9b1f29cd2ab',
-    name: 'USDC / SUI (0.05%)',
-    symbolA: 'USDC',
+    poolId: '0x763f63cbada3a932c46972c6c6dcf1abd8a9a73331908a1d7ef24c2232d85520',
+    name: 'NS / SUI (0.25%)',
+    symbolA: 'NS',
     symbolB: 'SUI',
     decimalsA: 6,
     decimalsB: 9,
-    feePct: 0.05,
-    priceBaseCoin: 'coin_b',
-    logoA: '/tokens/usdc.svg',
+    feePct: 0.25,
+    priceBaseCoin: 'coin_a',
+    logoA: '/tokens/ns.svg',
     logoB: '/tokens/sui.svg',
   },
   {
@@ -131,32 +175,56 @@ export const CURATED_CETUS_POOLS: CetusClmmPoolMeta[] = [
     decimalsA: 6,
     decimalsB: 9,
     feePct: 0.05,
-    priceBaseCoin: 'coin_b',
+    priceBaseCoin: 'coin_a',
     logoA: '/tokens/deep.svg',
     logoB: '/tokens/sui.svg',
   },
   {
-    poolId: '0x4c50ba9d1e60d229800293a4222851c9c3f797aa5ba8a8d32cc67ec7e79fec60',
-    name: 'USDC / BUCK (0.01%)',
-    symbolA: 'USDC',
-    symbolB: 'BUCK',
+    poolId: '0xa2f4e24dc234cf024bae1bd5b1275ab5bdc7c28dd1ec84dd98c2d012bbd315f0',
+    name: 'DEEP / USDC (0.05%)',
+    symbolA: 'DEEP',
+    symbolB: 'USDC',
     decimalsA: 6,
-    decimalsB: 9,
-    feePct: 0.01,
-    priceBaseCoin: 'coin_b',
-    logoA: '/tokens/usdc.svg',
-    logoB: '/tokens/buck.svg',
+    decimalsB: 6,
+    feePct: 0.05,
+    priceBaseCoin: 'coin_a',
+    logoA: '/tokens/deep.svg',
+    logoB: '/tokens/usdc.svg',
   },
   {
-    poolId: '0x59cf0d333464ad29443d92bfd2ddfd1f794c5830141a5ee4a815d1ef3395bf6c',
-    name: 'BUCK / SUI (0.05%)',
-    symbolA: 'BUCK',
+    poolId: '0xe01243f37f712ef87e556afb9b1d03d0fae13f96d324ec912daffc339dfdcbd2',
+    name: 'DEEP / SUI (0.25%)',
+    symbolA: 'DEEP',
     symbolB: 'SUI',
-    decimalsA: 9,
+    decimalsA: 6,
+    decimalsB: 9,
+    feePct: 0.25,
+    priceBaseCoin: 'coin_a',
+    logoA: '/tokens/deep.svg',
+    logoB: '/tokens/sui.svg',
+  },
+  {
+    poolId: '0x9e59de50d9e5979fc03ac5bcacdb581c823dbd27d63a036131e17b391f2fac88',
+    name: 'USDC / ETH (0.25%)',
+    symbolA: 'USDC',
+    symbolB: 'ETH',
+    decimalsA: 6,
+    decimalsB: 8,
+    feePct: 0.25,
+    priceBaseCoin: 'coin_b',
+    logoA: '/tokens/usdc.svg',
+    logoB: '/tokens/eth.svg',
+  },
+  {
+    poolId: '0x51e883ba7c0b566a26cbc8a94cd33eb0abd418a77cc1e60ad22fd9b1f29cd2ab',
+    name: 'USDC / SUI (0.05%)',
+    symbolA: 'USDC',
+    symbolB: 'SUI',
+    decimalsA: 6,
     decimalsB: 9,
     feePct: 0.05,
     priceBaseCoin: 'coin_b',
-    logoA: '/tokens/buck.svg',
+    logoA: '/tokens/usdc.svg',
     logoB: '/tokens/sui.svg',
   },
 ];
@@ -233,7 +301,7 @@ export async function fetchCetusClmmPools(): Promise<CetusClmmPoolLive[]> {
     const symPair = `${meta.symbolA}-${meta.symbolB}`.toUpperCase();
     const llamaMatch = llamaCetus
       .filter((p) => String(p.symbol || '').toUpperCase() === symPair)
-      .sort((a, b) => Math.abs((b.tvlUsd || 0) - tvlUsd) - Math.abs((a.tvlUsd || 0) - tvlUsd))[0];
+      .sort((a, b) => Math.abs((a.tvlUsd || 0) - tvlUsd) - Math.abs((b.tvlUsd || 0) - tvlUsd))[0];
 
     const totalApyPct = Math.max(feeAprPct, Number(llamaMatch?.apy || 0));
     const currentPrice = computePriceFromSqrtX64(
@@ -254,7 +322,7 @@ export async function fetchCetusClmmPools(): Promise<CetusClmmPoolLive[]> {
     });
   });
 
-  return results;
+  return results.sort((a, b) => b.totalApyPct - a.totalApyPct);
 }
 
 export async function fetchUserCetusPositions(
@@ -400,19 +468,6 @@ export async function buildCetusRemoveLiquidityTx(params: {
 // SUILEND OFFICIAL LENDING SDK (@suilend/sdk)
 // ============================================================================
 
-function parseSuilendDecimal(val: any): number {
-  if (!val) return 0;
-  try {
-    // Suilend Decimal structs store { value: bigint } scaled by 1e18
-    if (typeof val === 'object' && 'value' in val) {
-      return Number(val.value) / 1e18;
-    }
-    return Number(val) || 0;
-  } catch {
-    return 0;
-  }
-}
-
 export async function fetchSuilendReserves(): Promise<SuilendReserveLive[]> {
   const client = await SuilendClient.initialize(
     LENDING_MARKET_ID,
@@ -420,26 +475,28 @@ export async function fetchSuilendReserves(): Promise<SuilendReserveLive[]> {
     suiGrpcClient as any
   );
 
-  const reserves: SuilendReserveLive[] = [];
+  const rawReserves: SuilendReserveLive[] = [];
   for (const r of client.lendingMarket.reserves) {
     const coinType = normalizeStructTag(r.coinType);
-    const meta = resolveTokenDisplay(coinType);
+    if (coinType.toLowerCase().includes('::fud::fud')) continue;
+
     const decimals = Number(r.mintDecimals || 9);
     const scale = Math.pow(10, decimals);
 
     const availHuman = Number(r.availableAmount || 0) / scale;
-    const borrowedHuman = parseSuilendDecimal(r.borrowedAmount);
+    const borrowedHuman = decimalToBigNumber(r.borrowedAmount).toNumber() / scale;
     const totalDepositHuman = availHuman + borrowedHuman;
-    const priceUsd = parseSuilendDecimal(r.price);
+    const priceUsd = decimalToBigNumber(r.price).toNumber();
     const tvlUsd = totalDepositHuman * priceUsd;
 
     const depositAprPct = calculateDepositAprPercent(r).toNumber();
     const utilizationPct = calculateUtilizationPercent(r).toNumber();
     const depositLimitUsd = Number((r.config as any)?.element?.depositLimitUsd || 0);
 
-    if (tvlUsd < 20_000) continue;
+    if (tvlUsd < 10_000 || depositAprPct <= 0.01) continue;
 
-    reserves.push({
+    const meta = resolveTokenDisplay(coinType);
+    rawReserves.push({
       coinType,
       symbol: meta.symbol,
       name: meta.name,
@@ -454,7 +511,33 @@ export async function fetchSuilendReserves(): Promise<SuilendReserveLive[]> {
     });
   }
 
-  return reserves.sort((a, b) => b.tvlUsd - a.tvlUsd);
+  const top7 = rawReserves
+    .sort((a, b) => b.depositAprPct - a.depositAprPct)
+    .slice(0, 7);
+
+  // Resolve real on-chain symbol/name for generic ::coin::COIN reserves
+  await Promise.all(
+    top7.map(async (item) => {
+      if (item.symbol === 'COIN' || item.name.endsWith(' Reserve')) {
+        try {
+          const metaRes = await suiGrpcClient.core.getCoinMetadata({ coinType: item.coinType });
+          const sym = metaRes?.coinMetadata?.symbol?.trim();
+          const name = metaRes?.coinMetadata?.name?.trim();
+          if (sym) {
+            item.symbol = sym.toUpperCase();
+            item.logo = TOKEN_LOGO_FALLBACK[item.symbol] || item.logo;
+          }
+          if (name) {
+            item.name = name;
+          }
+        } catch {
+          // ignore metadata fetch failure
+        }
+      }
+    })
+  );
+
+  return top7;
 }
 
 export async function fetchUserSuilendPositions(owner: string): Promise<SuilendUserState> {
@@ -487,11 +570,12 @@ export async function fetchUserSuilendPositions(owner: string): Promise<SuilendU
       if (!reserve) continue;
       const coinType = normalizeStructTag(reserve.coinType);
       const dec = Number(reserve.mintDecimals || 9);
+      const scale = Math.pow(10, dec);
       const cTokenRatio =
         Number(reserve.ctokenSupply || 0) > 0
-          ? (Number(reserve.availableAmount || 0) / Math.pow(10, dec) +
-              parseSuilendDecimal(reserve.borrowedAmount)) /
-            (Number(reserve.ctokenSupply) / Math.pow(10, dec))
+          ? (Number(reserve.availableAmount || 0) / scale +
+              decimalToBigNumber(reserve.borrowedAmount).toNumber() / scale) /
+            (Number(reserve.ctokenSupply) / scale)
           : 1;
       const depositedHuman =
         (Number(dep.depositedCtokenAmount || 0) / Math.pow(10, dec)) * cTokenRatio;
