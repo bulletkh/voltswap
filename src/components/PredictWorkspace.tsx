@@ -149,7 +149,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
   const [lowerStrikeInput, setLowerStrikeInput] = useState<string>('');
   const [upperStrikeInput, setUpperStrikeInput] = useState<string>('');
   const [rangePickStep, setRangePickStep] = useState<'lower' | 'upper'>('lower');
-  const [amountInput, setAmountInput] = useState<string>('5');
+  const [amountInput, setAmountInput] = useState<string>('1.5');
   const [isCustomAmountOpen, setIsCustomAmountOpen] = useState<boolean>(false);
   const [slippageCents, setSlippageCents] = useState<number | 'auto'>('auto');
 
@@ -965,7 +965,13 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    disabled={isSubmitting || !simpleMarket || !simpleUpReady || !account}
+                    disabled={
+                      isSubmitting ||
+                      !simpleMarket ||
+                      !simpleUpReady ||
+                      !account ||
+                      !simpleCanCoverAmount
+                    }
                     onClick={() => handleSimpleBet('up')}
                     className="rounded-lg border border-[#08D189]/40 bg-[#08D189]/12 hover:bg-[#08D189]/22 disabled:opacity-45 disabled:cursor-not-allowed py-2.5 px-3 flex flex-col items-center justify-center transition-all"
                   >
@@ -986,7 +992,13 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
 
                   <button
                     type="button"
-                    disabled={isSubmitting || !simpleMarket || !simpleDownReady || !account}
+                    disabled={
+                      isSubmitting ||
+                      !simpleMarket ||
+                      !simpleDownReady ||
+                      !account ||
+                      !simpleCanCoverAmount
+                    }
                     onClick={() => handleSimpleBet('down')}
                     className="rounded-lg border border-[#F0525E]/40 bg-[#F0525E]/12 hover:bg-[#F0525E]/22 disabled:opacity-45 disabled:cursor-not-allowed py-2.5 px-3 flex flex-col items-center justify-center transition-all"
                   >
@@ -1005,6 +1017,27 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                     </span>
                   </button>
                 </div>
+
+                {simpleMarket && (!simpleUpReady || !simpleDownReady) && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] text-amber-200 flex items-center justify-between gap-2">
+                    <span className="leading-snug">
+                      {simpleMarket.referencePrice == null
+                        ? 'Round reference price pending. Play an active OTM strike in Trader mode:'
+                        : 'Side locked (>50% or <15% band at round ref). Play OTM strike:'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedMarketId(simpleMarket.market.id);
+                        setSide(!simpleUpReady && simpleDownReady ? 'down' : 'up');
+                        setPredictMode('trader');
+                      }}
+                      className="shrink-0 px-2 py-1 rounded bg-[#2B7FFF]/25 border border-[#2B7FFF]/50 text-[#93C5FD] hover:bg-[#2B7FFF]/35 font-semibold text-[10px] whitespace-nowrap"
+                    >
+                      Trader Auto-fit
+                    </button>
+                  </div>
+                )}
 
                 {/* Enable 1-Click Trading */}
                 <div className="flex items-center justify-center">
@@ -1040,7 +1073,7 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                 {/* Quick Amount Chips + Balance */}
                 <div className="flex items-center justify-between gap-2 pt-0.5">
                   <div className="flex items-center gap-1.5">
-                    {['5', '10', '25'].map((v) => (
+                    {['1.5', '5', '10', '25'].map((v) => (
                       <button
                         key={v}
                         type="button"
@@ -1102,7 +1135,23 @@ export const PredictWorkspace: React.FC<PredictWorkspaceProps> = ({
                     <div>
                       <div className="font-semibold text-white">Insufficient USDC balance</div>
                       <div className="text-slate-400">
-                        Lower the size or{' '}
+                        {availableUsdc + walletUsdc >= PREDICT_ORDER_USD_MIN ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const maxBet = Math.floor((availableUsdc + walletUsdc) * 100) / 100;
+                                setAmountInput(maxBet.toFixed(2));
+                              }}
+                              className="text-[#60A5FA] hover:underline font-medium"
+                            >
+                              Use ${(Math.floor((availableUsdc + walletUsdc) * 100) / 100).toFixed(2)}
+                            </button>{' '}
+                            or{' '}
+                          </>
+                        ) : (
+                          'Lower the size or '
+                        )}
                         <button
                           type="button"
                           onClick={() => {
