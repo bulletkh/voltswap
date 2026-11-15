@@ -27,7 +27,12 @@ import {
   safeNormalizeCoinType,
 } from '../suiClient';
 import { simulateTxBeforeWallet } from '../suiSimulate';
-import { buildBestSwapTx, fetchBestSwapQuote, type SmartSwapQuote } from '../smartSwap';
+import {
+  buildBestSwapTx,
+  fetchBestSwapQuote,
+  type SmartSwapQuote,
+  type SwapRouterProvider,
+} from '../smartSwap';
 import {
   addWalletVolumeUsd,
   calcFeeUnits,
@@ -80,6 +85,32 @@ interface SwapWorkspaceProps {
 }
 
 const SUI_TOKENS = POPULAR_TOKENS.filter((t) => t.chain === 'sui');
+
+const STABLE_SWAP_SYMBOLS = new Set([
+  'USDC',
+  'USDT',
+  'WUSDC',
+  'WUSDT',
+  'USDSUI',
+  'AUSD',
+  'BUCK',
+  'FDUSD',
+  'USDY',
+]);
+
+const ROUTER_LABELS: Record<SwapRouterProvider, string> = {
+  FlowX: 'FlowX Aggregator',
+  Cetus: 'Cetus Aggregator',
+  Aftermath: 'Aftermath Router',
+  Bluefin7k: 'Bluefin7k Meta',
+};
+
+const ROUTER_SHORT_LABELS: Record<SwapRouterProvider, string> = {
+  FlowX: 'FlowX Meta',
+  Cetus: 'Cetus Agg',
+  Aftermath: 'Aftermath',
+  Bluefin7k: 'Bluefin7k',
+};
 
 export const AGGREGATED_PROTOCOLS = [
   { id: 'cetus', name: 'Cetus CLMM', note: 'Concentrated AMM' },
@@ -286,6 +317,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
     [walletVolumeUsd, activeReferrer]
   );
   const refTier = useMemo(() => resolveReferralTier(walletVolumeUsd), [walletVolumeUsd]);
+  const isStableSwapPair =
+    STABLE_SWAP_SYMBOLS.has(fromToken.symbol.toUpperCase()) &&
+    STABLE_SWAP_SYMBOLS.has(toToken.symbol.toUpperCase());
+  const effectiveSwapFeeRate = isStableSwapPair ? 0 : traderTier.marketFeeRate;
 
   const refreshBalances = useCallback(async () => {
     if (!account?.address) {
@@ -324,7 +359,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           fromCoinType: fromToken.address,
           toCoinType: toToken.address,
           amountInAtomic: atomic,
-          feeRate: traderTier.feeRate,
+          feeRate: effectiveSwapFeeRate,
         });
         if (!cancelled) setQuote(q);
       } catch (err: any) {
@@ -341,7 +376,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [mode, amountIn, fromToken, toToken, traderTier.feeRate]);
+  }, [mode, amountIn, fromToken, toToken, effectiveSwapFeeRate]);
 
   // Load DeepBook v3 Pools & native Spot Referral caps once
   useEffect(() => {
@@ -777,22 +812,30 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
 
       let sim = await simulateTxBeforeWallet(tx, { sender: account.address });
       if (!sim.ok) {
-        const fallbackQuote: SmartSwapQuote | null =
-          quote.provider === 'Cetus' && quote.aftermathRoute
-            ? { ...quote, provider: 'Aftermath' }
-            : quote.provider === 'Aftermath' && quote.cetusQuote
-              ? { ...quote, provider: 'Cetus' }
-              : null;
-        if (fallbackQuote) {
-          tx = await buildBestSwapTx({
-            sender: account.address,
-            fromCoinType: fromToken.address,
-            amountInAtomic: atomic,
-            quote: fallbackQuote,
-            slippage: slippagePct / 100,
-            refSharePct: refTier.revSharePct,
-          });
-          sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+        const backups = quote.alternatives
+          .filter((a) => a.amountOutAtomic > 0n && a.provider !== quote.provider)
+          .sort((a, b) => (b.amountOutAtomic > a.amountOutAtomic ? 1 : -1));
+        for (const backup of backups) {
+          try {
+            const fallbackQuote: SmartSwapQuote = {
+              ...quote,
+              provider: backup.provider,
+              amountOutAtomic: backup.amountOutAtomic,
+              dexHops: backup.dexHops,
+            };
+            tx = await buildBestSwapTx({
+              sender: account.address,
+              fromCoinType: fromToken.address,
+              amountInAtomic: atomic,
+              quote: fallbackQuote,
+              slippage: slippagePct / 100,
+              refSharePct: refTier.revSharePct,
+            });
+            sim = await simulateTxBeforeWallet(tx, { sender: account.address });
+            if (sim.ok) break;
+          } catch {
+            // Try next fallback router
+          }
         }
       }
       if (!sim.ok) {
@@ -824,7 +867,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
           fromAmount: amountIn,
           toAmount: formattedOut,
           volumeUsd: estUsd,
-          feeRate: traderTier.feeRate,
+          feeRate: effectiveSwapFeeRate,
           tierName: traderTier.name,
           tierEmoji: traderTier.badgeEmoji,
           swapMode: 'MARKET',
@@ -1305,9 +1348,12 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   </button>
                   <span
                     className="px-2 py-1 rounded-md bg-[#080B10] border border-[#2D374B] text-[11px] font-mono text-slate-300"
-                    title={`Trader Tier: ${traderTier.name}`}
+                    title={`Trader Tier: ${traderTier.name} (${swapCardTab === 'market' ? 'Market Swap' : 'Limit / CLOB'})`}
                   >
-                    {traderTier.badgeEmoji} <span className="text-[#60A5FA] font-bold">{(traderTier.feeRate * 100).toFixed(2)}%</span>
+                    {traderTier.badgeEmoji}{' '}
+                    <span className="text-[#60A5FA] font-bold">
+                      {((swapCardTab === 'market' ? effectiveSwapFeeRate : traderTier.feeRate) * 100).toFixed(2)}%
+                    </span>
                   </span>
                   {activeReferrer && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#08D189]/10 border border-[#08D189]/35 text-[10px] font-mono text-[#08D189] font-semibold">
@@ -1548,7 +1594,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                       {quote ? (
                         <div className="flex items-center gap-1.5">
                           <span className="px-2 py-0.5 rounded bg-[#2B7FFF]/15 text-[#60A5FA] border border-[#2B7FFF]/35 text-[11px] font-bold">
-                            {quote.provider === 'Cetus' ? 'Cetus Engine (incl. Bluefin/7K)' : 'Aftermath Engine'}
+                            {ROUTER_LABELS[quote.provider] || quote.provider}
                           </span>
                           {quote.savingsPct > 0.001 && (
                             <span className="text-[11px] font-bold text-[#08D189] bg-[#08D189]/15 border border-[#08D189]/30 px-1.5 py-0.5 rounded">
@@ -1586,7 +1632,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   {quote && quote.alternatives.some((a) => a.amountOutAtomic > 0n) && (
                     <div className="pt-1 border-t border-[#1F2735]">
                       <div className="text-[11px] text-slate-400 mb-1.5 flex items-center justify-between">
-                        <span>Quotes Race (Live Comparison)</span>
+                        <span>Quotes Race (Live 4-Router)</span>
                         <span className="text-[10px] text-slate-500">Auto-routed to best</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -1596,9 +1642,11 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                             alt.amountOutAtomic > 0n
                               ? Number(alt.amountOutAtomic) / Math.pow(10, toToken.decimals)
                               : 0;
+                          const missLabel = alt.error?.toLowerCase().includes('key') ? 'Partner Key' : 'No Route';
                           return (
                             <div
                               key={alt.provider}
+                              title={alt.error || undefined}
                               className={`p-2 rounded-lg border transition-all ${
                                 isWinner
                                   ? 'bg-[#2B7FFF]/10 border-[#2B7FFF]/50 text-white'
@@ -1607,7 +1655,7 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                             >
                               <div className="flex items-center justify-between text-[11px] mb-0.5">
                                 <span className={isWinner ? 'text-[#60A5FA] font-bold' : 'text-slate-400'}>
-                                  {alt.provider === 'Cetus' ? 'Cetus + Bluefin/7K' : 'Aftermath Router'}
+                                  {ROUTER_SHORT_LABELS[alt.provider] || alt.provider}
                                 </span>
                                 {isWinner && (
                                   <span className="text-[9px] font-bold text-[#08D189] bg-[#08D189]/15 px-1 py-0.2 rounded uppercase">
@@ -1616,8 +1664,10 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                                 )}
                               </div>
                               <div className="text-xs font-bold font-mono text-white">
-                                {outVal > 0 ? (outVal >= 1 ? outVal.toFixed(4) : outVal.toFixed(6)) : 'No Route'}{' '}
-                                <span className="text-[10px] text-slate-400 font-normal">{toToken.symbol}</span>
+                                {outVal > 0 ? (outVal >= 1 ? outVal.toFixed(4) : outVal.toFixed(6)) : missLabel}{' '}
+                                {outVal > 0 && (
+                                  <span className="text-[10px] text-slate-400 font-normal">{toToken.symbol}</span>
+                                )}
                               </div>
                             </div>
                           );
@@ -1629,10 +1679,16 @@ export const SwapWorkspace: React.FC<SwapWorkspaceProps> = ({
                   {/* Fee & Slippage info */}
                   <div className="pt-1 border-t border-[#1F2735] space-y-1">
                     <div className="flex justify-between text-slate-400">
-                      <span>Volt Tier Fee ({traderTier.name})</span>
+                      <span>Volt Swap Fee ({isStableSwapPair ? 'Stable Pair' : traderTier.name})</span>
                       <span className="text-[#60A5FA] font-semibold tabular-nums">
-                        {(traderTier.feeRate * 100).toFixed(2)}%
-                        {activeReferrer ? ` (${Math.round(refTier.revSharePct * 100)}% → Ref)` : ''}
+                        {isStableSwapPair ? (
+                          <span className="text-[#08D189]">0.00% (Free)</span>
+                        ) : (
+                          <>
+                            {(effectiveSwapFeeRate * 100).toFixed(2)}%
+                            {activeReferrer ? ` (${Math.round(refTier.revSharePct * 100)}% → Ref)` : ''}
+                          </>
+                        )}
                       </span>
                     </div>
                     {quote && (

@@ -344,16 +344,16 @@ export const TRADER_TIERS: TraderTierConfig[] = [
     badgeEmoji: '⚪',
     minVolumeUsd: 0,
     nextTierVolumeUsd: 1000,
-    feeRate: 0.0025,
-    marketFeeRate: 0.0025,
-    smartFeeRate: 0.0025,
+    feeRate: 0.0015,
+    marketFeeRate: 0.0005,
+    smartFeeRate: 0.0005,
     discountPct: 0,
     badgeBg: 'bg-white/5',
     badgeBorder: 'border-white/10',
     badgeText: 'text-gray-400',
     badgeGlow: '',
-    tagline: 'Standard base tier for new wallets without active referral or volume',
-    perks: ['Standard PTB DEX routing across 10 Sui pools', 'Live Whale Radar preview']
+    tagline: 'Ultra-low 0.05% Market Swap (0.00% stables) · 0.15% Perps/CLOB',
+    perks: ['0.05% Market Swap (10x cheaper than wallet swaps)', '0.00% Stablecoin Swaps (USDC/USDT/USDSUI)', '4-Router Meta-Aggregation (Cetus + FlowX + Aftermath + Bluefin7k)']
   },
   {
     id: 'plankton',
@@ -361,16 +361,16 @@ export const TRADER_TIERS: TraderTierConfig[] = [
     badgeEmoji: '🦐',
     minVolumeUsd: 1000,
     nextTierVolumeUsd: 10000,
-    feeRate: 0.0020,
-    marketFeeRate: 0.0020,
-    smartFeeRate: 0.0020,
+    feeRate: 0.0012,
+    marketFeeRate: 0.0004,
+    smartFeeRate: 0.0004,
     discountPct: 20,
     badgeBg: 'bg-emerald-500/10',
     badgeBorder: 'border-emerald-500/25',
     badgeText: 'text-emerald-400',
     badgeGlow: 'shadow-[0_0_15px_rgba(16,185,129,0.2)]',
     tagline: 'Unlocked via Referral Link, Social Follow or $1,000 Volume',
-    perks: ['-20% Fee Discount (0.20% flat rate)', 'Full Whale Tape & Cross-DEX Arb Access', 'Community Discord access']
+    perks: ['-20% Rebate (0.04% Swap · 0.12% Perps/CLOB)', '0.00% Stablecoin Swaps', 'Full Whale Radar & Cross-DEX Arb Access']
   },
   {
     id: 'dolphin',
@@ -378,16 +378,16 @@ export const TRADER_TIERS: TraderTierConfig[] = [
     badgeEmoji: '🐬',
     minVolumeUsd: 10000,
     nextTierVolumeUsd: 50000,
-    feeRate: 0.0015,
-    marketFeeRate: 0.0015,
-    smartFeeRate: 0.0015,
+    feeRate: 0.0009,
+    marketFeeRate: 0.0003,
+    smartFeeRate: 0.0003,
     discountPct: 40,
     badgeBg: 'bg-cyan-500/10',
     badgeBorder: 'border-cyan-500/25',
     badgeText: 'text-cyan-400',
     badgeGlow: 'shadow-[0_0_15px_rgba(56,189,248,0.25)]',
     tagline: 'Active Scalper ($10,000 – $50,000 volume)',
-    perks: ['-40% Fee Discount (0.15% flat rate)', 'Dolphin Badge in Terminal', 'Priority Route Splitting']
+    perks: ['-40% Rebate (0.03% Swap · 0.09% Perps/CLOB)', 'Dolphin Badge in Terminal', 'Priority 4-Router Route Splitting']
   },
   {
     id: 'shark',
@@ -395,16 +395,16 @@ export const TRADER_TIERS: TraderTierConfig[] = [
     badgeEmoji: '🦈',
     minVolumeUsd: 50000,
     nextTierVolumeUsd: 250000,
-    feeRate: 0.0010,
-    marketFeeRate: 0.0010,
-    smartFeeRate: 0.0010,
+    feeRate: 0.0006,
+    marketFeeRate: 0.0002,
+    smartFeeRate: 0.0002,
     discountPct: 60,
     badgeBg: 'bg-purple-500/10',
     badgeBorder: 'border-purple-500/25',
     badgeText: 'text-purple-400',
     badgeGlow: 'shadow-[0_0_20px_rgba(168,85,247,0.3)]',
     tagline: 'High-Volume Pro Trader ($50,000 – $250,000 volume)',
-    perks: ['-60% Fee Discount (0.10% flat rate — DeepBook level)', 'Zero-Impact DeepBook v3 CLOB Routing', 'Alpha Telegram Whale Channel']
+    perks: ['-60% Rebate (0.02% Swap · 0.06% Perps/CLOB)', 'Zero-Impact DeepBook v3 CLOB Routing', 'VIP Leaderboard Eligibility']
   },
   {
     id: 'whale',
@@ -412,16 +412,16 @@ export const TRADER_TIERS: TraderTierConfig[] = [
     badgeEmoji: '🐋',
     minVolumeUsd: 250000,
     nextTierVolumeUsd: 1000000,
-    feeRate: 0.0006,
-    marketFeeRate: 0.0006,
-    smartFeeRate: 0.0006,
-    discountPct: 76,
+    feeRate: 0.0004,
+    marketFeeRate: 0.0001,
+    smartFeeRate: 0.0001,
+    discountPct: 80,
     badgeBg: 'bg-amber-500/15',
     badgeBorder: 'border-amber-500/40',
     badgeText: 'text-amber-400',
     badgeGlow: 'shadow-[0_0_25px_rgba(245,158,11,0.35)]',
     tagline: 'Heavy High-Roller ($250,000 – $1,000,000 volume)',
-    perks: ['-76% Fee Discount (0.06% flat rate)', 'Golden VIP Terminal Frame', 'Direct Syndicate Broker Integration']
+    perks: ['-80% Rebate (0.01% Swap · 0.04% Perps/CLOB)', 'Golden VIP Terminal Frame', 'Direct Syndicate Priority']
   },
   {
     id: 'leviathan',
@@ -430,14 +430,14 @@ export const TRADER_TIERS: TraderTierConfig[] = [
     minVolumeUsd: 1000000,
     nextTierVolumeUsd: null,
     feeRate: 0.0003,
-    marketFeeRate: 0.0003,
-    smartFeeRate: 0.0003,
-    discountPct: 88,
+    marketFeeRate: 0,
+    smartFeeRate: 0,
+    discountPct: 100,
     badgeBg: 'bg-gradient-to-r from-amber-500/20 via-volt/20 to-amber-500/20',
     badgeBorder: 'border-volt/60',
     badgeText: 'text-volt font-black',
     badgeGlow: 'shadow-[0_0_30px_rgba(56, 189, 248,0.4)]',
-    tagline: 'Apex $1M Syndicate Legend — Absolute Lowest Fees on Entire Sui Network',
-    perks: ['-88% Fee Discount (0.03% flat rate — Absolute Minimum on Sui)', 'Golden Crown VIP Terminal Status', 'Private Low-Latency RPC & Direct Move Execution']
+    tagline: 'Apex $1M Syndicate Legend — 0.00% Market Swap Fees on Entire Sui Network',
+    perks: ['0.00% Market Swap · 0.03% Perps/CLOB', 'Golden Crown VIP Terminal Status', 'Direct Low-Latency Move Execution']
   }
 ];

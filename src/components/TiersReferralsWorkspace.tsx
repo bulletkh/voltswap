@@ -111,7 +111,7 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
           </h1>
           <p className="text-sm text-slate-300 mt-0.5">
             {subTab === 'traders'
-              ? 'Volume-based fee rebates down to 0.03% across Market Swap, DeepBook Limit, Margin, Perps & Predict.'
+              ? 'Volume-based fee rebates down to 0.00% on Market Swap (0.00% stables) and 0.03% on Perps, Limit & Margin.'
               : 'Instant non-custodial PTB rev-share paid directly to your wallet on every referred trade.'}
           </p>
         </div>
@@ -216,12 +216,13 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
               </div>
 
               <div className="lg:col-span-2 panel-carbon-sub rounded-xl p-3.5 text-center border border-[#2B7FFF]/35">
-                <div className="text-xs text-[#8E98A8]">Your Protocol Fee</div>
-                <div className="text-2xl font-mono font-bold text-[#60A5FA] mt-0.5">
-                  {(traderTier.feeRate * 100).toFixed(2)}%
+                <div className="text-xs text-[#8E98A8]">Swap / Pro Fee</div>
+                <div className="text-xl font-mono font-bold text-[#60A5FA] mt-0.5 tabular-nums">
+                  {(traderTier.marketFeeRate * 100).toFixed(2)}%{' '}
+                  <span className="text-xs text-slate-400">/ {(traderTier.feeRate * 100).toFixed(2)}%</span>
                 </div>
-                <div className="text-xs text-[#08D189] font-mono">
-                  {traderTier.discountPct > 0 ? `-${traderTier.discountPct}% Rebate` : 'Base Rate'}
+                <div className="text-xs text-[#08D189] font-mono mt-0.5">
+                  {traderTier.discountPct > 0 ? `-${traderTier.discountPct}% Rebate` : '0.00% Stables'}
                 </div>
               </div>
             </div>
@@ -298,13 +299,19 @@ export const TiersReferralsWorkspace: React.FC<TiersReferralsWorkspaceProps> = (
                           </div>
                         </div>
                       </div>
-                      <span
-                        className={`text-base font-mono font-bold ${
-                          isActive ? 'text-[#60A5FA]' : 'text-white'
-                        }`}
-                      >
-                        {(tier.feeRate * 100).toFixed(2)}%
-                      </span>
+                      <div className="text-right">
+                        <div
+                          className={`text-sm font-mono font-bold tabular-nums ${
+                            isActive ? 'text-[#60A5FA]' : 'text-white'
+                          }`}
+                        >
+                          {(tier.marketFeeRate * 100).toFixed(2)}%{' '}
+                          <span className="text-[11px] font-normal text-slate-400">Swap</span>
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-400 tabular-nums">
+                          {(tier.feeRate * 100).toFixed(2)}% Pro
+                        </div>
+                      </div>
                     </div>
 
                     <p className="text-xs text-slate-300 leading-relaxed">{tier.tagline}</p>

@@ -7,6 +7,8 @@ export default defineConfig({
     alias: {
       'node:buffer': 'buffer',
       buffer: 'buffer',
+      'node:events': 'events',
+      events: 'events',
     },
   },
   server: {
