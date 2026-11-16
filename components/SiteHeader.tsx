@@ -1,7 +1,7 @@
 import "@/app/nav-portfolio.css";
 import { ConnectSlot } from "./ClientOnly";
 
-export function SiteHeader({ active }: { active: "swap" | "market" | "portfolio" }) {
+export function SiteHeader({ active }: { active: "swap" | "market" | "portfolio" | "whales" }) {
   return (
     <header className="topbar">
       <a className="brand" href="/" aria-label="Voltswap home">
@@ -14,6 +14,7 @@ export function SiteHeader({ active }: { active: "swap" | "market" | "portfolio"
         <a href="/" aria-current={active === "swap" ? "page" : undefined}>Swap</a>
         <a href="/market" aria-current={active === "market" ? "page" : undefined}>Market</a>
         <a href="/portfolio" aria-current={active === "portfolio" ? "page" : undefined}>Portfolio</a>
+        <a href="/whales" aria-current={active === "whales" ? "page" : undefined}>Radar</a>
       </nav>
       <ConnectSlot />
     </header>

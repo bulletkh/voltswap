@@ -42,3 +42,6 @@ button.mk-swap:disabled { opacity: 0.5; cursor: not-allowed; }
   .topbar { flex-wrap: wrap; gap: 8px; }
   .topnav { order: 3; width: 100%; margin: 0; }
 }
+.wh-filter { font-size: 14px; color: var(--muted); }
+.wh-filter select { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.pf-val a, .pf-name a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
