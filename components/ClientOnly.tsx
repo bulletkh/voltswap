@@ -22,3 +22,8 @@ export const SwapSlot = dynamic(() => import("./SwapPanel").then((m) => m.SwapPa
   ssr: false,
   loading: () => <section className="card card-ph" aria-busy="true" aria-label="Swap loading" />,
 });
+
+export const TokenSlot = dynamic(() => import("./TokenPanel").then((m) => m.TokenPanel), {
+  ssr: false,
+  loading: () => <section className="card card-ph" aria-busy="true" aria-label="Token loading" />,
+});

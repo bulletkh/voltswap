@@ -58,3 +58,19 @@ button.mk-swap:disabled { opacity: 0.5; cursor: not-allowed; }
   .wh-filter { width: 100%; }
   .wh-filter input[type=range] { flex: 1; width: auto; min-width: 0; }
 }
+
+.pairs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.pairs .chip { font-size: 13px; padding: 3px 10px; }
+
+.tk-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.tk-head > div { flex: 1; min-width: 160px; }
+.tk-title { font-size: 22px; margin: 0; }
+.tk-title span { color: var(--muted); font-size: 15px; font-weight: 500; }
+.tk-price { font-size: 20px; font-weight: 600; }
+.tk-chart { width: 100%; height: auto; display: block; margin: 8px 0 0; }
+.tk-sub { font-size: 16px; margin: 20px 0 4px; }
+
+.wh-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.wh-tools select { font: 500 14px var(--body); border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 5px 10px; }
+.wh-tabs { display: flex; gap: 6px; margin: 0 0 6px; }
+.pf-list[hidden] { display: none; }

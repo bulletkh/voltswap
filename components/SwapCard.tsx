@@ -28,6 +28,14 @@ function errorText(e: unknown): string {
   return m.length > 220 ? m.slice(0, 220) + "…" : m;
 }
 
+const HOT_PAIRS: [string, string][] = [
+  ["SUI", "USDC"],
+  ["USDC", "SUI"],
+  ["SUI", "DEEP"],
+  ["SUI", "WAL"],
+  ["SUI", "CETUS"],
+];
+
 export function SwapCard() {
   const account = useCurrentAccount();
   const client = useCurrentClient();
@@ -47,6 +55,36 @@ export function SwapCard() {
   const [prices, setPrices] = useState<Record<string, number | null>>({});
 
   useEffect(() => setCustom(loadCustomTokens()), []);
+
+  // ?from=SUI&to=USDC (by symbol) preselects a pair, e.g. links from token pages
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const find = (v: string | null) => (v ? TOKENS.find((t) => t.symbol.toLowerCase() === v.toLowerCase()) : undefined);
+      const f = find(q.get("from"));
+      const t = find(q.get("to"));
+      if (f && t && f.type !== t.type) {
+        setFrom(f);
+        setTo(t);
+      } else if (f && !t) {
+        setFrom(f);
+        if (f.type === TOKENS[1].type) setTo(TOKENS[0]);
+      } else if (t && !f) {
+        setTo(t);
+        if (t.type === TOKENS[0].type) setFrom(TOKENS[1]);
+      }
+    } catch {
+      /* ignore malformed query */
+    }
+  }, []);
+  function setPair(a: string, b: string) {
+    const f = TOKENS.find((t) => t.symbol === a);
+    const t = TOKENS.find((t) => t.symbol === b);
+    if (!f || !t) return;
+    setFrom(f);
+    setTo(t);
+    setAmount("");
+  }
   const tokens = useMemo(
     () => [...TOKENS, ...custom.filter((c) => !TOKENS.some((t) => t.type === c.type))],
     [custom],
@@ -205,6 +243,18 @@ export function SwapCard() {
 
   return (
     <section className="card" aria-label="Swap">
+      <div className="pairs" role="group" aria-label="Popular pairs">
+        {HOT_PAIRS.map(([a, b]) => (
+          <button
+            key={a + b}
+            type="button"
+            className={"chip" + (from.symbol === a && to.symbol === b ? " on" : "")}
+            onClick={() => setPair(a, b)}
+          >
+            {a} → {b}
+          </button>
+        ))}
+      </div>
       <div className="field">
         <div className="field-head">
           <label htmlFor="amount-in">You pay</label>

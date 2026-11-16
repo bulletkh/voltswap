@@ -138,7 +138,7 @@ export function MarketView() {
                   Remove
                 </button>
               ) : (
-                <a className="mk-swap" href="/">Swap</a>
+                <a className="mk-swap" href={`/token/${r.token.symbol}`}>Open</a>
               )}
             </li>
           ))}
