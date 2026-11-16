@@ -58,6 +58,22 @@ export function WhalesView() {
   const [alertAt, setAlertAt] = useState<number>(0); // 0 = off
   const seen = useRef<Set<string> | null>(null);
 
+  // shareable filters: /whales?token=DEEP&dex=Cetus&wallet=0x…
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setFToken(q.get("token") ?? "");
+    setFDex(q.get("dex") ?? "");
+    setFWallet(q.get("wallet") ?? "");
+  }, []);
+  useEffect(() => {
+    const q = new URLSearchParams();
+    if (fToken) q.set("token", fToken);
+    if (fDex) q.set("dex", fDex);
+    if (fWallet) q.set("wallet", fWallet);
+    const qs = q.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, [fToken, fDex, fWallet]);
+
   useEffect(() => {
     try {
       const v = Number(window.localStorage.getItem("voltswap:alert-usd"));

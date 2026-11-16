@@ -20,6 +20,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${t.name} (${t.symbol}) price and swap · Voltswap`,
     description: `Live ${t.symbol} price, 30-day chart and large swaps on Sui. Swap ${t.name} at the best route across Sui exchanges.`,
     alternates: { canonical: `/token/${t.symbol}` },
+    openGraph: { title: `${t.name} (${t.symbol}) · Voltswap`, description: `Live ${t.symbol} price and swap on Sui.`, url: `https://voltswap.org/token/${t.symbol}` },
+    twitter: { card: "summary_large_image", title: `${t.name} (${t.symbol}) · Voltswap` },
   };
 }
 

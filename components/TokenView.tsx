@@ -119,6 +119,9 @@ export function TokenView({ token }: { token: Token }) {
           </li>
         ))}
       </ul>
+      <p className="pf-note">
+        <a href={`/whales?token=${token.symbol}`}>See all {token.symbol} swaps on the radar →</a>
+      </p>
       <p className="pf-note">Prices from DeFiLlama. Informational only, not financial advice.</p>
     </section>
   );
