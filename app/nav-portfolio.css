@@ -74,3 +74,5 @@ button.mk-swap:disabled { opacity: 0.5; cursor: not-allowed; }
 .wh-tools select { font: 500 14px var(--body); border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 5px 10px; }
 .wh-tabs { display: flex; gap: 6px; margin: 0 0 6px; }
 .pf-list[hidden] { display: none; }
+
+.fav { background: none; border: 0; font-size: 20px; line-height: 1; cursor: pointer; color: #c79a00; padding: 0 2px; }

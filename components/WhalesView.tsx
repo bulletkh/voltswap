@@ -51,7 +51,7 @@ export function WhalesView() {
   const [level, setLevel] = useState(0);
   const min = LEVELS[level];
   const [now, setNow] = useState(() => Date.now());
-  const [tab, setTab] = useState<"feed" | "top">("feed");
+  const [tab, setTab] = useState<"feed" | "top" | "stats">("feed");
   const [fToken, setFToken] = useState("");
   const [fDex, setFDex] = useState("");
   const [fWallet, setFWallet] = useState("");
@@ -166,6 +166,24 @@ export function WhalesView() {
     return [...m.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 10);
   }, [filtered]);
 
+  const stats = useMemo(() => {
+    const dex = new Map<string, { usd: number; n: number }>();
+    const pair = new Map<string, number>();
+    for (const w of filtered) {
+      const d = dex.get(w.dex) ?? { usd: 0, n: 0 };
+      d.usd += w.usd;
+      d.n += 1;
+      dex.set(w.dex, d);
+      const k = `${w.inSym} → ${w.outSym}`;
+      pair.set(k, (pair.get(k) ?? 0) + w.usd);
+    }
+    return {
+      total: filtered.reduce((a, w) => a + w.usd, 0),
+      dex: [...dex.entries()].sort((a, b) => b[1].usd - a[1].usd),
+      pairs: [...pair.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
+    };
+  }, [filtered]);
+
   const tokenOpts = useMemo(() => [...new Set((items ?? []).flatMap((w) => [w.inSym, w.outSym]))].sort(), [items]);
   const dexOpts = useMemo(() => [...new Set((items ?? []).map((w) => w.dex))].sort(), [items]);
 
@@ -229,7 +247,41 @@ export function WhalesView() {
         <button type="button" role="tab" aria-selected={tab === "top"} className={"chip" + (tab === "top" ? " on" : "")} onClick={() => setTab("top")}>
           Top wallets
         </button>
+        <button type="button" role="tab" aria-selected={tab === "stats"} className={"chip" + (tab === "stats" ? " on" : "")} onClick={() => setTab("stats")}>
+          Stats
+        </button>
       </div>
+
+      {tab === "stats" && (
+        <div>
+          <p className="pf-note">
+            {filtered.length} large swaps worth {usd(stats.total)} in the last hour (current filters).
+          </p>
+          <ul className="pf-list">
+            {stats.dex.map(([d, v]) => (
+              <li key={d}>
+                <div className="pf-name">
+                  <strong>{d}</strong>
+                  <span>{v.n} swap{v.n > 1 ? "s" : ""}</span>
+                </div>
+                <div className="pf-val">
+                  <strong>{usd(v.usd)}</strong>
+                  <span>{stats.total ? Math.round((v.usd / stats.total) * 100) : 0}% of volume</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <h2 className="tk-sub">Busiest pairs</h2>
+          <ul className="pf-list">
+            {stats.pairs.map(([k, v]) => (
+              <li key={k}>
+                <div className="pf-name"><strong>{k}</strong></div>
+                <div className="pf-val"><strong>{usd(v)}</strong></div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {tab === "top" && (
         <ul className="pf-list">

@@ -49,6 +49,27 @@ export function MarketView() {
 
   useEffect(() => setCustom(loadCustomTokens()), []);
 
+  const [favs, setFavs] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(window.localStorage.getItem("voltswap:favs") ?? "[]");
+      if (Array.isArray(v)) setFavs(v.filter((x) => typeof x === "string"));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  function toggleFav(type: string) {
+    setFavs((prev) => {
+      const next = prev.includes(type) ? prev.filter((x) => x !== type) : [...prev, type];
+      try {
+        window.localStorage.setItem("voltswap:favs", JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
   const tokens = useMemo(
     () => [...TOKENS, ...custom.filter((c) => !TOKENS.some((t) => t.type === c.type))],
     [custom],
@@ -115,8 +136,17 @@ export function MarketView() {
 
       {rows && (
         <ul className="pf-list">
-          {rows.map((r) => (
+          {[...rows].sort((a, b) => Number(favs.includes(b.token.type)) - Number(favs.includes(a.token.type))).map((r) => (
             <li key={r.token.type}>
+              <button
+                type="button"
+                className="fav"
+                onClick={() => toggleFav(r.token.type)}
+                aria-pressed={favs.includes(r.token.type)}
+                aria-label={`${favs.includes(r.token.type) ? "Remove" : "Add"} ${r.token.symbol} ${favs.includes(r.token.type) ? "from" : "to"} favorites`}
+              >
+                {favs.includes(r.token.type) ? "★" : "☆"}
+              </button>
               <TokenIcon token={r.token} size={36} />
               <div className="pf-name">
                 <strong>{r.token.symbol}</strong>
