@@ -1,8 +1,36 @@
-// Free "whale radar": recent large Cetus swaps, read from Sui's public GraphQL and valued with DeFiLlama prices.
+// Free "whale radar": recent large Cetus, Bluefin and Momentum swaps, read from Sui's public GraphQL and valued with DeFiLlama prices.
 // State lives in module memory (one serverless instance); it is a live tape, not a permanent history.
 
 const GQL = "https://graphql.mainnet.sui.io/graphql";
-const CETUS_SWAP = "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb::pool::SwapEvent";
+
+type Swap = { pool: string; aToB: boolean; amountIn: string; amountOut: string };
+type Dex = { name: string; type: string; parse: (j: Record<string, unknown>) => Swap | null };
+
+const str = (v: unknown) => (typeof v === "string" || typeof v === "number" ? String(v) : "");
+
+// Event shapes were checked against live mainnet events.
+const DEXES: Dex[] = [
+  {
+    name: "Cetus",
+    type: "0x1eabed72c53feb3805120a081dc15963c204dc8d091542592abaf7a35689b2fb::pool::SwapEvent",
+    parse: (j) => (j.pool ? { pool: str(j.pool), aToB: j.atob === true || j.atob === "true", amountIn: str(j.amount_in), amountOut: str(j.amount_out) } : null),
+  },
+  {
+    name: "Bluefin",
+    type: "0x3492c874c1e3b3e2984e8c41b589e642d4d0a5d6459e5a9cfc2d52fd7c89c267::events::AssetSwap",
+    parse: (j) => (j.pool_id ? { pool: str(j.pool_id), aToB: j.a2b === true || j.a2b === "true", amountIn: str(j.amount_in), amountOut: str(j.amount_out) } : null),
+  },
+  {
+    // In Momentum's event amount_x / amount_y are the pool's X and Y sides; the input side is X when x_for_y.
+    name: "Momentum",
+    type: "0x70285592c97965e811e0c6f98dccc3a9c2b4ad854b3594faab9597ada267b860::trade::SwapEvent",
+    parse: (j) => {
+      if (!j.pool_id) return null;
+      const xForY = j.x_for_y === true || j.x_for_y === "true";
+      return { pool: str(j.pool_id), aToB: xForY, amountIn: xForY ? str(j.amount_x) : str(j.amount_y), amountOut: xForY ? str(j.amount_y) : str(j.amount_x) };
+    },
+  },
+];
 const LLAMA = "https://coins.llama.fi/prices/current/";
 
 export const FLOOR_USD = 1_000;
@@ -15,6 +43,7 @@ export type Whale = {
   id: string;
   t: number;
   digest: string;
+  dex: string;
   sender: string | null;
   inSym: string;
   inAmt: number;
@@ -33,9 +62,10 @@ type Price = { price: number; decimals: number; symbol: string; at: number };
 
 const state = {
   whales: new Map<string, Whale>(),
-  lastSeen: 0,
+  lastSeen: new Map<string, number>(),
   lastRun: 0,
-  warm: false,
+  warm: new Set<string>(),
+  warmAll: false,
   pools: new Map<string, [string, string] | null>(),
   prices: new Map<string, Price | null>(),
   inflight: null as Promise<void> | null,
@@ -113,38 +143,62 @@ async function loadPrices(types: string[]) {
   }
 }
 
-async function refresh() {
+type Fresh = { dex: Dex; node: Node; swap: Swap; t: number };
+
+async function fetchDex(dex: Dex): Promise<Fresh[]> {
   const pages: Node[][] = [];
   let before: string | null = null;
-  const maxPages = state.warm ? 4 : 16;
+  const seen = state.lastSeen.get(dex.name) ?? 0;
+  const maxPages = state.warm.has(dex.name) ? 4 : 16;
   for (let i = 0; i < maxPages; i++) {
     const d: {
       events: { pageInfo: { hasPreviousPage: boolean; startCursor: string | null }; nodes: Node[] };
-    } = await gql(EVENTS_Q, { t: CETUS_SWAP, b: before });
+    } = await gql(EVENTS_Q, { t: dex.type, b: before });
     pages.push(d.events.nodes);
     const oldest = d.events.nodes[0]?.timestamp ? Date.parse(d.events.nodes[0].timestamp) : 0;
     if (!d.events.pageInfo.hasPreviousPage || !d.events.pageInfo.startCursor) break;
-    if (state.lastSeen && oldest <= state.lastSeen) break;
+    if (seen && oldest <= seen) break;
     before = d.events.pageInfo.startCursor;
   }
-  const nodes = pages.flat().filter((n) => n.timestamp && n.contents && n.transaction);
-  const fresh = nodes.filter((n) => Date.parse(n.timestamp as string) > state.lastSeen - 2_000);
-  if (fresh.length === 0) {
-    state.warm = true;
-    return;
+  const out: Fresh[] = [];
+  for (const node of pages.flat()) {
+    if (!node.timestamp || !node.contents || !node.transaction) continue;
+    const t = Date.parse(node.timestamp);
+    if (t <= seen - 2_000) continue;
+    const swap = dex.parse(node.contents.json);
+    if (swap) out.push({ dex, node, swap, t });
   }
+  state.warm.add(dex.name);
+  return out;
+}
 
-  await loadPools([...new Set(fresh.map((n) => (n.contents as { json: Record<string, string> }).json.pool))]);
+async function refresh() {
+  const results = await Promise.allSettled(DEXES.map((d) => fetchDex(d)));
+  const fresh: Fresh[] = [];
+  let failed = 0;
+  let lastErr: unknown = null;
+  for (const r of results) {
+    if (r.status === "fulfilled") fresh.push(...r.value);
+    else {
+      failed++;
+      lastErr = r.reason;
+    }
+  }
+  if (failed === DEXES.length) throw lastErr instanceof Error ? lastErr : new Error("fetch failed");
+  state.warmAll = true;
+  if (fresh.length === 0) return;
+
+  await loadPools([...new Set(fresh.map((f) => f.swap.pool))]);
   const coinTypes = new Set<string>();
-  for (const n of fresh) {
-    const pair = state.pools.get((n.contents as { json: Record<string, string> }).json.pool);
+  for (const f of fresh) {
+    const pair = state.pools.get(f.swap.pool);
     if (pair) pair.forEach((c) => coinTypes.add(c));
   }
   await loadPrices([...coinTypes]);
 
   state.stats = {
     fresh: fresh.length,
-    scanned: nodes.length,
+    scanned: fresh.length,
     poolsOk: [...state.pools.values()].filter(Boolean).length,
     poolsNone: [...state.pools.values()].filter((v) => !v).length,
     pricesOk: [...state.prices.values()].filter(Boolean).length,
@@ -154,18 +208,17 @@ async function refresh() {
 
   // One row per transaction: keep the biggest hop (aggregator routes emit several swap events).
   const best = new Map<string, Whale>();
-  for (const n of fresh) {
-    const j = (n.contents as { json: Record<string, string> }).json;
-    const pair = state.pools.get(j.pool);
+  for (const f of fresh) {
+    const { swap } = f;
+    const pair = state.pools.get(swap.pool);
     if (!pair) continue;
-    const atob = j.atob === "true" || (j.atob as unknown) === true;
-    const inT = atob ? pair[0] : pair[1];
-    const outT = atob ? pair[1] : pair[0];
+    const inT = swap.aToB ? pair[0] : pair[1];
+    const outT = swap.aToB ? pair[1] : pair[0];
     const pin = state.prices.get(inT);
     const pout = state.prices.get(outT);
     if (!pin && !pout) continue;
-    const inAmt = pin ? Number(j.amount_in) / 10 ** pin.decimals : NaN;
-    const outAmt = pout ? Number(j.amount_out) / 10 ** pout.decimals : NaN;
+    const inAmt = pin ? Number(swap.amountIn) / 10 ** pin.decimals : NaN;
+    const outAmt = pout ? Number(swap.amountOut) / 10 ** pout.decimals : NaN;
     const inUsd = pin ? inAmt * pin.price : NaN;
     const outUsd = pout ? outAmt * pout.price : NaN;
     // Both sides priced: they must roughly agree, otherwise the price data for a thin token is unreliable.
@@ -173,12 +226,13 @@ async function refresh() {
     const usd = Number.isFinite(inUsd) ? inUsd : outUsd;
     if (Number.isFinite(usd) && usd > state.stats.maxUsd) state.stats.maxUsd = Math.round(usd);
     if (!Number.isFinite(usd) || usd < FLOOR_USD) continue;
-    const digest = (n.transaction as { digest: string }).digest;
+    const digest = (f.node.transaction as { digest: string }).digest;
     const row: Whale = {
-      id: `${digest}:${j.pool}`,
-      t: Date.parse(n.timestamp as string),
+      id: `${digest}:${swap.pool}`,
+      t: f.t,
       digest,
-      sender: n.transaction?.sender?.address ?? null,
+      dex: f.dex.name,
+      sender: f.node.transaction?.sender?.address ?? null,
       inSym: pin?.symbol ?? inT.split("::").pop() ?? "?",
       inAmt: Number.isFinite(inAmt) ? inAmt : 0,
       outSym: pout?.symbol ?? outT.split("::").pop() ?? "?",
@@ -190,8 +244,10 @@ async function refresh() {
   }
   for (const row of best.values()) state.whales.set(row.digest, row);
 
-  state.lastSeen = Math.max(state.lastSeen, ...fresh.map((n) => Date.parse(n.timestamp as string)));
-  state.warm = true;
+  for (const d of DEXES) {
+    const ts = fresh.filter((f) => f.dex === d).map((f) => f.t);
+    if (ts.length) state.lastSeen.set(d.name, Math.max(state.lastSeen.get(d.name) ?? 0, ...ts));
+  }
 
   const cutoff = Date.now() - KEEP_MS;
   const sorted = [...state.whales.values()].filter((w) => w.t >= cutoff).sort((a, b) => b.t - a.t).slice(0, MAX_KEEP);
@@ -212,7 +268,7 @@ export async function getWhales(): Promise<{ updated: number; floor: number; err
         state.inflight = null;
       });
   }
-  if (state.inflight && !state.warm) await state.inflight;
+  if (state.inflight && !state.warmAll) await state.inflight;
   return {
     updated: state.lastRun,
     floor: FLOOR_USD,

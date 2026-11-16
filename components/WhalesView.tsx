@@ -57,7 +57,7 @@ export function WhalesView() {
   return (
     <section className="card pf" aria-label="Whale radar">
       <div className="pf-head">
-        <span className="pf-label">Large swaps on Cetus</span>
+        <span className="pf-label">Large swaps on Sui</span>
         <label className="wh-filter">
           Min size{" "}
           <select value={min} onChange={(e) => setMin(Number(e.target.value))}>
@@ -84,7 +84,7 @@ export function WhalesView() {
                 {w.inSym} → {w.outSym}
               </strong>
               <span>
-                {amt(w.inAmt)} {w.inSym}
+                {w.dex} · {amt(w.inAmt)} {w.inSym}
                 {w.outAmt ? ` → ${amt(w.outAmt)} ${w.outSym}` : ""}
               </span>
             </div>
@@ -110,8 +110,8 @@ export function WhalesView() {
       </ul>
 
       <p className="pf-note">
-        A live feed of large swaps on Cetus pools, read from public Sui data and valued at market prices. It covers the
-        last hour, and only while the page is open does it update every few seconds. Swaps through other exchanges, and
+        A live feed of large swaps on Cetus, Bluefin and Momentum pools, read from public Sui data and valued at market prices. It covers the
+        last hour, and only while the page is open does it update every few seconds. Swaps through other exchanges (such as Turbos or DeepBook), and
         tokens without reliable prices, are not shown. Wallet addresses are public on-chain information; a large
         trade says nothing about what the trader will do next. Not financial advice.
       </p>
