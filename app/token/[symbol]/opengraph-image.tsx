@@ -38,9 +38,9 @@ export default async function Image({ params }: { params: Promise<{ symbol: stri
         </div>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={{ fontSize: 120, fontWeight: 700, letterSpacing: -3, lineHeight: 1 }}>{sym}</div>
-          <div style={{ marginTop: 16, fontSize: 48, color: "#44506b" }}>{name} price, chart and swap on Sui</div>
+          <div style={{ marginTop: 16, fontSize: 48, color: "#44506b" }}>{`${name} price, chart and swap on Sui`}</div>
         </div>
-        <div style={{ display: "flex", fontSize: 30, color: "#2447ff", fontWeight: 700 }}>voltswap.org/token/{sym}</div>
+        <div style={{ display: "flex", fontSize: 30, color: "#2447ff", fontWeight: 700 }}>{`voltswap.org/token/${sym}`}</div>
       </div>
     ),
     { ...size },
