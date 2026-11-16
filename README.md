@@ -1,76 +1,37 @@
-# VoltSwap ⚡
+# Voltswap — свап на Sui (MVP)
 
-> **Next-Generation Decentralized Exchange & Liquidity Protocol on Sui**
+Next.js 16 + актуальный dApp Kit (`@mysten/dapp-kit-react`) + агрегатор Cetus (`@cetusprotocol/aggregator-sdk`).
+Свои смарт-контракты не нужны: роутинг делает агрегатор, средства пользователей проходят только через его кошелёк.
 
-VoltSwap is a high-performance decentralized exchange (DEX), smart liquidity aggregator, and yield protocol built on the Sui blockchain. It combines concentrated liquidity routing, instant cross-DEX aggregation, automated fee compounding, and non-custodial yield vaults with institutional-grade UI/UX.
-
----
-
-## 🚀 Key Features
-
-* **Smart DEX Aggregation:** Instant optimal route discovery across Cetus CLMM, DeepBook v3, 7k, FlowX, and Aftermath with minimal slippage.
-* **Concentrated Liquidity & Yield Vaults:** High-capital-efficiency market making with automated rebalancing and fee harvesting.
-* **Sui dApp Kit Integration:** Native wallet support (Sui Wallet, Suiet, Nightly, Martian, OKX Wallet, Phantom).
-* **On-Chain Analytics & Whale Radar:** Real-time on-chain transaction monitoring, DEX swap tracking, and Telegram alerts.
-* **Modern UI/UX:** Built with React 18, TypeScript, TailwindCSS, Lucide Icons, and Vercel Analytics.
-
----
-
-## 🛠 Tech Stack
-
-* **Frontend:** React 18, TypeScript, Vite, TailwindCSS
-* **Blockchain / SDKs:** `@mysten/sui`, `@mysten/dapp-kit`, `@cetusprotocol/aggregator-sdk`, `@7kprotocol/sdk-ts`, `navi-sdk`
-* **State & Query:** `@tanstack/react-query`
-* **Serverless Backend:** Vercel Functions (`/api/*`)
-* **Styling & Icons:** Lucide React, Tailwind CSS
-
----
-
-## 📦 Getting Started
-
-### Prerequisites
-
-* [Node.js](https://nodejs.org/) (v18 or higher recommended)
-* [pnpm](https://pnpm.io/) or [npm](https://www.npmjs.com/)
-
-### Installation
+## Запуск
 
 ```bash
-# Clone the repository
-git clone https://github.com/bulletkh/voltswap.git
-cd voltswap
-
-# Install dependencies
 npm install
+cp .env.example .env.local   # впишите СВОЙ адрес для комиссий
+npm run dev                  # http://localhost:3000
+npm run build && npm start   # продакшен
 ```
 
-### Development
+## Настройки (`.env.local`)
 
-```bash
-# Run local development server
-npm run dev
-```
+| Переменная | Что это |
+|---|---|
+| `NEXT_PUBLIC_FEE_RECEIVER` | ваш адрес Sui (0x + 64 символа), куда уходит комиссия |
+| `NEXT_PUBLIC_FEE_RATE` | комиссия, `0.001` = 0,1 % (допустимо < 0.05) |
+| `NEXT_PUBLIC_SUI_GRPC_URL` | gRPC-узел Sui; перед запуском возьмите свой/платный |
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Если адрес не задан, комиссия отключена, а сайт честно пишет об этом.
 
-### Production Build
+## Что проверить ПЕРЕД публикацией
 
-```bash
-# Build for production
-npm run build
+1. **Токены** — `lib/tokens.ts`: сверьте тип и decimals каждого токена на Suiscan.
+2. **Комиссия** — сделайте тестовый свап на 1–2 $ и убедитесь, что комиссия пришла на ваш адрес и итоговая сумма совпадает с тем, что показал сайт.
+3. **Узел** — публичный узел имеет лимиты; используйте свой.
+4. **Юридическое** — условия использования, предупреждение о рисках, ограничения по странам (зависит от вашей юрисдикции).
 
-# Preview production build locally
-npm run preview
-```
+## Структура
 
----
-
-## 🌐 Deployment
-
-VoltSwap is configured for automatic deployment on [Vercel](https://vercel.com/) with native support for serverless API routes and edge caching.
-
----
-
-## 📄 License
-
-Proprietary & Confidential. All rights reserved.
+- `lib/dapp-kit.ts` — кошельки и клиент сети
+- `components/SwapCard.tsx` — вся логика свапа (котировка → проверка → подпись → результат)
+- `lib/tokens.ts` — список токенов
+- `app/globals.css` — оформление

@@ -1,0 +1,24 @@
+"use client";
+
+import dynamic from "next/dynamic";
+
+// Кошелёк работает только в браузере (window/document), поэтому без SSR.
+export const ConnectSlot = dynamic(() => import("./Header").then((m) => m.Header), {
+  ssr: false,
+  loading: () => <span className="connect-ph" aria-hidden="true" />,
+});
+
+export const PortfolioSlot = dynamic(() => import("./PortfolioPanel").then((m) => m.PortfolioPanel), {
+  ssr: false,
+  loading: () => <section className="card card-ph" aria-busy="true" aria-label="Portfolio loading" />,
+});
+
+export const MarketSlot = dynamic(() => import("./MarketPanel").then((m) => m.MarketPanel), {
+  ssr: false,
+  loading: () => <section className="card card-ph" aria-busy="true" aria-label="Market loading" />,
+});
+
+export const SwapSlot = dynamic(() => import("./SwapPanel").then((m) => m.SwapPanel), {
+  ssr: false,
+  loading: () => <section className="card card-ph" aria-busy="true" aria-label="Swap loading" />,
+});

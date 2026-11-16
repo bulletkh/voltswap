@@ -1,46 +1,28 @@
 {
-  "name": "volt-swap",
-  "version": "1.0.0",
+  "name": "voltswap",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test:sim": "node scripts/test-sim.mjs"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@bluefin-exchange/bluefin7k-aggregator-sdk": "^7.7.0",
-    "@cetusprotocol/aggregator-sdk": "^1.7.5",
-    "@cetusprotocol/common-sdk": "^1.4.3",
-    "@cetusprotocol/sui-clmm-sdk": "^1.4.9",
-    "@flowx-finance/sdk": "^2.1.0",
-    "@mysten/dapp-kit-core": "^1.6.43",
-    "@mysten/dapp-kit-react": "^2.1.45",
-    "@mysten/deepbook-v3": "^2.12.0",
-    "@mysten/sui": "^2.39.1",
-    "@pythnetwork/pyth-sui-js": "^2.4.0",
-    "@suilend/sdk": "^16.0.0",
-    "@suilend/sui-core": "^2.3.0",
-    "@tanstack/react-query": "^5.60.5",
-    "@vercel/analytics": "^2.0.1",
-    "blakejs": "^1.2.1",
-    "buffer": "^6.0.3",
-    "clsx": "^2.1.1",
-    "events": "^3.3.0",
-    "lightweight-charts": "^5.1.0",
-    "lucide-react": "^0.460.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.5.4"
+    "@cetusprotocol/aggregator-sdk": "1.7.5",
+    "@mysten/dapp-kit-react": "2.1.45",
+    "@mysten/sui": "2.39.1",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.3",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.15",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.11"
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  },
+  "overrides": {
+    "@mysten/sui": "2.39.1"
   }
 }
