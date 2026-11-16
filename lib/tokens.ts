@@ -4,6 +4,8 @@ export type Token = {
   type: string;
   decimals: number;
   iconUrl?: string | null;
+  /** token whose on-chain icon is reused when this token has none */
+  iconFrom?: string;
   /** true = added by the user by address, not on Voltswap's list */
   custom?: boolean;
 };
@@ -119,18 +121,21 @@ export const TOKENS: Token[] = [
     name: "USD Coin (Wormhole Ethereum)",
     type: "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN",
     decimals: 6,
+    iconFrom: USDC_TYPE,
   },
   {
     symbol: "wUSDT",
     name: "Tether (Wormhole Ethereum)",
     type: "0xc060006111016b8a020ad5b33834984a437aaa7d3c74c18e09a95d48aceab08c::coin::COIN",
     decimals: 6,
+    iconFrom: USDT_TYPE,
   },
   {
     symbol: "wETH",
     name: "Ether (Wormhole)",
     type: "0xaf8cd5edc19c4512f4259f0bee101a40d41ebed738ade5874359610ef8eeced5::coin::COIN",
     decimals: 8,
+    iconFrom: "0xd0e89b2af5e4910726fbcd8b8dd37bb79b29e5f83f7491bca830e94f7f226d29::eth::ETH",
   },
   {
     symbol: "wSOL",
