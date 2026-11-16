@@ -4,7 +4,31 @@ import { useEffect, useMemo, useState } from "react";
 import type { Whale } from "@/lib/whales";
 
 const POLL_MS = 10_000;
-const LEVELS = [1_000, 2_500, 5_000, 10_000, 50_000];
+const LEVELS = [1_000, 2_000, 3_000, 5_000, 7_500, 10_000, 15_000, 25_000, 50_000, 100_000];
+const GROUP_MS = 15 * 60 * 1000;
+
+type Row = Whale & { count: number };
+
+// Fold repeated swaps by the same wallet on the same pair and exchange (bots) into one row.
+function group(list: Whale[]): Row[] {
+  const out: Row[] = [];
+  const open = new Map<string, Row>();
+  for (const w of list) {
+    const key = `${w.sender ?? w.digest}|${w.dex}|${w.inSym}|${w.outSym}`;
+    const cur = open.get(key);
+    if (cur && cur.t - w.t <= GROUP_MS) {
+      cur.count += 1;
+      cur.usd += w.usd;
+      cur.inAmt += w.inAmt;
+      cur.outAmt += w.outAmt;
+            continue;
+    }
+    const row: Row = { ...w, count: 1 };
+    open.set(key, row);
+    out.push(row);
+  }
+  return out;
+}
 
 function usd(v: number) {
   return "$" + Math.round(v).toLocaleString("en-US");
@@ -24,7 +48,8 @@ const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
 export function WhalesView() {
   const [items, setItems] = useState<Whale[] | null>(null);
   const [error, setError] = useState(false);
-  const [min, setMin] = useState(1_000);
+  const [level, setLevel] = useState(0);
+  const min = LEVELS[level];
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -52,21 +77,27 @@ export function WhalesView() {
     };
   }, []);
 
-  const shown = useMemo(() => (items ?? []).filter((w) => w.usd >= min), [items, min]);
+  const shown = useMemo(
+    () => group((items ?? []).filter((w) => w.usd >= min).sort((a, b) => b.t - a.t)),
+    [items, min],
+  );
 
   return (
     <section className="card pf" aria-label="Whale radar">
       <div className="pf-head">
         <span className="pf-label">Large swaps on Sui</span>
         <label className="wh-filter">
-          Min size{" "}
-          <select value={min} onChange={(e) => setMin(Number(e.target.value))}>
-            {LEVELS.map((l) => (
-              <option key={l} value={l}>
-                {usd(l)}
-              </option>
-            ))}
-          </select>
+          Min size <strong>{usd(min)}</strong>
+          <input
+            type="range"
+            min={0}
+            max={LEVELS.length - 1}
+            step={1}
+            value={level}
+            onChange={(e) => setLevel(Number(e.target.value))}
+            aria-label="Minimum swap size in US dollars"
+            aria-valuetext={usd(min)}
+          />
         </label>
       </div>
 
@@ -84,7 +115,7 @@ export function WhalesView() {
                 {w.inSym} → {w.outSym}
               </strong>
               <span>
-                {w.dex} · {amt(w.inAmt)} {w.inSym}
+                {w.dex} · {w.count > 1 ? `${w.count} swaps · ` : ""}{amt(w.inAmt)} {w.inSym}
                 {w.outAmt ? ` → ${amt(w.outAmt)} ${w.outSym}` : ""}
               </span>
             </div>

@@ -43,5 +43,7 @@ button.mk-swap:disabled { opacity: 0.5; cursor: not-allowed; }
   .topnav { order: 3; width: 100%; margin: 0; }
 }
 .wh-filter { font-size: 14px; color: var(--muted); }
-.wh-filter select { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.wh-filter { display: flex; align-items: center; gap: 10px; }
+.wh-filter strong { color: var(--ink); min-width: 64px; display: inline-block; }
+.wh-filter input[type=range] { width: 140px; accent-color: var(--accent, currentColor); }
 .pf-val a, .pf-name a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
