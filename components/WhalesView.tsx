@@ -110,8 +110,8 @@ export function WhalesView() {
       </ul>
 
       <p className="pf-note">
-        A live feed of large swaps on Cetus, Bluefin and Momentum pools, read from public Sui data and valued at market prices. It covers the
-        last hour, and only while the page is open does it update every few seconds. Swaps through other exchanges (such as Turbos or DeepBook), and
+        A live feed of large swaps on Cetus, Bluefin, Momentum, Turbos and DeepBook, read from public Sui data and valued at market prices. It covers the
+        last hour, and only while the page is open does it update every few seconds. Swaps through other exchanges, and
         tokens without reliable prices, are not shown. Wallet addresses are public on-chain information; a large
         trade says nothing about what the trader will do next. Not financial advice.
       </p>

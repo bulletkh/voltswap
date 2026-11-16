@@ -1,4 +1,4 @@
-// Free "whale radar": recent large Cetus, Bluefin and Momentum swaps, read from Sui's public GraphQL and valued with DeFiLlama prices.
+// Free "whale radar": recent large Cetus, Bluefin, Momentum, Turbos and DeepBook swaps, read from Sui's public GraphQL and valued with DeFiLlama prices.
 // State lives in module memory (one serverless instance); it is a live tape, not a permanent history.
 
 const GQL = "https://graphql.mainnet.sui.io/graphql";
@@ -28,6 +28,26 @@ const DEXES: Dex[] = [
       if (!j.pool_id) return null;
       const xForY = j.x_for_y === true || j.x_for_y === "true";
       return { pool: str(j.pool_id), aToB: xForY, amountIn: xForY ? str(j.amount_x) : str(j.amount_y), amountOut: xForY ? str(j.amount_y) : str(j.amount_x) };
+    },
+  },
+  {
+    name: "Turbos",
+    type: "0x91bfbc386a41afcfd9b2533058d7e915a1d3829089cc268ff4333d54d6339ca1::pool::SwapEvent",
+    parse: (j) => {
+      if (!j.pool) return null;
+      const aToB = j.a_to_b === true || j.a_to_b === "true";
+      return { pool: str(j.pool), aToB, amountIn: aToB ? str(j.amount_a) : str(j.amount_b), amountOut: aToB ? str(j.amount_b) : str(j.amount_a) };
+    },
+  },
+  {
+    // DeepBook v3 order book: one event per matched maker order. Fills of one taker order are summed below.
+    // The pool's base coin is side A; a taker bid pays quote (B) to receive base (A).
+    name: "DeepBook",
+    type: "0x2c8d603bc51326b8c13cef9dd07031a408a48dddb541963357661df5d3204809::order_info::OrderFilled",
+    parse: (j) => {
+      if (!j.pool_id) return null;
+      const bid = j.taker_is_bid === true || j.taker_is_bid === "true";
+      return { pool: str(j.pool_id), aToB: !bid, amountIn: bid ? str(j.quote_quantity) : str(j.base_quantity), amountOut: bid ? str(j.base_quantity) : str(j.quote_quantity) };
     },
   },
 ];
@@ -107,7 +127,7 @@ async function loadPools(ids: string[]) {
       );
       chunk.forEach((p, k) => {
         const repr = d[`p${k}`]?.asMoveObject?.contents?.type?.repr ?? "";
-        const m = /Pool<(.+?),\s*(.+)>$/.exec(repr);
+        const m = /Pool<([^,<>\s]+),\s*([^,<>\s]+)/.exec(repr);
         state.pools.set(p, m ? [m[1].trim(), m[2].trim()] : null);
       });
     } catch {
@@ -207,8 +227,28 @@ async function refresh() {
   };
 
   // One row per transaction: keep the biggest hop (aggregator routes emit several swap events).
-  const best = new Map<string, Whale>();
+  // Sum fills of the same pool and direction inside one transaction (order books emit one event per maker order).
+  const merged = new Map<string, Fresh>();
   for (const f of fresh) {
+    const key = `${(f.node.transaction as { digest: string }).digest}|${f.swap.pool}|${f.swap.aToB}`;
+    const cur = merged.get(key);
+    if (!cur) {
+      merged.set(key, f);
+      continue;
+    }
+    try {
+      cur.swap = {
+        ...cur.swap,
+        amountIn: (BigInt(cur.swap.amountIn) + BigInt(f.swap.amountIn)).toString(),
+        amountOut: (BigInt(cur.swap.amountOut) + BigInt(f.swap.amountOut)).toString(),
+      };
+    } catch {
+      // malformed amount: keep the first event only
+    }
+  }
+
+  const best = new Map<string, Whale>();
+  for (const f of merged.values()) {
     const { swap } = f;
     const pair = state.pools.get(swap.pool);
     if (!pair) continue;
