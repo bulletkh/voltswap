@@ -45,5 +45,10 @@ button.mk-swap:disabled { opacity: 0.5; cursor: not-allowed; }
 .wh-filter { font-size: 14px; color: var(--muted); }
 .wh-filter { display: flex; align-items: center; gap: 10px; }
 .wh-filter strong { color: var(--ink); min-width: 64px; display: inline-block; }
-.wh-filter input[type=range] { width: 140px; accent-color: var(--accent, currentColor); }
+.wh-filter input[type=range] { -webkit-appearance: none; appearance: none; width: 160px; height: 22px; background: transparent; cursor: pointer; margin: 0; }
+.wh-filter input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: #c9d2e3; }
+.wh-filter input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: #c9d2e3; }
+.wh-filter input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin-top: -7px; border-radius: 50%; background: #2f6bff; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(20, 30, 60, 0.35); }
+.wh-filter input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #2f6bff; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(20, 30, 60, 0.35); }
+.wh-filter input[type=range]:focus-visible { outline: 2px solid #2f6bff; outline-offset: 3px; border-radius: 6px; }
 .pf-val a, .pf-name a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
