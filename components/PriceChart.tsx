@@ -207,13 +207,13 @@ export function PriceChart() {
           <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${asset.symbol} price over ${range}`} onPointerMove={move} onPointerLeave={() => setHover(null)}>
             <defs>
               <linearGradient id="pc-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#d6ff3d" stopOpacity="0.32" />
-                <stop offset="1" stopColor="#d6ff3d" stopOpacity="0" />
+                <stop offset="0" stopColor="#ffd60a" stopOpacity="0.32" />
+                <stop offset="1" stopColor="#ffd60a" stopOpacity="0" />
               </linearGradient>
               <linearGradient id="pc-stroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stopColor="#7be8ff" />
-                <stop offset="0.55" stopColor="#d6ff3d" />
-                <stop offset="1" stopColor="#f4ff9a" />
+                <stop offset="0" stopColor="#6f8dff" />
+                <stop offset="0.55" stopColor="#ffd60a" />
+                <stop offset="1" stopColor="#fff1a0" />
               </linearGradient>
             </defs>
             {[0.25, 0.5, 0.75].map((k) => (
