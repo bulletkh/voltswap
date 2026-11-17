@@ -28,13 +28,21 @@ function errorText(e: unknown): string {
   return m.length > 220 ? m.slice(0, 220) + "…" : m;
 }
 
-const HOT_PAIRS: [string, string][] = [
-  ["SUI", "USDC"],
-  ["USDC", "SUI"],
-  ["SUI", "DEEP"],
-  ["SUI", "WAL"],
-  ["SUI", "CETUS"],
-];
+function Celebrate() {
+  return (
+    <div className="burst" aria-hidden="true">
+      <i className="burst-flash" />
+      <i className="burst-ring" />
+      <i className="burst-ring r2" />
+      <svg className="burst-bolt" viewBox="0 0 24 24">
+        <path d="M13.5 2 5 13.5h6L10 22l9-12.5h-6.2L13.5 2Z" />
+      </svg>
+      {Array.from({ length: 20 }, (_, i) => (
+        <b key={i} className="spark" style={{ "--a": `${i * 18}deg`, "--d": `${150 + ((i * 37) % 70)}px`, "--i": i } as React.CSSProperties} />
+      ))}
+    </div>
+  );
+}
 
 export function SwapCard() {
   const account = useCurrentAccount();
@@ -55,6 +63,37 @@ export function SwapCard() {
   const [prices, setPrices] = useState<Record<string, number | null>>({});
 
   useEffect(() => setCustom(loadCustomTokens()), []);
+  const [win, setWin] = useState(0);
+
+  // the price tape asks for a token: buy it with USDC
+  useEffect(() => {
+    const on = (e: Event) => {
+      const sym = (e as CustomEvent<{ symbol: string }>).detail?.symbol;
+      const t = TOKENS.find((x) => x.symbol === sym);
+      const usdc = TOKENS.find((x) => x.symbol === "USDC");
+      if (!t || !usdc || t.type === usdc.type) return;
+      setFrom(usdc);
+      setTo(t);
+      setAmount("");
+    };
+    const celebrate = () => setWin(Date.now());
+    window.addEventListener("vs:pick", on);
+    window.addEventListener("vs:celebrate", celebrate);
+    return () => {
+      window.removeEventListener("vs:pick", on);
+      window.removeEventListener("vs:celebrate", celebrate);
+    };
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("vs:pair", { detail: { from: from.symbol, fromType: from.type, to: to.symbol, toType: to.type } }),
+    );
+  }, [from, to]);
+  useEffect(() => {
+    if (!win) return;
+    const t = setTimeout(() => setWin(0), 2600);
+    return () => clearTimeout(t);
+  }, [win]);
 
   // ?from=SUI&to=USDC (by symbol) preselects a pair, e.g. links from token pages
   useEffect(() => {
@@ -77,14 +116,6 @@ export function SwapCard() {
       /* ignore malformed query */
     }
   }, []);
-  function setPair(a: string, b: string) {
-    const f = TOKENS.find((t) => t.symbol === a);
-    const t = TOKENS.find((t) => t.symbol === b);
-    if (!f || !t) return;
-    setFrom(f);
-    setTo(t);
-    setAmount("");
-  }
   const tokens = useMemo(
     () => [...TOKENS, ...custom.filter((c) => !TOKENS.some((t) => t.type === c.type))],
     [custom],
@@ -225,6 +256,7 @@ export function SwapCard() {
         throw new Error("The transaction failed on-chain. No funds were swapped.");
       }
       setStatus({ kind: "done", digest: result.Transaction.digest });
+      setWin(Date.now());
       setAmount("");
       void loadBalance();
     } catch (e) {
@@ -242,19 +274,8 @@ export function SwapCard() {
   else action = { label: highDeviation ? "Swap anyway" : "Swap", disabled: false, onClick: swap };
 
   return (
-    <section className="card" aria-label="Swap">
-      <div className="pairs" role="group" aria-label="Popular pairs">
-        {HOT_PAIRS.map(([a, b]) => (
-          <button
-            key={a + b}
-            type="button"
-            className={"chip" + (from.symbol === a && to.symbol === b ? " on" : "")}
-            onClick={() => setPair(a, b)}
-          >
-            {a} → {b}
-          </button>
-        ))}
-      </div>
+    <section className={"card" + (win ? " win" : "")} aria-label="Swap">
+      {win ? <Celebrate key={win} /> : null}
       <div className="field">
         <div className="field-head">
           <label htmlFor="amount-in">You pay</label>
@@ -377,7 +398,7 @@ export function SwapCard() {
 
       {status.kind === "done" && (
         <p className="notice ok" role="status">
-          Swap complete.{" "}
+          <span className="ok-bolt" aria-hidden="true">⚡</span> Swap complete.{" "}
           <a href={EXPLORER_TX + status.digest} target="_blank" rel="noreferrer">
             View on Suiscan
           </a>

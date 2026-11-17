@@ -8,7 +8,7 @@ export function SiteHeader({ active }: { active: "swap" | "market" | "portfolio"
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M13.5 2 5 13.5h6L10 22l9-12.5h-6.2L13.5 2Z" fill="currentColor" />
         </svg>
-        Voltswap
+        <span className="brand-name"><b>Volt</b>swap</span>
       </a>
       <nav className="topnav" aria-label="Main">
         <a href="/" aria-current={active === "swap" ? "page" : undefined}>Swap</a>

@@ -1,11 +1,39 @@
+import { PriceChart } from "@/components/PriceChart";
 import { SwapSlot } from "@/components/ClientOnly";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Ticker } from "@/components/Ticker";
 import { FEE_ENABLED, FEE_RATE } from "@/lib/config";
+
+const fee = (FEE_RATE * 100).toFixed(2).replace(/\.?0+$/, "");
+
+const PERKS = [
+  {
+    title: "Best route, found for you",
+    text: "Your trade is split across Sui's major pools to get the best rate available.",
+    icon: "M4 12h4l3-8 4 16 3-8h2",
+  },
+  {
+    title: "See it before you sign",
+    text: "The exact route and the minimum you receive are shown before you confirm.",
+    icon: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+  },
+  {
+    title: "Your tokens stay yours",
+    text: "Non-custodial. Swaps run from your wallet and tokens never leave it.",
+    icon: "M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Zm-3 9 2 2 4-4",
+  },
+  {
+    title: FEE_ENABLED ? `One fee: ${fee}%` : "No Voltswap fee",
+    text: FEE_ENABLED ? "Already included in the quote you see, so the number you confirm is the number you get." : "No Voltswap fee is applied at the moment.",
+    icon: "M12 2v20M17 6.5C16 5 14 4.5 12 4.5c-2.5 0-4.5 1.2-4.5 3.2 0 4.3 9 2.3 9 6.6 0 2-2 3.2-4.5 3.2-2.2 0-4.2-.7-5.2-2.3",
+  },
+];
 
 export default function Home() {
   return (
     <>
       <SiteHeader active="swap" />
+      <Ticker />
 
       <main className="stage">
         <section className="intro">
@@ -13,46 +41,28 @@ export default function Home() {
             <i aria-hidden="true" />
             Live on Sui
           </span>
-          <h1>One quote across every major Sui pool.</h1>
-          <p>
-            Voltswap splits your trade across liquidity pools and shows the exact route before you
-            sign. It is non-custodial: your tokens never leave your wallet.
-          </p>
-          <p className="fine">
-            {FEE_ENABLED
-              ? `Fee: ${(FEE_RATE * 100).toFixed(2).replace(/\.?0+$/, "")}% of each swap, included in the quote.`
-              : "No Voltswap fee is applied at the moment."}
-          </p>
-          <ul className="points">
-            <li>Best route across pools</li>
-            <li>Non-custodial</li>
-            <li>Route shown before you sign</li>
-          </ul>
-          <svg className="route-art" viewBox="0 0 460 150" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="vs-grad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0" stopColor="#6f8dff" />
-                <stop offset="1" stopColor="#ffd60a" />
-              </linearGradient>
-            </defs>
-            <path className="rail" d="M40 75 C150 75 150 25 230 25 S330 75 420 75" />
-            <path className="rail" d="M40 75 L420 75" />
-            <path className="rail" d="M40 75 C150 75 150 125 230 125 S330 75 420 75" />
-            <path className="flow" d="M40 75 C150 75 150 25 230 25 S330 75 420 75" />
-            <path className="flow b" d="M40 75 L420 75" />
-            <path className="flow c" d="M40 75 C150 75 150 125 230 125 S330 75 420 75" />
-            <circle className="mid" cx="230" cy="25" r="5" />
-            <circle className="mid" cx="230" cy="75" r="5" />
-            <circle className="mid" cx="230" cy="125" r="5" />
-            <circle className="node start" cx="40" cy="75" r="12" />
-            <circle className="node end" cx="420" cy="75" r="12" />
-            <text x="40" y="108" textAnchor="middle">YOU PAY</text>
-            <text x="420" y="108" textAnchor="middle">YOU GET</text>
-          </svg>
+          <h1>Swap on Sui at the best price.</h1>
+          <p className="lede">Voltswap checks every major pool and splits your trade for the best rate.</p>
         </section>
 
         <SwapSlot />
       </main>
+
+      <div className="pc-wrap">
+        <PriceChart />
+      </div>
+
+      <section className="perks" aria-label="Why Voltswap">
+        {PERKS.map((p) => (
+          <article key={p.title} className="perk">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d={p.icon} />
+            </svg>
+            <h2>{p.title}</h2>
+            <p>{p.text}</p>
+          </article>
+        ))}
+      </section>
 
       <footer className="foot">
         <p>
