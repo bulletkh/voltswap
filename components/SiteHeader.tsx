@@ -1,7 +1,7 @@
 import "@/app/nav-portfolio.css";
 import { ConnectSlot } from "./ClientOnly";
 
-export function SiteHeader({ active }: { active: "swap" | "market" | "portfolio" | "whales" }) {
+export function SiteHeader({ active }: { active: "swap" | "market" | "portfolio" | "whales" | "owner" }) {
   return (
     <header className="topbar">
       <a className="brand" href="/" aria-label="Voltswap home">

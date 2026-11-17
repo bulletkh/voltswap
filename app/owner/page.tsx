@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function OwnerPage() {
   return (
     <>
-      <SiteHeader active="swap" />
+      <SiteHeader active="owner" />
       <main className="page-narrow page-wide">
         <h1 className="page-title">Cabinet</h1>
         <p className="page-lead">Fees, volume and wallets, read from the chain.</p>
