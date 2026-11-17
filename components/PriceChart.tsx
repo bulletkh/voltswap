@@ -34,11 +34,28 @@ function curve(xy: [number, number][]) {
   return d;
 }
 
-function useTween(target: number | null) {
+// Drop single-point glitches: a point far from both neighbours (which are close to each other) is replaced by their mean.
+function despike(a: Pt[]): Pt[] {
+  return a.map((pt, i) => {
+    if (i === 0 || i === a.length - 1) return pt;
+    const l = a[i - 1].p;
+    const r = a[i + 1].p;
+    const m = (l + r) / 2;
+    if (Math.abs(l - r) / m < 0.03 && Math.abs(pt.p - m) / m > 0.05) return { t: pt.t, p: m };
+    return pt;
+  });
+}
+
+function useTween(target: number | null, reset: string) {
   const [v, setV] = useState<number | null>(target);
   const from = useRef<number | null>(target);
+  const seen = useRef(reset);
   useEffect(() => {
     if (target === null) return;
+    if (seen.current !== reset) {
+      seen.current = reset;
+      from.current = null;
+    }
     const start = from.current ?? target;
     const t0 = performance.now();
     let raf = 0;
@@ -52,7 +69,7 @@ function useTween(target: number | null) {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [target]);
+  }, [target, reset]);
   return v;
 }
 
@@ -109,7 +126,7 @@ export function PriceChart() {
       .then((a) => (a.length > 2 ? a : get(`span=${span}&period=${period}`)))
       .then((a) => {
         if (!alive) return;
-        if (a.length > 2) setHist(a.map((x) => ({ t: x.timestamp, p: x.price })));
+        if (a.length > 2) setHist(despike(a.map((x) => ({ t: x.timestamp, p: x.price }))));
         else setFailed(true);
       })
       .catch(() => alive && setFailed(true));
@@ -163,8 +180,9 @@ export function PriceChart() {
   const first = pts[0]?.p;
   const lastP = pts.length ? pts[pts.length - 1].p : null;
   const shown = hover !== null && pts[hover] ? pts[hover].p : lastP;
-  const tween = useTween(hover === null ? lastP : null);
-  const headPrice = hover !== null ? shown : tween ?? shown;
+  const tween = useTween(hover === null ? lastP : null, id);
+  const ready = hist !== null && live !== null;
+  const headPrice = !ready ? null : hover !== null ? shown : tween ?? shown;
   const chg = first && lastP ? ((lastP - first) / first) * 100 : null;
   const up = (chg ?? 0) >= 0;
 
