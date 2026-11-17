@@ -606,3 +606,8 @@ body::before { background:
 
 @media (max-width: 760px) { .rd-filters { grid-template-columns: 1fr 1fr; } .rd-size { grid-column: 1 / -1; } }
 @media (max-width: 520px) { .rd-kpis > div { padding: 10px; } .rd .wh-tabs button { padding: 7px 11px; } .rd .pf-list li { padding: 11px 12px; } }
+
+/* Dropdown lists: native popups must be dark with light text everywhere (otherwise options are invisible until hovered). */
+select { color-scheme: dark; }
+select option, select optgroup { background-color: #0d1330; color: #eef2ff; }
+select option:checked, select option:hover { background-color: #26306b; color: #fff; }
