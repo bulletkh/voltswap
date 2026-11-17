@@ -11,7 +11,7 @@ export default function WhalesPage() {
   return (
     <>
       <SiteHeader active="whales" />
-      <main className="page-narrow">
+      <main className="page-narrow page-wide">
         <h1 className="page-title">Whale radar</h1>
         <p className="page-lead">Large swaps on Sui, live. Free and read-only.</p>
         <WhalesView />

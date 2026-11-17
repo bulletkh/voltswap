@@ -12,9 +12,9 @@ export function SiteHeader({ active }: { active: "swap" | "market" | "portfolio"
       </a>
       <nav className="topnav" aria-label="Main">
         <a href="/" aria-current={active === "swap" ? "page" : undefined}>Swap</a>
+        <a href="/whales" aria-current={active === "whales" ? "page" : undefined}>Radar</a>
         <a href="/market" aria-current={active === "market" ? "page" : undefined}>Market</a>
         <a href="/portfolio" aria-current={active === "portfolio" ? "page" : undefined}>Portfolio</a>
-        <a href="/whales" aria-current={active === "whales" ? "page" : undefined}>Radar</a>
       </nav>
       <ConnectSlot />
     </header>

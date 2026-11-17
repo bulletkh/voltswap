@@ -57,6 +57,7 @@ export function WhalesView() {
   const [fWallet, setFWallet] = useState("");
   const [alertAt, setAlertAt] = useState<number>(0); // 0 = off
   const seen = useRef<Set<string> | null>(null);
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
 
   // shareable filters: /whales?token=DEEP&dex=Cetus&wallet=0x…
   useEffect(() => {
@@ -128,9 +129,11 @@ export function WhalesView() {
       seen.current = new Set(items.map((w) => w.id));
       return;
     }
+    const added: string[] = [];
     for (const w of items) {
       if (seen.current.has(w.id)) continue;
       seen.current.add(w.id);
+      added.push(w.id);
       if (alertAt > 0 && w.usd >= alertAt && "Notification" in window && Notification.permission === "granted") {
         try {
           new Notification(`Whale swap ${usd(w.usd)}`, { body: `${w.inSym} → ${w.outSym} on ${w.dex}` });
@@ -139,6 +142,7 @@ export function WhalesView() {
         }
       }
     }
+    if (added.length) setFresh(new Set(added));
   }, [items, alertAt]);
 
   const filtered = useMemo(
@@ -188,69 +192,89 @@ export function WhalesView() {
   const dexOpts = useMemo(() => [...new Set((items ?? []).map((w) => w.dex))].sort(), [items]);
 
   return (
-    <section className="card pf" aria-label="Whale radar">
-      <div className="pf-head">
-        <span className="pf-label">Large swaps on Sui</span>
-        <label className="wh-filter">
-          Min size <strong>{usd(min)}</strong>
-          <input
-            type="range"
-            min={0}
-            max={LEVELS.length - 1}
-            step={1}
-            value={level}
-            onChange={(e) => setLevel(Number(e.target.value))}
-            aria-label="Minimum swap size in US dollars"
-            aria-valuetext={usd(min)}
-          />
-        </label>
+    <section className="card pf rd" aria-label="Whale radar">
+      <div className="rd-kpis">
+        <div>
+          <span>Large swaps · 1h</span>
+          <strong>{filtered.length}</strong>
+        </div>
+        <div>
+          <span>Volume</span>
+          <strong>{usd(stats.total)}</strong>
+        </div>
+        <div>
+          <span>Largest</span>
+          <strong>{filtered.length ? usd(Math.max(...filtered.map((w) => w.usd))) : "—"}</strong>
+        </div>
       </div>
 
-      <div className="wh-tools">
-        <select value={fToken} onChange={(e) => setFToken(e.target.value)} aria-label="Filter by token">
-          <option value="">All tokens</option>
-          {tokenOpts.map((t) => (
-            <option key={t}>{t}</option>
+      <div className="rd-top">
+        <div className="wh-tabs" role="tablist">
+          {([["feed", "Live feed"], ["top", "Top wallets"], ["stats", "Stats"]] as const).map(([k, label]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+              {label}
+            </button>
           ))}
-        </select>
-        <select value={fDex} onChange={(e) => setFDex(e.target.value)} aria-label="Filter by exchange">
-          <option value="">All exchanges</option>
-          {dexOpts.map((d) => (
-            <option key={d}>{d}</option>
-          ))}
-        </select>
-        <select
-          value={alertAt}
-          onChange={(e) => void setAlert(Number(e.target.value))}
-          aria-label="Browser alerts for swaps above"
-        >
-          <option value={0}>Alerts off</option>
-          {[10_000, 25_000, 50_000, 100_000].map((v) => (
-            <option key={v} value={v}>
-              Alert ≥ {usd(v)}
-            </option>
-          ))}
-        </select>
+        </div>
+        <span className="rd-live"><i aria-hidden="true" />Live</span>
+      </div>
+
+      <div className="rd-filters">
+        <label className="rd-f rd-size">
+          <span>Min size</span>
+          <div>
+            <input
+              type="range"
+              min={0}
+              max={LEVELS.length - 1}
+              step={1}
+              value={level}
+              style={{ "--p": `${(level / (LEVELS.length - 1)) * 100}%` } as React.CSSProperties}
+              onChange={(e) => setLevel(Number(e.target.value))}
+              aria-label="Minimum swap size in US dollars"
+              aria-valuetext={usd(min)}
+            />
+            <strong>{usd(min)}</strong>
+          </div>
+        </label>
+        <label className="rd-f">
+          <span>Token</span>
+          <select value={fToken} onChange={(e) => setFToken(e.target.value)}>
+            <option value="">All tokens</option>
+            {tokenOpts.map((t) => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+        <label className="rd-f">
+          <span>Exchange</span>
+          <select value={fDex} onChange={(e) => setFDex(e.target.value)}>
+            <option value="">All exchanges</option>
+            {dexOpts.map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
+        </label>
+        <label className="rd-f">
+          <span>Alerts</span>
+          <select value={alertAt} onChange={(e) => void setAlert(Number(e.target.value))}>
+            <option value={0}>Off</option>
+            {[10_000, 25_000, 50_000, 100_000].map((v) => (
+              <option key={v} value={v}>
+                ≥ {usd(v)}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {fWallet && (
-        <p className="pf-note">
-          Wallet {short(fWallet)}{" "}
+        <p className="rd-wallet">
+          Wallet <b>{short(fWallet)}</b>
           <button type="button" className="linklike" onClick={() => setFWallet("")}>
-            clear
+            clear ✕
           </button>
         </p>
       )}
-      <div className="wh-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "feed"} className={"chip" + (tab === "feed" ? " on" : "")} onClick={() => setTab("feed")}>
-          Live feed
-        </button>
-        <button type="button" role="tab" aria-selected={tab === "top"} className={"chip" + (tab === "top" ? " on" : "")} onClick={() => setTab("top")}>
-          Top wallets
-        </button>
-        <button type="button" role="tab" aria-selected={tab === "stats"} className={"chip" + (tab === "stats" ? " on" : "")} onClick={() => setTab("stats")}>
-          Stats
-        </button>
-      </div>
 
       {tab === "stats" && (
         <div>
@@ -311,9 +335,9 @@ export function WhalesView() {
         <p className="pf-note">No swaps this large in the last hour. New ones appear here as they happen.</p>
       )}
 
-      <ul className="pf-list" hidden={tab !== "feed"}>
+      <ul className="pf-list rd-feed" hidden={tab !== "feed"}>
         {shown.map((w) => (
-          <li key={w.id}>
+          <li key={w.id} className={fresh.has(w.id) ? "fresh" : undefined} style={{ "--w": `${Math.max(4, Math.round((w.usd / (shown[0] ? Math.max(...shown.map((x) => x.usd)) : 1)) * 100))}%` } as React.CSSProperties}>
             <div className="pf-name">
               <strong>
                 {w.inSym} → {w.outSym}
@@ -348,12 +372,15 @@ export function WhalesView() {
         ))}
       </ul>
 
-      <p className="pf-note">
+      <details className="rd-about">
+        <summary>About this data</summary>
+        <p>
         A live feed of large swaps on Cetus, Bluefin, Momentum, Turbos and DeepBook, read from public Sui data and valued at market prices. It covers the
         last hour, and only while the page is open does it update every few seconds. Browser alerts work only while this tab stays open. Swaps through other exchanges, and
         tokens without reliable prices, are not shown. Wallet addresses are public on-chain information; a large
         trade says nothing about what the trader will do next. Not financial advice.
       </p>
+      </details>
     </section>
   );
 }
