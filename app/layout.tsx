@@ -2,6 +2,7 @@ import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./theme.css";
+import "./premium.css";
 
 const TITLE = "Voltswap · Swap on Sui";
 const DESCRIPTION =
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#eef1f6",
+  themeColor: "#060914",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
