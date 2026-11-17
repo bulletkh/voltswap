@@ -27,3 +27,8 @@ export const TokenSlot = dynamic(() => import("./TokenPanel").then((m) => m.Toke
   ssr: false,
   loading: () => <section className="card card-ph" aria-busy="true" aria-label="Token loading" />,
 });
+
+export const OwnerSlot = dynamic(() => import("./OwnerPanel").then((m) => m.OwnerPanel), {
+  ssr: false,
+  loading: () => <section className="card card-ph" aria-busy="true" aria-label="Cabinet loading" />,
+});

@@ -257,6 +257,11 @@ export function SwapCard() {
       }
       setStatus({ kind: "done", digest: result.Transaction.digest });
       setWin(Date.now());
+      void fetch("/api/notify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "swap", digest: result.Transaction.digest }),
+      }).catch(() => {});
       setAmount("");
       void loadBalance();
     } catch (e) {
