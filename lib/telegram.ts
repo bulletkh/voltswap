@@ -14,8 +14,18 @@ export async function sendTelegram(html: string): Promise<boolean> {
       body: JSON.stringify({ chat_id: chat, text: html, parse_mode: "HTML", disable_web_page_preview: true }),
       signal: AbortSignal.timeout(8_000),
     });
+    if (!r.ok) {
+      let why = "";
+      try {
+        why = ((await r.json()) as { description?: string }).description ?? "";
+      } catch {
+        /* ignore */
+      }
+      console.error("[telegram] sendMessage failed:", r.status, why); // never logs the token
+    }
     return r.ok;
-  } catch {
+  } catch (e) {
+    console.error("[telegram] request error:", e instanceof Error ? e.name : "unknown");
     return false;
   }
 }
