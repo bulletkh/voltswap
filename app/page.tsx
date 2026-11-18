@@ -72,7 +72,6 @@ export default function Home() {
         <nav aria-label="Legal">
           <a href="/terms">Terms of use</a>
           <a href="/risks">Risks</a>
-          <a href="https://darkglide.com" target="_blank" rel="noopener noreferrer">Part of Darkglide ↗</a>
         </nav>
       </footer>
     </>
