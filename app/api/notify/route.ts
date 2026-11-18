@@ -10,7 +10,8 @@ const seen = new Set<string>(); // digests and wallets already announced (one in
 const stamps: number[] = []; // connect notices in the last hour
 
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
-const usd = (v: number) => "$" + v.toLocaleString("en-US", { maximumFractionDigits: v >= 100 ? 0 : 2 });
+const usd = (v: number) =>
+  v === 0 ? "$0" : v < 0.01 ? "$" + v.toLocaleString("en-US", { maximumSignificantDigits: 2, maximumFractionDigits: 6 }) : "$" + v.toLocaleString("en-US", { maximumFractionDigits: v >= 100 ? 0 : 2 });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function loadTx(digest: string): Promise<RawTx | null> {
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
       `⚡ <b>Swap on Voltswap</b>\n` +
       `${a.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${esc(sym(out?.coin))} → ${b.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${esc(sym(into?.coin))}\n` +
       (volUsd !== null ? `Volume: <b>${usd(volUsd)}</b>\n` : "") +
-      (feeUsd !== null ? `Fee earned: <b>${usd(feeUsd)}</b> (${(fee.rate * 100).toFixed(2)}%)\n` : "") +
+      `Fee earned: <b>${feeUsd !== null ? usd(feeUsd) : Number(fee.feeRaw) / 10 ** dec + " " + esc(sym(fee.feeCoin))}</b> (${(fee.rate * 100).toFixed(2)}%)\n` +
       `Wallet: <a href="https://suiscan.xyz/mainnet/account/${fee.wallet}">${short(fee.wallet)}</a>\n` +
       `<a href="https://suiscan.xyz/mainnet/tx/${fee.digest}">Transaction</a>`;
     const ok = await sendTelegram(text);

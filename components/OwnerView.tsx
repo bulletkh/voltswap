@@ -8,8 +8,13 @@ import type { OwnerStats } from "@/lib/owner";
 type Range = "d1" | "d7" | "d30" | "all";
 const RANGES: [Range, string][] = [["d1", "24h"], ["d7", "7 days"], ["d30", "30 days"], ["all", "All time"]];
 
-const usd = (v: number) => "$" + v.toLocaleString("en-US", { minimumFractionDigits: v < 100 ? 2 : 0, maximumFractionDigits: v < 100 ? 2 : 0 });
-const amt = (v: number) => v.toLocaleString("en-US", { maximumFractionDigits: v >= 100 ? 0 : v >= 1 ? 2 : 6 });
+// Tiny amounts keep their significant digits ($0.0014, not $0.00).
+const usd = (v: number) => {
+  if (v === 0) return "$0";
+  if (v < 0.01) return "$" + v.toLocaleString("en-US", { maximumSignificantDigits: 2, maximumFractionDigits: 6 });
+  return "$" + v.toLocaleString("en-US", { minimumFractionDigits: v < 100 ? 2 : 0, maximumFractionDigits: v < 100 ? 2 : 0 });
+};
+const amt = (v: number) => (v === 0 ? "0" : v.toLocaleString("en-US", { maximumFractionDigits: v >= 100 ? 0 : v >= 1 ? 2 : 8 }));
 const short = (a: string) => a.slice(0, 6) + "…" + a.slice(-4);
 function ago(t: number) {
   const s = Math.max(0, Math.round((Date.now() - t) / 1000));
@@ -151,7 +156,7 @@ export function OwnerView() {
                 {data.coins.map((c) => (
                   <li key={c.symbol}>
                     <div className="pf-name"><strong>{c.symbol}</strong><span>{c.swaps} payment{c.swaps > 1 ? "s" : ""}</span></div>
-                    <div className="pf-val"><strong>{c.usd === null ? "—" : usd(c.usd)}</strong><span>{amt(c.amount)} {c.symbol}</span></div>
+                    <div className="pf-val"><strong>{c.usd === null ? `${amt(c.amount)} ${c.symbol}` : usd(c.usd)}</strong>{c.usd !== null && <span>{amt(c.amount)} {c.symbol}</span>}</div>
                   </li>
                 ))}
                 {data.coins.length === 0 && <li><p className="pf-note">Nothing yet.</p></li>}
@@ -186,8 +191,8 @@ export function OwnerView() {
                     <span>{short(s.wallet)} · {ago(s.t)}</span>
                   </div>
                   <div className="pf-val">
-                    <strong>{s.feeUsd === null ? "—" : usd(s.feeUsd)}</strong>
-                    <span><a href={`https://suiscan.xyz/mainnet/tx/${s.digest}`} target="_blank" rel="noopener noreferrer">tx</a> · {amt(s.fee)} {s.coin}</span>
+                    <strong>{s.feeUsd === null ? `${amt(s.fee)} ${s.coin}` : usd(s.feeUsd)}</strong>
+                    <span><a href={`https://suiscan.xyz/mainnet/tx/${s.digest}`} target="_blank" rel="noopener noreferrer">tx</a>{s.feeUsd !== null && <> · {amt(s.fee)} {s.coin}</>}</span>
                   </div>
                 </li>
               ))}
