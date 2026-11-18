@@ -69,6 +69,11 @@ export default function Home() {
           Swaps are executed on-chain and cannot be reversed. Token prices can move between quote
           and execution; slippage protection applies. This is not financial advice.
         </p>
+        <nav aria-label="Guides">
+          <a href="/guides">Guides</a>
+          <a href="/guides/how-to-swap-on-sui">How to swap on Sui</a>
+          <a href="/swap/sui-to-usdc">SUI to USDC</a>
+        </nav>
         <nav aria-label="Legal">
           <a href="/terms">Terms of use</a>
           <a href="/risks">Risks</a>
