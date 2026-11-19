@@ -63,6 +63,12 @@ export const TOKENS: Token[] = [
     decimals: 8,
   },
   {
+    symbol: "hBTC",
+    name: "Hashi BTC",
+    type: "0xd30fb3f8914efdbeb7b8e85fae1d65dc584b44a1281f66737b92bb9f03a59d06::btc::BTC",
+    decimals: 8,
+  },
+  {
     symbol: "xBTC",
     name: "OKX Wrapped BTC",
     type: "0x876a4b7bce8aeaef60464c11f4026903e9afacab79b9b142686158aa86560b50::xbtc::XBTC",
