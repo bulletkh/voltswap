@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   metadataBase: new URL("https://voltswap.org"),
   icons: { icon: "/favicon.svg" },
+  verification: { google: "3pzeIBXVr1IvBkw_Hd42ROF4cyjpi-LRv_v9PowR254" },
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
