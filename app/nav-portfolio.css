@@ -8,6 +8,27 @@
 }
 .topnav a:hover { color: var(--ink); }
 .topnav a[aria-current="page"] { color: var(--ink); background: var(--card); box-shadow: 0 0 0 1px var(--line); }
+.topbar-actions { display: inline-flex; align-items: center; gap: 10px; }
+.x-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--line);
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s, box-shadow 0.25s, transform 0.25s;
+}
+.x-link:hover {
+  color: var(--signal, var(--ink));
+  border-color: rgba(255, 214, 10, 0.45);
+  box-shadow: 0 0 18px -6px rgba(255, 214, 10, 0.55);
+  transform: translateY(-1px);
+}
+.foot-x { display: inline-flex; align-items: center; gap: 6px; }
 
 .page-narrow { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: clamp(16px, 4vw, 48px) clamp(16px, 4vw, 24px); }
 .page-title { font-family: var(--display); font-size: clamp(30px, 5vw, 44px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 8px; }

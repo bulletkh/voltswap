@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     siteName: "Voltswap",
     type: "website",
   },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+  twitter: { card: "summary_large_image", site: "@voltswap", creator: "@voltswap", title: TITLE, description: DESCRIPTION },
 };
 
 export const viewport: Viewport = {

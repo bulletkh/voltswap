@@ -11,3 +11,4 @@ export const FEE_ENABLED =
 
 export const DEFAULT_SLIPPAGE = 0.005; // 0.5%
 export const EXPLORER_TX = "https://suiscan.xyz/mainnet/tx/";
+export const X_URL = "https://x.com/voltswap";

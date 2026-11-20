@@ -197,8 +197,9 @@ select:focus-visible, button:focus-visible, a:focus-visible {
   justify-content: space-between;
 }
 .foot p { margin: 0; max-width: 70ch; }
-.foot nav { display: flex; gap: 20px; }
+.foot nav { display: flex; gap: 20px; align-items: center; }
 .foot a, .back { color: var(--ink); }
+.foot-x { display: inline-flex; align-items: center; gap: 6px; }
 
 .usd { font-size: 13px; color: var(--muted); margin-top: 2px; min-height: 20px; }
 
