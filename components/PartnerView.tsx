@@ -224,7 +224,7 @@ export function PartnerView() {
 
           <div className="pt-mini-kpis pt-ref-kpis">
             <div>
-              <span>Invited wallets</span>
+              <span>Invited</span>
               <strong>{address ? (data?.wallet?.invitedWallets ?? 0) : "—"}</strong>
             </div>
             <div>
@@ -236,7 +236,7 @@ export function PartnerView() {
               <strong>{address ? usd(data?.wallet?.referredVolume ?? 0) : "—"}</strong>
             </div>
             <div>
-              <span>Instant earned</span>
+              <span>Earned</span>
               <strong className="ow-big">{address ? usd(data?.wallet?.refEarnedUsd ?? 0) : "—"}</strong>
             </div>
           </div>
