@@ -98,8 +98,8 @@ export type PartnerTier = {
   requirement: string;
 };
 
-/** Option A: referrers unlock 25% instant rev-share after $100+ personal swap volume on Voltswap. */
-export const PARTNER_MIN_VOLUME_USD = 100;
+/** Option A: referrers unlock 25% instant rev-share after $1,000+ personal swap volume (Plankton rank) on Voltswap. */
+export const PARTNER_MIN_VOLUME_USD = 1_000;
 /** Anti-sybil floor: an invited wallet counts as an active referral once it swaps ≥ $10 via the link. */
 export const ACTIVE_REFERRAL_MIN_USD = 10;
 
@@ -114,7 +114,7 @@ export const PARTNER_TIERS: PartnerTier[] = [
     minActiveRefs: 0,
     color: "#8896b3",
     glow: "rgba(136, 150, 179, 0.25)",
-    requirement: "Swap ≥ $100 on Voltswap to activate 25% instant rev-share",
+    requirement: "Swap ≥ $1,000 on Voltswap to activate 25% instant rev-share",
   },
   {
     id: "scout",
@@ -126,7 +126,7 @@ export const PARTNER_TIERS: PartnerTier[] = [
     minActiveRefs: 0,
     color: "#38bdf8",
     glow: "rgba(56, 189, 248, 0.45)",
-    requirement: "$100+ personal swap volume (Standard Partner · Fast-track: Zealy Sprint ≥$10)",
+    requirement: "$1,000+ personal swap volume (Standard Partner · Fast-track: Zealy Sprint ≥$10)",
   },
   {
     id: "commander",

@@ -205,7 +205,7 @@ export function PartnerView() {
               className={`pt-status-pill ${partnerTier.active ? "active" : "locked"}`}
               style={{ "--rk-color": partnerTier.color, "--rk-glow": partnerTier.glow } as React.CSSProperties}
             >
-              {partnerTier.emoji} {partnerTier.active ? `${partnerTier.name} · ${Math.round(partnerTier.revSharePct * 100)}%` : `Swap $${PARTNER_MIN_VOLUME_USD} to activate`}
+              {partnerTier.emoji} {partnerTier.active ? `${partnerTier.name} · ${Math.round(partnerTier.revSharePct * 100)}%` : `Swap ${usd(PARTNER_MIN_VOLUME_USD)} to activate`}
             </span>
           </div>
 
@@ -213,13 +213,13 @@ export function PartnerView() {
             <div className="pt-unlock-box">
               <div className="pt-prog-labels">
                 <span>Activate 25% Instant Rev-Share</span>
-                <strong>{usd(volumeUsd)} / ${PARTNER_MIN_VOLUME_USD}</strong>
+                <strong>{usd(volumeUsd)} / {usd(PARTNER_MIN_VOLUME_USD)}</strong>
               </div>
               <div className="pt-bar">
                 <i style={{ width: `${unlockPct}%`, background: "linear-gradient(90deg, #38bdf8, #ffd60a)" }} />
               </div>
               <p className="pt-note">
-                Complete at least <b>${PARTNER_MIN_VOLUME_USD}</b> in swap volume on Voltswap to activate your{" "}
+                Complete at least <b>{usd(PARTNER_MIN_VOLUME_USD)}</b> in swap volume on Voltswap to activate your{" "}
                 <b>25% Volt Scout</b> on-chain payouts.{" "}
                 <a href="/" className="pt-inline-cta">Swap now →</a>
               </p>
@@ -403,7 +403,7 @@ export function PartnerView() {
                 const unlockHeadline =
                   p.minActiveRefs > 0
                     ? `${p.minActiveRefs}+ active refs or ${usd(p.minVolumeUsd)}+ vol`
-                    : `$${PARTNER_MIN_VOLUME_USD}+ personal swap`;
+                    : `${usd(PARTNER_MIN_VOLUME_USD)}+ personal swap`;
                 return (
                   <article
                     key={p.id}
