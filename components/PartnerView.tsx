@@ -205,7 +205,7 @@ export function PartnerView() {
               className={`pt-status-pill ${partnerTier.active ? "active" : "locked"}`}
               style={{ "--rk-color": partnerTier.color, "--rk-glow": partnerTier.glow } as React.CSSProperties}
             >
-              {partnerTier.emoji} {partnerTier.active ? `${partnerTier.name} · ${Math.round(partnerTier.revSharePct * 100)}%` : "Swap $10 to activate"}
+              {partnerTier.emoji} {partnerTier.active ? `${partnerTier.name} · ${Math.round(partnerTier.revSharePct * 100)}%` : `Swap $${PARTNER_MIN_VOLUME_USD} to activate`}
             </span>
           </div>
 

@@ -98,8 +98,8 @@ export type PartnerTier = {
   requirement: string;
 };
 
-/** Option A: referrers unlock 25% instant rev-share after $10+ personal swap volume on Voltswap. */
-export const PARTNER_MIN_VOLUME_USD = 10;
+/** Option A: referrers unlock 25% instant rev-share after $100+ personal swap volume on Voltswap. */
+export const PARTNER_MIN_VOLUME_USD = 100;
 /** Anti-sybil floor: an invited wallet counts as an active referral once it swaps ≥ $10 via the link. */
 export const ACTIVE_REFERRAL_MIN_USD = 10;
 
@@ -114,7 +114,7 @@ export const PARTNER_TIERS: PartnerTier[] = [
     minActiveRefs: 0,
     color: "#8896b3",
     glow: "rgba(136, 150, 179, 0.25)",
-    requirement: "Swap ≥ $10 on Voltswap to activate 25% instant rev-share",
+    requirement: "Swap ≥ $100 on Voltswap to activate 25% instant rev-share",
   },
   {
     id: "scout",
@@ -126,7 +126,7 @@ export const PARTNER_TIERS: PartnerTier[] = [
     minActiveRefs: 0,
     color: "#38bdf8",
     glow: "rgba(56, 189, 248, 0.45)",
-    requirement: "$10+ personal swap volume (Standard Partner)",
+    requirement: "$100+ personal swap volume (Standard Partner · Fast-track: Zealy Sprint ≥$10)",
   },
   {
     id: "commander",
@@ -167,6 +167,7 @@ export const PARTNER_TIERS: PartnerTier[] = [
 ];
 
 // Sprint winner whitelists — add normalized 0x... Sui addresses here or via comma-separated env vars.
+const STATIC_SCOUT_25_PARTNERS: string[] = [];
 const STATIC_VIP_40_PARTNERS: string[] = [];
 const STATIC_SYNDICATE_50_PARTNERS: string[] = [];
 
@@ -180,6 +181,7 @@ function parseAddrList(raw: string | undefined, extra: string[]): Set<string> {
   return out;
 }
 
+export const SCOUT_25_SET = parseAddrList(process.env.NEXT_PUBLIC_SCOUT_25_PARTNERS, STATIC_SCOUT_25_PARTNERS);
 export const VIP_40_SET = parseAddrList(process.env.NEXT_PUBLIC_VIP_40_PARTNERS, STATIC_VIP_40_PARTNERS);
 export const SYNDICATE_50_SET = parseAddrList(process.env.NEXT_PUBLIC_SYNDICATE_50_PARTNERS, STATIC_SYNDICATE_50_PARTNERS);
 
@@ -211,10 +213,11 @@ export function resolvePartnerTier(
   const totalVol = volumeUsd + referredVolumeUsd;
   const whitelisted50 = Boolean(norm && SYNDICATE_50_SET.has(norm));
   const whitelisted40 = Boolean(norm && VIP_40_SET.has(norm));
+  const whitelisted25 = Boolean(norm && SCOUT_25_SET.has(norm));
 
   if (whitelisted50) return PARTNER_TIERS[4]; // Whale Syndicate 50% (Sprint / KOL whitelist)
-  if (volumeUsd < PARTNER_MIN_VOLUME_USD && !whitelisted40) {
-    return PARTNER_TIERS[0]; // Locked until $10 personal swap (Option A)
+  if (volumeUsd < PARTNER_MIN_VOLUME_USD && !whitelisted40 && !whitelisted25) {
+    return PARTNER_TIERS[0]; // Locked until $100 personal swap (or Sprint whitelist)
   }
   if (activeReferrals >= 100 || totalVol >= 250_000) {
     return PARTNER_TIERS[4]; // Whale Syndicate 50%
