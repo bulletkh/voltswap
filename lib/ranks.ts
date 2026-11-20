@@ -135,10 +135,10 @@ export const PARTNER_TIERS: PartnerTier[] = [
     active: true,
     revSharePct: 0.35,
     minVolumeUsd: 25_000,
-    minActiveRefs: 10,
+    minActiveRefs: 15,
     color: "#c084fc",
     glow: "rgba(192, 132, 252, 0.52)",
-    requirement: "10+ active referrals (≥$10 each) OR $25,000+ personal/referred volume",
+    requirement: "15+ active referrals (≥$10 each) OR $25,000+ personal/referred volume",
   },
   {
     id: "vip",
@@ -147,10 +147,10 @@ export const PARTNER_TIERS: PartnerTier[] = [
     active: true,
     revSharePct: 0.4,
     minVolumeUsd: 100_000,
-    minActiveRefs: 25,
+    minActiveRefs: 50,
     color: "#fbbf24",
     glow: "rgba(251, 191, 36, 0.58)",
-    requirement: "25+ active referrals (≥$10 each) OR $100,000+ volume · Fast-track: Top 11–50 Sprint",
+    requirement: "50+ active referrals (≥$10 each) OR $100,000+ volume · Fast-track: Top 11–50 Sprint",
   },
   {
     id: "syndicate",
@@ -159,10 +159,10 @@ export const PARTNER_TIERS: PartnerTier[] = [
     active: true,
     revSharePct: 0.5,
     minVolumeUsd: 250_000,
-    minActiveRefs: 50,
+    minActiveRefs: 100,
     color: "#ffd60a",
     glow: "rgba(255, 214, 10, 0.72)",
-    requirement: "50+ active referrals (≥$10 each) OR $250,000+ volume · Fast-track: Top 1–10 Sprint",
+    requirement: "100+ active referrals (≥$10 each) OR $250,000+ volume · Fast-track: Top 1–10 Sprint",
   },
 ];
 
@@ -216,13 +216,13 @@ export function resolvePartnerTier(
   if (volumeUsd < PARTNER_MIN_VOLUME_USD && !whitelisted40) {
     return PARTNER_TIERS[0]; // Locked until $10 personal swap (Option A)
   }
-  if (activeReferrals >= 50 || totalVol >= 250_000) {
+  if (activeReferrals >= 100 || totalVol >= 250_000) {
     return PARTNER_TIERS[4]; // Whale Syndicate 50%
   }
-  if (whitelisted40 || activeReferrals >= 25 || totalVol >= 100_000) {
+  if (whitelisted40 || activeReferrals >= 50 || totalVol >= 100_000) {
     return PARTNER_TIERS[3]; // VIP Partner 40%
   }
-  if (activeReferrals >= 10 || totalVol >= 25_000) {
+  if (activeReferrals >= 15 || totalVol >= 25_000) {
     return PARTNER_TIERS[2]; // Volt Commander 35%
   }
   return PARTNER_TIERS[1]; // Volt Scout 25%
