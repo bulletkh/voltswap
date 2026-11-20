@@ -1,6 +1,6 @@
 import { FEE_RATE } from "./config";
 import { OWNER_ADDRESS, TX_FIELDS, classify, coinMeta, currentPrices, dayKey, dayPrices, gql, normType, type FeeEvent, type RawTx } from "./fees";
-import { normalizeSuiAddress, resolvePartnerTier, type PartnerTierId } from "./ranks";
+import { ACTIVE_REFERRAL_MIN_USD, normalizeSuiAddress, resolvePartnerTier, type PartnerTierId } from "./ranks";
 
 const PAGE = 50;
 const MAX_PAGES = 40; // up to 2000 transactions touching the treasury
@@ -38,6 +38,7 @@ export type WalletRankStats = {
   volume: number;
   rank: number | null;
   invitedWallets: number;
+  activeReferrals: number; // invited wallets with ≥ $10 referred swap volume
   referredSwaps: number;
   referredVolume: number;
   refEarnedUsd: number;
@@ -46,6 +47,8 @@ export type WalletRankStats = {
 export type RefCheck = {
   address: string;
   volume: number;
+  activeReferrals: number;
+  referredVolume: number;
   active: boolean;
   revSharePct: number;
   tierId: PartnerTierId;
@@ -60,7 +63,7 @@ export type RanksPayload = {
   referrer: RefCheck | null;
 };
 
-type RefAgg = { invited: Set<string>; swaps: number; volume: number; earnedUsd: number };
+type RefAgg = { invitedVols: Map<string, number>; swaps: number; volume: number; earnedUsd: number };
 type CachedBundle = {
   ownerStats: OwnerStats;
   allWallets: Map<string, { swaps: number; volume: number; fee: number; last: number; rank: number }>;
@@ -128,8 +131,9 @@ async function compute(): Promise<CachedBundle> {
     if (e.referrer && e.refFeeRaw) {
       const refNorm = normalizeSuiAddress(e.referrer) ?? e.referrer.toLowerCase();
       const refFee = Number(e.refFeeRaw) / 10 ** dec;
-      const r = refs.get(refNorm) ?? { invited: new Set<string>(), swaps: 0, volume: 0, earnedUsd: 0 };
-      r.invited.add(e.wallet);
+      const r = refs.get(refNorm) ?? { invitedVols: new Map<string, number>(), swaps: 0, volume: 0, earnedUsd: 0 };
+      const wNorm = normalizeSuiAddress(e.wallet) ?? e.wallet.toLowerCase();
+      r.invitedVols.set(wNorm, (r.invitedVols.get(wNorm) ?? 0) + (volumeUsd ?? 0));
       r.swaps++;
       r.volume += volumeUsd ?? 0;
       if (price !== undefined) r.earnedUsd += refFee * price;
@@ -259,6 +263,15 @@ export async function getOwnerStats(): Promise<OwnerStats> {
   return (await getBundle()).ownerStats;
 }
 
+function countActiveRefs(r?: RefAgg): number {
+  if (!r) return 0;
+  let n = 0;
+  for (const v of r.invitedVols.values()) {
+    if (v >= ACTIVE_REFERRAL_MIN_USD) n++;
+  }
+  return n;
+}
+
 export async function getRanksData(walletRaw?: string | null, refRaw?: string | null): Promise<RanksPayload> {
   const b = await getBundle();
   const wNorm = normalizeSuiAddress(walletRaw);
@@ -273,7 +286,8 @@ export async function getRanksData(walletRaw?: string | null, refRaw?: string | 
       swaps: w?.swaps ?? 0,
       volume: w?.volume ?? 0,
       rank: w?.rank ?? null,
-      invitedWallets: ref?.invited.size ?? 0,
+      invitedWallets: ref?.invitedVols.size ?? 0,
+      activeReferrals: countActiveRefs(ref),
       referredSwaps: ref?.swaps ?? 0,
       referredVolume: ref?.volume ?? 0,
       refEarnedUsd: ref?.earnedUsd ?? 0,
@@ -283,11 +297,16 @@ export async function getRanksData(walletRaw?: string | null, refRaw?: string | 
   let referrer: RefCheck | null = null;
   if (rNorm) {
     const rw = b.allWallets.get(rNorm);
+    const rr = b.refs.get(rNorm);
     const vol = rw?.volume ?? 0;
-    const tier = resolvePartnerTier(rNorm, vol);
+    const activeRefs = countActiveRefs(rr);
+    const refVol = rr?.volume ?? 0;
+    const tier = resolvePartnerTier(rNorm, vol, activeRefs, refVol);
     referrer = {
       address: rNorm,
       volume: vol,
+      activeReferrals: activeRefs,
+      referredVolume: refVol,
       active: tier.active,
       revSharePct: tier.revSharePct,
       tierId: tier.id,

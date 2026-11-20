@@ -5,6 +5,7 @@ import { useCurrentAccount } from "@mysten/dapp-kit-react";
 import { FEE_RATE, FEE_RECEIVER } from "@/lib/config";
 import type { RanksPayload } from "@/lib/owner";
 import {
+  ACTIVE_REFERRAL_MIN_USD,
   PARTNER_MIN_VOLUME_USD,
   PARTNER_TIERS,
   TRADER_TIERS,
@@ -74,10 +75,29 @@ export function PartnerView() {
     () => Math.max(data?.wallet?.volume ?? 0, optVol),
     [data?.wallet?.volume, optVol],
   );
+  const activeRefs = data?.wallet?.activeReferrals ?? 0;
+  const referredVol = data?.wallet?.referredVolume ?? 0;
+  const combinedVol = volumeUsd + referredVol;
   const hasActiveRef = Boolean(data?.referrer?.active);
   const traderTier = useMemo(() => resolveTraderTier(volumeUsd, hasActiveRef), [volumeUsd, hasActiveRef]);
-  const partnerTier = useMemo(() => resolvePartnerTier(address, volumeUsd), [address, volumeUsd]);
+  const partnerTier = useMemo(
+    () => resolvePartnerTier(address, volumeUsd, activeRefs, referredVol),
+    [address, volumeUsd, activeRefs, referredVol],
+  );
   const effFee = effectiveSwapFeeRate(FEE_RATE, traderTier);
+
+  const nextPartner = useMemo(() => {
+    const idx = PARTNER_TIERS.findIndex((p) => p.id === partnerTier.id);
+    if (idx < 0 || idx >= PARTNER_TIERS.length - 1) return null;
+    return PARTNER_TIERS[idx + 1];
+  }, [partnerTier.id]);
+
+  const partnerProgPct = useMemo(() => {
+    if (!nextPartner || !partnerTier.active) return 0;
+    const refPct = nextPartner.minActiveRefs > 0 ? (activeRefs / nextPartner.minActiveRefs) * 100 : 0;
+    const volPct = nextPartner.minVolumeUsd > 0 ? (combinedVol / nextPartner.minVolumeUsd) * 100 : 0;
+    return Math.min(100, Math.max(0, Math.max(refPct, volPct)));
+  }, [nextPartner, partnerTier.active, activeRefs, combinedVol]);
 
   const nextTrader = useMemo(() => {
     const idx = TRADER_TIERS.findIndex((t) => t.id === traderTier.id);
@@ -222,10 +242,39 @@ export function PartnerView() {
             </button>
           </div>
 
+          {address && partnerTier.active && nextPartner && (
+            <div className="pt-prog-wrap" style={{ marginTop: 0 }}>
+              <div className="pt-prog-labels">
+                <span>
+                  Next: {nextPartner.emoji} {nextPartner.name} ({Math.round(nextPartner.revSharePct * 100)}%)
+                </span>
+                <span>
+                  {activeRefs} / {nextPartner.minActiveRefs} active refs (≥${ACTIVE_REFERRAL_MIN_USD}) · or {usd(combinedVol)} / {usd(nextPartner.minVolumeUsd)}
+                </span>
+              </div>
+              <div className="pt-bar">
+                <i
+                  style={{
+                    width: `${partnerProgPct}%`,
+                    background: `linear-gradient(90deg, ${partnerTier.color}, ${nextPartner.color})`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="pt-mini-kpis pt-ref-kpis">
-            <div>
-              <span>Invited</span>
-              <strong>{address ? (data?.wallet?.invitedWallets ?? 0) : "—"}</strong>
+            <div title={`Active referrals (swapped ≥ $${ACTIVE_REFERRAL_MIN_USD}) / total invited`}>
+              <span>Active refs</span>
+              <strong>
+                {address
+                  ? `${activeRefs}${
+                      (data?.wallet?.invitedWallets ?? 0) > activeRefs
+                        ? ` / ${data?.wallet?.invitedWallets}`
+                        : ""
+                    }`
+                  : "—"}
+              </strong>
             </div>
             <div>
               <span>Ref swaps</span>
@@ -233,7 +282,7 @@ export function PartnerView() {
             </div>
             <div>
               <span>Ref volume</span>
-              <strong>{address ? usd(data?.wallet?.referredVolume ?? 0) : "—"}</strong>
+              <strong>{address ? usd(referredVol) : "—"}</strong>
             </div>
             <div>
               <span>Earned</span>
@@ -344,32 +393,41 @@ export function PartnerView() {
         )}
 
         {tab === "partners" && (
-          <div className="pt-tier-grid pt-partner-grid">
-            {PARTNER_TIERS.filter((p) => p.id !== "locked").map((p) => {
-              const isCur = address && partnerTier.id === p.id;
-              return (
-                <article
-                  key={p.id}
-                  className={`pt-tier-card${isCur ? " current" : ""}`}
-                  style={{ "--rk-color": p.color, "--rk-glow": p.glow } as React.CSSProperties}
-                >
-                  <div className="pt-tier-top">
-                    <span className="pt-tier-emoji" aria-hidden="true">{p.emoji}</span>
-                    <div>
-                      <h3>{p.name}</h3>
-                      <span className="pt-tier-vol">{Math.round(p.revSharePct * 100)}% instant PTB split</span>
+          <>
+            <p className="pt-note">
+              Unlock higher instant rev-share automatically by bringing <b>active referrals</b> (each swapping ≥ ${ACTIVE_REFERRAL_MIN_USD}) <b>OR</b> by personal + referred volume — no Zealy required.
+            </p>
+            <div className="pt-tier-grid pt-partner-grid">
+              {PARTNER_TIERS.filter((p) => p.id !== "locked").map((p) => {
+                const isCur = address && partnerTier.id === p.id;
+                const unlockHeadline =
+                  p.minActiveRefs > 0
+                    ? `${p.minActiveRefs}+ active refs or ${usd(p.minVolumeUsd)}+ vol`
+                    : `$${PARTNER_MIN_VOLUME_USD}+ personal swap`;
+                return (
+                  <article
+                    key={p.id}
+                    className={`pt-tier-card${isCur ? " current" : ""}`}
+                    style={{ "--rk-color": p.color, "--rk-glow": p.glow } as React.CSSProperties}
+                  >
+                    <div className="pt-tier-top">
+                      <span className="pt-tier-emoji" aria-hidden="true">{p.emoji}</span>
+                      <div>
+                        <h3>{p.name}</h3>
+                        <span className="pt-tier-vol">{unlockHeadline}</span>
+                      </div>
+                      {isCur && <span className="pt-you">Your Tier</span>}
                     </div>
-                    {isCur && <span className="pt-you">Your Tier</span>}
-                  </div>
-                  <div className="pt-tier-fee">
-                    <b>{Math.round(p.revSharePct * 100)}%</b>
-                    <span>of referred swap fees</span>
-                  </div>
-                  <p>{p.requirement}</p>
-                </article>
-              );
-            })}
-          </div>
+                    <div className="pt-tier-fee">
+                      <b>{Math.round(p.revSharePct * 100)}%</b>
+                      <span>instant on-chain PTB split</span>
+                    </div>
+                    <p>{p.requirement}</p>
+                  </article>
+                );
+              })}
+            </div>
+          </>
         )}
       </section>
     </div>

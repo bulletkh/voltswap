@@ -92,6 +92,7 @@ export type PartnerTier = {
   active: boolean;
   revSharePct: number; // 0..0.50
   minVolumeUsd: number;
+  minActiveRefs: number;
   color: string;
   glow: string;
   requirement: string;
@@ -99,6 +100,8 @@ export type PartnerTier = {
 
 /** Option A: referrers unlock 25% instant rev-share after $10+ personal swap volume on Voltswap. */
 export const PARTNER_MIN_VOLUME_USD = 10;
+/** Anti-sybil floor: an invited wallet counts as an active referral once it swaps ≥ $10 via the link. */
+export const ACTIVE_REFERRAL_MIN_USD = 10;
 
 export const PARTNER_TIERS: PartnerTier[] = [
   {
@@ -108,6 +111,7 @@ export const PARTNER_TIERS: PartnerTier[] = [
     active: false,
     revSharePct: 0,
     minVolumeUsd: 0,
+    minActiveRefs: 0,
     color: "#8896b3",
     glow: "rgba(136, 150, 179, 0.25)",
     requirement: "Swap ≥ $10 on Voltswap to activate 25% instant rev-share",
@@ -119,6 +123,7 @@ export const PARTNER_TIERS: PartnerTier[] = [
     active: true,
     revSharePct: 0.25,
     minVolumeUsd: PARTNER_MIN_VOLUME_USD,
+    minActiveRefs: 0,
     color: "#38bdf8",
     glow: "rgba(56, 189, 248, 0.45)",
     requirement: "$10+ personal swap volume (Standard Partner)",
@@ -130,20 +135,22 @@ export const PARTNER_TIERS: PartnerTier[] = [
     active: true,
     revSharePct: 0.35,
     minVolumeUsd: 25_000,
+    minActiveRefs: 10,
     color: "#c084fc",
     glow: "rgba(192, 132, 252, 0.52)",
-    requirement: "$25,000+ personal swap volume",
+    requirement: "10+ active referrals (≥$10 each) OR $25,000+ personal/referred volume",
   },
   {
     id: "vip",
-    name: "VIP Founding Partner",
+    name: "VIP Partner",
     emoji: "⚡",
     active: true,
     revSharePct: 0.4,
-    minVolumeUsd: 0,
+    minVolumeUsd: 100_000,
+    minActiveRefs: 25,
     color: "#fbbf24",
     glow: "rgba(251, 191, 36, 0.58)",
-    requirement: "Top 11–50 Sprint Winner (exclusive 40% slot)",
+    requirement: "25+ active referrals (≥$10 each) OR $100,000+ volume · Fast-track: Top 11–50 Sprint",
   },
   {
     id: "syndicate",
@@ -152,9 +159,10 @@ export const PARTNER_TIERS: PartnerTier[] = [
     active: true,
     revSharePct: 0.5,
     minVolumeUsd: 250_000,
+    minActiveRefs: 50,
     color: "#ffd60a",
     glow: "rgba(255, 214, 10, 0.72)",
-    requirement: "$250,000+ volume or Top 1–10 Sprint Winner (50% Lifetime)",
+    requirement: "50+ active referrals (≥$10 each) OR $250,000+ volume · Fast-track: Top 1–10 Sprint",
   },
 ];
 
@@ -193,21 +201,31 @@ export function resolveTraderTier(volumeUsd: number, hasActiveReferrer = false):
   return active;
 }
 
-export function resolvePartnerTier(address?: string | null, volumeUsd = 0): PartnerTier {
+export function resolvePartnerTier(
+  address?: string | null,
+  volumeUsd = 0,
+  activeReferrals = 0,
+  referredVolumeUsd = 0,
+): PartnerTier {
   const norm = normalizeSuiAddress(address);
-  if ((norm && SYNDICATE_50_SET.has(norm)) || volumeUsd >= 250_000) {
+  const totalVol = volumeUsd + referredVolumeUsd;
+  const whitelisted50 = Boolean(norm && SYNDICATE_50_SET.has(norm));
+  const whitelisted40 = Boolean(norm && VIP_40_SET.has(norm));
+
+  if (whitelisted50) return PARTNER_TIERS[4]; // Whale Syndicate 50% (Sprint / KOL whitelist)
+  if (volumeUsd < PARTNER_MIN_VOLUME_USD && !whitelisted40) {
+    return PARTNER_TIERS[0]; // Locked until $10 personal swap (Option A)
+  }
+  if (activeReferrals >= 50 || totalVol >= 250_000) {
     return PARTNER_TIERS[4]; // Whale Syndicate 50%
   }
-  if (norm && VIP_40_SET.has(norm)) {
-    return PARTNER_TIERS[3]; // VIP Founding Partner 40%
+  if (whitelisted40 || activeReferrals >= 25 || totalVol >= 100_000) {
+    return PARTNER_TIERS[3]; // VIP Partner 40%
   }
-  if (volumeUsd >= 25_000) {
+  if (activeReferrals >= 10 || totalVol >= 25_000) {
     return PARTNER_TIERS[2]; // Volt Commander 35%
   }
-  if (volumeUsd >= PARTNER_MIN_VOLUME_USD) {
-    return PARTNER_TIERS[1]; // Volt Scout 25%
-  }
-  return PARTNER_TIERS[0]; // Locked (< $10)
+  return PARTNER_TIERS[1]; // Volt Scout 25%
 }
 
 export function effectiveSwapFeeRate(baseRate: number, tier: TraderTier): number {
