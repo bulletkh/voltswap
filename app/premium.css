@@ -683,14 +683,15 @@ select option:checked, select option:hover { background-color: #26306b; color: #
 }
 .fee-rank-tag:hover { text-decoration: underline; }
 
-.pt { display: grid; gap: 16px; }
-.pt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
-.pt-card { display: flex; flex-direction: column; gap: 14px; }
-.pt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pt { display: grid; gap: 16px; width: 100%; min-width: 0; }
+.pt-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; min-width: 0; }
+.pt-card { display: flex; flex-direction: column; gap: 14px; min-width: 0; overflow: hidden; }
+.pt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .pt-head .tk-sub { margin: 0; font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.pt-hero-row { display: flex; align-items: center; gap: 12px; }
+.pt-hero-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .rank-badge-lg {
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -700,7 +701,8 @@ select option:checked, select option:hover { background-color: #26306b; color: #
   border: 1px solid color-mix(in srgb, var(--rk-color, #9aa8c7) 42%, transparent);
   box-shadow: 0 0 26px -8px var(--rk-glow, transparent);
 }
-.rank-emoji-lg { font-size: 32px; line-height: 1; filter: drop-shadow(0 0 12px var(--rk-glow, transparent)); }
+.rank-emoji-lg { font-size: 32px; line-height: 1; flex-shrink: 0; filter: drop-shadow(0 0 12px var(--rk-glow, transparent)); }
+.rank-badge-lg > div { min-width: 0; }
 .rank-badge-lg strong { display: block; font-family: var(--display); font-size: 20px; color: var(--rk-color, #fff); }
 .rank-badge-lg span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
 
@@ -708,21 +710,24 @@ select option:checked, select option:hover { background-color: #26306b; color: #
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  min-width: 0;
 }
 .pt-ref-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: auto; }
 .pt-mini-kpis > div {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 10px 12px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 10px 10px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
-.pt-mini-kpis span { display: block; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
-.pt-mini-kpis strong { display: block; font-family: var(--display); font-size: 17px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.pt-mini-kpis span { display: block; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pt-mini-kpis strong { display: block; font-family: var(--display); font-size: 16px; margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.pt-prog-wrap { margin-top: auto; display: grid; gap: 6px; }
+.pt-prog-wrap { margin-top: auto; display: grid; gap: 6px; min-width: 0; }
 .pt-prog-labels { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
 .pt-bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .pt-bar i { display: block; height: 100%; border-radius: 999px; transition: width 0.5s var(--ease); }
@@ -735,6 +740,8 @@ select option:checked, select option:hover { background-color: #26306b; color: #
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
+  max-width: 100%;
+  white-space: nowrap;
   color: var(--rk-color, var(--ink));
   background: color-mix(in srgb, var(--rk-color, #8896b3) 14%, rgba(255, 255, 255, 0.03));
   border: 1px solid color-mix(in srgb, var(--rk-color, #8896b3) 45%, transparent);
@@ -743,6 +750,7 @@ select option:checked, select option:hover { background-color: #26306b; color: #
 .pt-unlock-box {
   display: grid;
   gap: 8px;
+  min-width: 0;
   padding: 12px 14px;
   border-radius: 14px;
   background: rgba(56, 189, 248, 0.07);
@@ -753,10 +761,12 @@ select option:checked, select option:hover { background-color: #26306b; color: #
 .pt-inline-cta { color: var(--signal); font-weight: 700; text-decoration: none; }
 .pt-inline-cta:hover { text-decoration: underline; }
 
-.pt-link-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pt-link-row { display: flex; gap: 8px; align-items: center; min-width: 0; width: 100%; }
 .pt-code {
-  flex: 1;
-  min-width: 180px;
+  display: block;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(6, 9, 20, 0.8);
@@ -768,29 +778,33 @@ select option:checked, select option:hover { background-color: #26306b; color: #
   white-space: nowrap;
 }
 .pt-copy {
+  flex: 0 0 auto;
+  white-space: nowrap;
   border: 0;
   border-radius: 999px;
-  padding: 9px 16px;
+  padding: 9px 14px;
   background: var(--signal);
   color: #1a1400;
   font: 700 13px var(--body);
   cursor: pointer;
   transition: transform 0.2s var(--ease), box-shadow 0.2s;
 }
+.pt-link-row .ow-btn { flex: 0 0 auto; white-space: nowrap; }
 .pt-copy:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 20px -4px rgba(255, 214, 10, 0.6); }
 .pt-copy:disabled { opacity: 0.45; cursor: not-allowed; }
 
-.pt-board { display: grid; gap: 14px; }
-.pt-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); }
+.pt-board { display: grid; gap: 14px; min-width: 0; overflow: hidden; }
+.pt-tabs { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 20px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); max-width: 100%; }
 .pt-tabs button { border: 0; background: none; color: var(--muted); font: 600 13px var(--body); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
 .pt-tabs button.on { background: var(--signal); color: #1a1400; }
 .pt-meta { font-size: 12.5px; color: var(--muted); }
 
-.pt-lb { display: grid; gap: 8px; }
+.pt-lb { display: grid; gap: 8px; min-width: 0; }
 .pt-lb li {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   padding: 11px 14px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -853,13 +867,15 @@ select option:checked, select option:hover { background-color: #26306b; color: #
 .pt-tier-fee span { font-size: 12.5px; color: var(--muted); }
 .pt-tier-card p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
 
-@media (max-width: 860px) {
-  .pt-grid { grid-template-columns: 1fr; }
-  .pt-tier-grid, .pt-partner-grid { grid-template-columns: 1fr 1fr; }
+@media (max-width: 920px) {
+  .pt-grid { grid-template-columns: minmax(0, 1fr); }
+  .pt-tier-grid, .pt-partner-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   .rank-pill .rank-name { display: none; }
   .rank-pill { padding: 7px 10px; }
-  .pt-ref-kpis { grid-template-columns: 1fr 1fr; }
-  .pt-tier-grid, .pt-partner-grid { grid-template-columns: 1fr; }
+  .pt-link-row { flex-wrap: wrap; }
+  .pt-code { flex: 1 1 100%; width: 100%; }
+  .pt-ref-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pt-tier-grid, .pt-partner-grid { grid-template-columns: minmax(0, 1fr); }
 }
