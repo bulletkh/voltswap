@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Transaction } from "@mysten/sui/transactions";
+import { Transaction, coinWithBalance } from "@mysten/sui/transactions";
 import type { SuiGrpcClient } from "@mysten/sui/grpc";
 import { AggregatorClient, Env } from "@cetusprotocol/aggregator-sdk";
 import { useCurrentAccount, useCurrentClient, useDAppKit } from "@mysten/dapp-kit-react";
@@ -10,6 +10,18 @@ import { formatUsd, getUsdPrice } from "@/lib/price";
 import { TokenPicker } from "./TokenPicker";
 import { fromBaseUnits, toBaseUnits } from "@/lib/format";
 import { DEFAULT_SLIPPAGE, EXPLORER_TX, FEE_ENABLED, FEE_RATE, FEE_RECEIVER } from "@/lib/config";
+import {
+  VOLUME_EVENT,
+  addOptimisticVolume,
+  captureReferralFromUrl,
+  effectiveSwapFeeRate,
+  formatFeePct,
+  getOptimisticVolume,
+  getValidReferrerForSender,
+  resolveTraderTier,
+  syncOptimisticVolume,
+} from "@/lib/ranks";
+import type { RefCheck, RanksPayload } from "@/lib/owner";
 
 const ZERO_ADDRESS = "0x" + "0".repeat(64);
 const SLIPPAGE_OPTIONS = [0.003, 0.005, 0.01];
@@ -61,8 +73,60 @@ export function SwapCard() {
   const requestId = useRef(0);
   const [custom, setCustom] = useState<Token[]>([]);
   const [prices, setPrices] = useState<Record<string, number | null>>({});
+  const [walletVol, setWalletVol] = useState(0);
+  const [storedRef, setStoredRef] = useState<string | null>(null);
+  const [refInfo, setRefInfo] = useState<RefCheck | null>(null);
 
-  useEffect(() => setCustom(loadCustomTokens()), []);
+  useEffect(() => {
+    setCustom(loadCustomTokens());
+    captureReferralFromUrl();
+    setStoredRef(getValidReferrerForSender(account?.address, FEE_RECEIVER));
+  }, [account?.address]);
+
+  useEffect(() => {
+    const addr = account?.address;
+    setWalletVol(getOptimisticVolume(addr));
+    const onVol = () => setWalletVol(getOptimisticVolume(addr));
+    window.addEventListener(VOLUME_EVENT, onVol);
+    return () => window.removeEventListener(VOLUME_EVENT, onVol);
+  }, [account?.address]);
+
+  useEffect(() => {
+    const addr = account?.address ?? null;
+    const ref = getValidReferrerForSender(addr, FEE_RECEIVER);
+    setStoredRef(ref);
+    if (!addr && !ref) {
+      setRefInfo(null);
+      return;
+    }
+    let alive = true;
+    const qs = new URLSearchParams();
+    if (addr) qs.set("wallet", addr);
+    if (ref) qs.set("ref", ref);
+    void fetch(`/api/ranks?${qs.toString()}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: RanksPayload | null) => {
+        if (!alive || !d) return;
+        if (addr && d.wallet) {
+          setWalletVol(syncOptimisticVolume(addr, d.wallet.volume));
+        }
+        setRefInfo(d.referrer ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [account?.address]);
+
+  const activeRef = useMemo(
+    () => (storedRef && refInfo && refInfo.address === storedRef && refInfo.active && refInfo.revSharePct > 0 ? refInfo : null),
+    [storedRef, refInfo],
+  );
+  const traderTier = useMemo(() => resolveTraderTier(walletVol, Boolean(activeRef)), [walletVol, activeRef]);
+  const effectiveFee = useMemo(
+    () => (FEE_ENABLED ? effectiveSwapFeeRate(FEE_RATE, traderTier) : 0),
+    [traderTier],
+  );
   const [win, setWin] = useState(0);
 
   // the price tape asks for a token: buy it with USDC
@@ -129,21 +193,48 @@ export function SwapCard() {
     });
   }
 
+  const amountIn = toBaseUnits(amount, from.decimals);
+
+  // Atomic PTB fee split when an active partner referral link is present
+  const refSplit = useMemo(() => {
+    if (!amountIn || !FEE_ENABLED || effectiveFee <= 0 || !activeRef) return null;
+    const ppm = BigInt(Math.round(effectiveFee * 1_000_000));
+    const totalFee = (amountIn * ppm) / 1_000_000n;
+    const refUnits = (totalFee * BigInt(Math.round(activeRef.revSharePct * 1000))) / 1000n;
+    const treasuryUnits = totalFee - refUnits;
+    const netIn = amountIn - totalFee;
+    if (totalFee <= 0n || refUnits <= 0n || treasuryUnits <= 0n || netIn <= 0n) return null;
+    return {
+      referrer: activeRef.address,
+      totalFee,
+      refUnits,
+      treasuryUnits,
+      netIn,
+    };
+  }, [amountIn, effectiveFee, activeRef]);
+
   const aggregator = useMemo(
     () =>
       new AggregatorClient({
         env: Env.Mainnet,
         client: client as unknown as SuiGrpcClient,
         signer: account?.address ?? ZERO_ADDRESS,
-        ...(FEE_ENABLED ? { overlayFeeRate: FEE_RATE, overlayFeeReceiver: FEE_RECEIVER } : {}),
+        ...(FEE_ENABLED && effectiveFee > 0 && !refSplit
+          ? { overlayFeeRate: effectiveFee, overlayFeeReceiver: FEE_RECEIVER }
+          : {}),
       }),
-    [client, account?.address],
+    [client, account?.address, effectiveFee, refSplit],
   );
 
-  // Отдельный клиент без комиссии — только для оценки цены в долларах
+  // Отдельный клиент без комиссии — для оценки цены в долларах и маршрутов с ручным PTB-сплитом
   const priceAgg = useMemo(
-    () => new AggregatorClient({ env: Env.Mainnet, client: client as unknown as SuiGrpcClient, signer: ZERO_ADDRESS }),
-    [client],
+    () =>
+      new AggregatorClient({
+        env: Env.Mainnet,
+        client: client as unknown as SuiGrpcClient,
+        signer: account?.address ?? ZERO_ADDRESS,
+      }),
+    [client, account?.address],
   );
   useEffect(() => {
     let alive = true;
@@ -156,8 +247,6 @@ export function SwapCard() {
       alive = false;
     };
   }, [priceAgg, from, to]);
-
-  const amountIn = toBaseUnits(amount, from.decimals);
 
   // Баланс выбранного токена
   const loadBalance = useCallback(async () => {
@@ -185,12 +274,14 @@ export function SwapCard() {
     }
     const id = ++requestId.current;
     setQuoting(true);
+    const quoteAmount = refSplit ? refSplit.netIn : amountIn;
+    const activeClient = refSplit ? priceAgg : aggregator;
     const timer = setTimeout(async () => {
       try {
-        const r = await aggregator.findRouters({
+        const r = await activeClient.findRouters({
           from: from.type,
           target: to.type,
-          amount: amountIn.toString(),
+          amount: quoteAmount.toString(),
           byAmountIn: true,
         });
         if (id !== requestId.current) return;
@@ -205,7 +296,7 @@ export function SwapCard() {
     }, 400);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, from.type, to.type, aggregator]);
+  }, [amount, from.type, to.type, aggregator, priceAgg, refSplit]);
 
   const amountOut = quote ? BigInt(quote.amountOut.toString()) : null;
   const minReceived =
@@ -246,15 +337,64 @@ export function SwapCard() {
   }
 
   async function swap() {
-    if (!quote || !account) return;
+    if (!quote || !account || !amountIn) return;
     setStatus({ kind: "signing" });
     try {
       const txb = new Transaction();
-      await aggregator.fastRouterSwap({ router: quote, txb, slippage });
+      txb.setSender(account.address);
+      if (refSplit) {
+        const isSui = from.type === SUI_TYPE || from.type.endsWith("::sui::SUI");
+        if (isSui) {
+          const [treasuryCoin, refCoin, swapCoin] = txb.splitCoins(txb.gas, [
+            refSplit.treasuryUnits,
+            refSplit.refUnits,
+            refSplit.netIn,
+          ]);
+          txb.transferObjects([treasuryCoin], FEE_RECEIVER);
+          txb.transferObjects([refCoin], refSplit.referrer);
+          const outCoin = await priceAgg.routerSwap({
+            router: quote,
+            inputCoin: swapCoin,
+            slippage,
+            txb,
+          });
+          txb.transferObjects([outCoin], account.address);
+        } else {
+          const sourceCoin = txb.add(
+            coinWithBalance({ type: from.type, balance: amountIn }),
+          );
+          const [treasuryCoin, refCoin] = txb.splitCoins(sourceCoin, [
+            refSplit.treasuryUnits,
+            refSplit.refUnits,
+          ]);
+          txb.transferObjects([treasuryCoin], FEE_RECEIVER);
+          txb.transferObjects([refCoin], refSplit.referrer);
+          const outCoin = await priceAgg.routerSwap({
+            router: quote,
+            inputCoin: sourceCoin,
+            slippage,
+            txb,
+          });
+          txb.transferObjects([outCoin], account.address);
+        }
+      } else {
+        await aggregator.fastRouterSwap({ router: quote, txb, slippage });
+      }
       const result = await dAppKit.signAndExecuteTransaction({ transaction: txb });
       if (result.$kind === "FailedTransaction") {
         throw new Error("The transaction failed on-chain. No funds were swapped.");
       }
+      // Optimistically update wallet volume so the glowing header rank & $10 partner unlock update right away
+      const fromPrice = prices[from.type];
+      const toPrice = prices[to.type];
+      const deltaUsd =
+        fromPrice && fromPrice > 0
+          ? (Number(amountIn) / 10 ** from.decimals) * fromPrice
+          : toPrice && toPrice > 0 && amountOut
+            ? (Number(amountOut) / 10 ** to.decimals) * toPrice
+            : 0;
+      if (deltaUsd > 0) addOptimisticVolume(account.address, deltaUsd);
+
       setStatus({ kind: "done", digest: result.Transaction.digest });
       setWin(Date.now());
       void fetch("/api/notify", {
@@ -358,7 +498,23 @@ export function SwapCard() {
           {FEE_ENABLED && (
             <div>
               <dt>Voltswap fee</dt>
-              <dd>{(FEE_RATE * 100).toFixed(2).replace(/\.?0+$/, "")}%</dd>
+              <dd>
+                {formatFeePct(effectiveFee)}
+                {traderTier.discountPct > 0 && (
+                  <>
+                    {" "}
+                    <a className="fee-rank-tag" href="/partner" style={{ color: traderTier.color }}>
+                      {traderTier.emoji} {traderTier.name} (-{traderTier.discountPct}%)
+                    </a>
+                  </>
+                )}
+              </dd>
+            </div>
+          )}
+          {activeRef && (
+            <div>
+              <dt>Partner link</dt>
+              <dd style={{ color: "#34d399" }}>Active · -20% Plankton boost</dd>
             </div>
           )}
         </dl>

@@ -23,8 +23,8 @@ const PERKS = [
     icon: "M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Zm-3 9 2 2 4-4",
   },
   {
-    title: FEE_ENABLED ? `One fee: ${fee}%` : "No Voltswap fee",
-    text: FEE_ENABLED ? "Already included in the quote you see, so the number you confirm is the number you get." : "No Voltswap fee is applied at the moment.",
+    title: FEE_ENABLED ? `From ${fee}% down to 0%` : "No Voltswap fee",
+    text: FEE_ENABLED ? "Base 0.1% fee included in your quote, with up to -100% rank discounts and 25–50% instant partner rev-share." : "No Voltswap fee is applied at the moment.",
     icon: "M12 2v20M17 6.5C16 5 14 4.5 12 4.5c-2.5 0-4.5 1.2-4.5 3.2 0 4.3 9 2.3 9 6.6 0 2-2 3.2-4.5 3.2-2.2 0-4.2-.7-5.2-2.3",
   },
 ];

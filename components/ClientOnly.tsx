@@ -32,3 +32,8 @@ export const OwnerSlot = dynamic(() => import("./OwnerPanel").then((m) => m.Owne
   ssr: false,
   loading: () => <section className="card card-ph" aria-busy="true" aria-label="Cabinet loading" />,
 });
+
+export const PartnerSlot = dynamic(() => import("./PartnerPanel").then((m) => m.PartnerPanel), {
+  ssr: false,
+  loading: () => <section className="card card-ph" aria-busy="true" aria-label="Partner cabinet loading" />,
+});

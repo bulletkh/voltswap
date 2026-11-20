@@ -1,5 +1,6 @@
 import { FEE_RATE } from "./config";
 import { OWNER_ADDRESS, TX_FIELDS, classify, coinMeta, currentPrices, dayKey, dayPrices, gql, normType, type FeeEvent, type RawTx } from "./fees";
+import { normalizeSuiAddress, resolvePartnerTier, type PartnerTierId } from "./ranks";
 
 const PAGE = 50;
 const MAX_PAGES = 40; // up to 2000 transactions touching the treasury
@@ -23,8 +24,52 @@ export type OwnerStats = {
   complete: boolean;
 };
 
-let cache: { at: number; data: OwnerStats } | null = null;
-let inflight: Promise<OwnerStats> | null = null;
+export type LeaderboardRow = {
+  rank: number;
+  address: string;
+  swaps: number;
+  volume: number;
+  last: number;
+};
+
+export type WalletRankStats = {
+  address: string;
+  swaps: number;
+  volume: number;
+  rank: number | null;
+  invitedWallets: number;
+  referredSwaps: number;
+  referredVolume: number;
+  refEarnedUsd: number;
+};
+
+export type RefCheck = {
+  address: string;
+  volume: number;
+  active: boolean;
+  revSharePct: number;
+  tierId: PartnerTierId;
+  tierName: string;
+};
+
+export type RanksPayload = {
+  updated: number;
+  totalWallets: number;
+  leaderboard: LeaderboardRow[];
+  wallet: WalletRankStats | null;
+  referrer: RefCheck | null;
+};
+
+type RefAgg = { invited: Set<string>; swaps: number; volume: number; earnedUsd: number };
+type CachedBundle = {
+  ownerStats: OwnerStats;
+  allWallets: Map<string, { swaps: number; volume: number; fee: number; last: number; rank: number }>;
+  leaderboard: LeaderboardRow[];
+  refs: Map<string, RefAgg>;
+};
+
+let cache: { at: number; data: CachedBundle } | null = null;
+let inflight: Promise<CachedBundle> | null = null;
 
 async function fetchTxs(): Promise<{ txs: RawTx[]; complete: boolean }> {
   const q = `query($a:SuiAddress,$b:String){ transactions(last:${PAGE}, before:$b, filter:{affectedAddress:$a}){ pageInfo{hasPreviousPage startCursor} nodes{ ${TX_FIELDS} } } }`;
@@ -44,7 +89,7 @@ async function fetchTxs(): Promise<{ txs: RawTx[]; complete: boolean }> {
   return { txs, complete };
 }
 
-async function compute(): Promise<OwnerStats> {
+async function compute(): Promise<CachedBundle> {
   const { txs, complete } = await fetchTxs();
   const events: FeeEvent[] = [];
   for (const tx of txs) {
@@ -71,6 +116,7 @@ async function compute(): Promise<OwnerStats> {
   );
 
   let unpriced = 0;
+  const refs = new Map<string, RefAgg>();
   const swaps: OwnerSwap[] = events.map((e) => {
     const m = metas.get(e.feeCoin);
     const dec = m?.decimals ?? 9;
@@ -78,7 +124,18 @@ async function compute(): Promise<OwnerStats> {
     const vol = Number(e.volumeRaw) / 10 ** dec;
     const price = hist.get(e.feeCoin)?.get(dayKey(e.t)) ?? now.get(e.feeCoin);
     if (price === undefined) unpriced++;
-    return { digest: e.digest, t: e.t, wallet: e.wallet, coin: m?.symbol ?? e.feeCoin.split("::").pop() ?? "?", fee, feeUsd: price === undefined ? null : fee * price, volumeUsd: price === undefined ? null : vol * price };
+    const volumeUsd = price === undefined ? null : vol * price;
+    if (e.referrer && e.refFeeRaw) {
+      const refNorm = normalizeSuiAddress(e.referrer) ?? e.referrer.toLowerCase();
+      const refFee = Number(e.refFeeRaw) / 10 ** dec;
+      const r = refs.get(refNorm) ?? { invited: new Set<string>(), swaps: 0, volume: 0, earnedUsd: 0 };
+      r.invited.add(e.wallet);
+      r.swaps++;
+      r.volume += volumeUsd ?? 0;
+      if (price !== undefined) r.earnedUsd += refFee * price;
+      refs.set(refNorm, r);
+    }
+    return { digest: e.digest, t: e.t, wallet: e.wallet, coin: m?.symbol ?? e.feeCoin.split("::").pop() ?? "?", fee, feeUsd: price === undefined ? null : fee * price, volumeUsd };
   });
 
   const period = (since: number): Period => {
@@ -150,13 +207,27 @@ async function compute(): Promise<OwnerStats> {
     /* balances are optional */
   }
 
-  return {
+  const sortedWallets = [...wm.entries()]
+    .map(([address, v]) => ({ address: normalizeSuiAddress(address) ?? address.toLowerCase(), ...v }))
+    .sort((a, b) => b.volume - a.volume);
+
+  const allWallets = new Map<string, { swaps: number; volume: number; fee: number; last: number; rank: number }>();
+  const leaderboard: LeaderboardRow[] = [];
+  sortedWallets.forEach((w, idx) => {
+    const rank = idx + 1;
+    allWallets.set(w.address, { swaps: w.swaps, volume: w.volume, fee: w.fee, last: w.last, rank });
+    if (idx < 50) {
+      leaderboard.push({ rank, address: w.address, swaps: w.swaps, volume: w.volume, last: w.last });
+    }
+  });
+
+  const ownerStats: OwnerStats = {
     updated: Date.now(),
     owner: OWNER_ADDRESS,
     feeRate: FEE_RATE,
     periods,
     daily: [...dailyMap.entries()].map(([day, v]) => ({ day, ...v })),
-    wallets: [...wm.entries()].map(([address, v]) => ({ address, ...v })).sort((a, b) => b.volume - a.volume).slice(0, 25),
+    wallets: sortedWallets.slice(0, 25),
     coins: [...cm.entries()].map(([symbol, v]) => ({ symbol, amount: v.amount, usd: v.priced ? v.usd : null, swaps: v.swaps })).sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0)),
     recent: swaps.slice(-30).reverse(),
     balances: balances.slice(0, 12),
@@ -165,9 +236,11 @@ async function compute(): Promise<OwnerStats> {
     scanned: txs.length,
     complete,
   };
+
+  return { ownerStats, allWallets, leaderboard, refs };
 }
 
-export async function getOwnerStats(): Promise<OwnerStats> {
+async function getBundle(): Promise<CachedBundle> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
   if (!inflight) {
     inflight = compute()
@@ -180,4 +253,53 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       });
   }
   return inflight;
+}
+
+export async function getOwnerStats(): Promise<OwnerStats> {
+  return (await getBundle()).ownerStats;
+}
+
+export async function getRanksData(walletRaw?: string | null, refRaw?: string | null): Promise<RanksPayload> {
+  const b = await getBundle();
+  const wNorm = normalizeSuiAddress(walletRaw);
+  const rNorm = normalizeSuiAddress(refRaw);
+
+  let wallet: WalletRankStats | null = null;
+  if (wNorm) {
+    const w = b.allWallets.get(wNorm);
+    const ref = b.refs.get(wNorm);
+    wallet = {
+      address: wNorm,
+      swaps: w?.swaps ?? 0,
+      volume: w?.volume ?? 0,
+      rank: w?.rank ?? null,
+      invitedWallets: ref?.invited.size ?? 0,
+      referredSwaps: ref?.swaps ?? 0,
+      referredVolume: ref?.volume ?? 0,
+      refEarnedUsd: ref?.earnedUsd ?? 0,
+    };
+  }
+
+  let referrer: RefCheck | null = null;
+  if (rNorm) {
+    const rw = b.allWallets.get(rNorm);
+    const vol = rw?.volume ?? 0;
+    const tier = resolvePartnerTier(rNorm, vol);
+    referrer = {
+      address: rNorm,
+      volume: vol,
+      active: tier.active,
+      revSharePct: tier.revSharePct,
+      tierId: tier.id,
+      tierName: tier.name,
+    };
+  }
+
+  return {
+    updated: b.ownerStats.updated,
+    totalWallets: b.allWallets.size,
+    leaderboard: b.leaderboard,
+    wallet,
+    referrer,
+  };
 }

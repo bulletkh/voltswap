@@ -45,12 +45,15 @@ export type FeeEvent = {
   feeRaw: bigint;
   volumeRaw: bigint; // size of the swap in feeCoin units
   rate: number;
+  referrer?: string;
+  refFeeRaw?: bigint;
 };
 
 /**
  * A fee payment = a successful tx where someone other than the treasury sends a coin to the treasury
  * and the same tx is a swap for that sender (one coin leaves, another arrives), with the payment being
- * roughly 0.01–1% of the swapped amount. Plain transfers and airdrops do not match.
+ * roughly 0.005–1% of the swapped amount. Plain transfers and airdrops do not match.
+ * If an atomic partner rev-share split occurred in the same PTB, `referrer` and `refFeeRaw` are captured too.
  */
 export function classify(tx: RawTx): FeeEvent | null {
   const e = tx.effects;
@@ -58,12 +61,19 @@ export function classify(tx: RawTx): FeeEvent | null {
   if (!e || e.status !== "SUCCESS" || !sender || sender === OWNER_ADDRESS) return null;
   const mine = new Map<string, bigint>();
   const theirs = new Map<string, bigint>();
+  const others = new Map<string, Map<string, bigint>>();
   for (const b of e.balanceChanges.nodes) {
     const o = b.owner?.address?.toLowerCase();
+    if (!o) continue;
     const c = normType(b.coinType.repr);
     const a = BigInt(b.amount);
     if (o === OWNER_ADDRESS) mine.set(c, (mine.get(c) ?? 0n) + a);
     else if (o === sender) theirs.set(c, (theirs.get(c) ?? 0n) + a);
+    else {
+      const m = others.get(c) ?? new Map<string, bigint>();
+      m.set(o, (m.get(o) ?? 0n) + a);
+      others.set(c, m);
+    }
   }
   const gains = [...theirs.values()].some((v) => v > 0n);
   const losses = [...theirs.values()].some((v) => v < 0n);
@@ -75,8 +85,30 @@ export function classify(tx: RawTx): FeeEvent | null {
     const volume = s > 0n ? s + fee : s < 0n ? -s : 0n;
     if (volume <= 0n) continue;
     const rate = Number(fee) / Number(volume);
-    if (rate < 0.0001 || rate > 0.01) continue;
-    return { digest: tx.digest, t: Date.parse(e.timestamp ?? "") || 0, wallet: sender, feeCoin: coin, feeRaw: fee, volumeRaw: volume, rate };
+    if (rate < 0.00005 || rate > 0.01) continue;
+    let referrer: string | undefined;
+    let refFeeRaw: bigint | undefined;
+    const coinOthers = others.get(coin);
+    if (coinOthers) {
+      for (const [addr, amt] of coinOthers) {
+        if (amt > 0n && amt * 100n >= fee * 20n && amt * 100n <= fee * 110n) {
+          referrer = addr;
+          refFeeRaw = amt;
+          break;
+        }
+      }
+    }
+    return {
+      digest: tx.digest,
+      t: Date.parse(e.timestamp ?? "") || 0,
+      wallet: sender,
+      feeCoin: coin,
+      feeRaw: fee,
+      volumeRaw: volume,
+      rate,
+      referrer,
+      refFeeRaw,
+    };
   }
   return null;
 }
