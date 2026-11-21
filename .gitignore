@@ -5,3 +5,6 @@ node_modules
 next-env.d.ts
 *.tsbuildinfo
 .whale-tg-state.json
+.trend-history.json
+.trend-card-*.png
+.trend-card-*.json
