@@ -37,6 +37,17 @@ const TOPIC_HINT = (process.env.TOPIC_HINT ?? "").trim();
 const STABLES = new Set(["USDC", "USDT", "BUCK", "AUSD", "FDUSD", "USDY", "SUSDC", "WUSDC", "USDB", "SBUSDT", "DAI"]);
 const isStable = (s) => STABLES.has(String(s ?? "").trim().toUpperCase());
 
+function sanitizeTelegramHtml(raw) {
+  let s = String(raw ?? "")
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/\s*(p|div|li|h[1-6])\s*>/gi, "\n")
+    .replace(/<\s*(p|div|li|h[1-6])[^>]*>/gi, "")
+    .replace(/<(?!\/?(?:b|strong|i|em|code|pre|a)(?:\s|>|$))[^>]+>/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return s;
+}
+
 function fmtUsd(v) {
   if (!Number.isFinite(v)) return "$0";
   const a = Math.abs(v);
@@ -352,9 +363,9 @@ STRICT RULES:
 1. NEVER invent or hallucinate numbers. Cite ONLY real numbers from the LIVE SIGNALS JSON.
 2. NEVER repeat a topic covered in the last 72h list below.
 3. ZERO AI slop or cringe marketing buzzwords (ban: "exciting", "revolutionizing", "game-changer", "dive into", "in the rapidly evolving", "delve", "unlock the power", "seamless"). Write like a real sharp crypto trader/analyst on X.
-4. Tie the live Sui trend naturally (1 short line) to the most relevant Voltswap link (voltswap.org, voltswap.org/whales, or voltswap.org/partner). Never mention Darkglide.
-5. x_text MUST be strictly <= 255 characters total (including URL and max 2 hashtags like #Sui #DeFi).
-6. tg_html must be crisp Telegram HTML (<b>, <code>, <i> only — no markdown **, no unescaped < or >), 300-520 chars, great for @voltswap_org subscribers.
+4. Tie the live Sui trend naturally (1 short line) to Voltswap (mention Voltswap Whale Radar or Voltswap split-routing). IMPORTANT for X reach & API cost: in x_text do NOT put clickable URLs or raw domain links (the URL already appears cleanly on the attached data graphic card!). Never mention Darkglide.
+5. x_text MUST be strictly <= 255 characters total (no URLs, max 2 hashtags like #Sui #DeFi).
+6. tg_html must use plain newlines (\n) — NEVER use <br> or <p> tags! Allowed Telegram HTML tags ONLY: <b>, <code>, <i>, <a href="...">. 300-520 chars, great for @voltswap_org subscribers.
 7. card fields MUST be clean ASCII/numbers (NO emojis in card fields!) for a 1600x900 dark-gold data graphic:
    - badge: 2-4 words uppercase (e.g. "SUI WHALE PULSE", "SUI BTCFI LIVE", "SUI TVL MOVERS")
    - headline: punchy 5-10 word headline with a real number or ticker
@@ -588,11 +599,12 @@ async function publishToTelegram(captionHtml, pngPath) {
     ],
   };
 
+  const caption = sanitizeTelegramHtml(captionHtml).slice(0, 1020);
   if (pngPath && fs.existsSync(pngPath)) {
     const fd = new FormData();
     fd.append("chat_id", chatId);
     fd.append("photo", new Blob([fs.readFileSync(pngPath)], { type: "image/png" }), "voltswap_trend.png");
-    fd.append("caption", captionHtml.slice(0, 1020));
+    fd.append("caption", caption);
     fd.append("parse_mode", "HTML");
     fd.append("reply_markup", JSON.stringify(replyMarkup));
     const r = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
@@ -609,7 +621,7 @@ async function publishToTelegram(captionHtml, pngPath) {
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text: captionHtml, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: replyMarkup }),
+    body: JSON.stringify({ chat_id: chatId, text: caption, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: replyMarkup }),
     signal: AbortSignal.timeout(15_000),
   });
   const j = await r.json().catch(() => ({ ok: false }));
