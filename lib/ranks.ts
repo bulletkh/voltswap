@@ -83,7 +83,7 @@ export const TRADER_TIERS: TraderTier[] = [
   },
 ];
 
-export type PartnerTierId = "locked" | "scout" | "commander" | "vip" | "syndicate";
+export type PartnerTierId = "locked" | "scout" | "commander" | "vip" | "syndicate" | "elite";
 
 export type PartnerTier = {
   id: PartnerTierId;
@@ -166,10 +166,25 @@ export const PARTNER_TIERS: PartnerTier[] = [
   },
 ];
 
-// Sprint winner whitelists — add normalized 0x... Sui addresses here or via comma-separated env vars.
+// Invite-only 1-of-1 Apex Partner tier (70% atomic PTB split — not listed publicly on /partner).
+export const ELITE_70_TIER: PartnerTier = {
+  id: "elite",
+  name: "Apex Partner",
+  emoji: "🔥",
+  active: true,
+  revSharePct: 0.7,
+  minVolumeUsd: 0,
+  minActiveRefs: 0,
+  color: "#ff9f1c",
+  glow: "rgba(255, 159, 28, 0.78)",
+  requirement: "Exclusive 1-of-1 Founding Media Partner (70% atomic PTB split)",
+};
+
+// Sprint & Media partner whitelists — add normalized 0x... Sui addresses here or via comma-separated env vars.
 const STATIC_SCOUT_25_PARTNERS: string[] = [];
 const STATIC_VIP_40_PARTNERS: string[] = [];
 const STATIC_SYNDICATE_50_PARTNERS: string[] = [];
+const STATIC_ELITE_70_PARTNERS: string[] = [];
 
 function parseAddrList(raw: string | undefined, extra: string[]): Set<string> {
   const out = new Set<string>();
@@ -184,6 +199,7 @@ function parseAddrList(raw: string | undefined, extra: string[]): Set<string> {
 export const SCOUT_25_SET = parseAddrList(process.env.NEXT_PUBLIC_SCOUT_25_PARTNERS, STATIC_SCOUT_25_PARTNERS);
 export const VIP_40_SET = parseAddrList(process.env.NEXT_PUBLIC_VIP_40_PARTNERS, STATIC_VIP_40_PARTNERS);
 export const SYNDICATE_50_SET = parseAddrList(process.env.NEXT_PUBLIC_SYNDICATE_50_PARTNERS, STATIC_SYNDICATE_50_PARTNERS);
+export const ELITE_70_SET = parseAddrList(process.env.NEXT_PUBLIC_ELITE_70_PARTNERS, STATIC_ELITE_70_PARTNERS);
 
 export function normalizeSuiAddress(raw?: string | null): string | null {
   if (!raw) return null;
@@ -211,10 +227,12 @@ export function resolvePartnerTier(
 ): PartnerTier {
   const norm = normalizeSuiAddress(address);
   const totalVol = volumeUsd + referredVolumeUsd;
+  const whitelisted70 = Boolean(norm && ELITE_70_SET.has(norm));
   const whitelisted50 = Boolean(norm && SYNDICATE_50_SET.has(norm));
   const whitelisted40 = Boolean(norm && VIP_40_SET.has(norm));
   const whitelisted25 = Boolean(norm && SCOUT_25_SET.has(norm));
 
+  if (whitelisted70) return ELITE_70_TIER; // Exclusive 70% Apex Partner
   if (whitelisted50) return PARTNER_TIERS[4]; // Whale Syndicate 50% (Sprint / KOL whitelist)
   if (volumeUsd < PARTNER_MIN_VOLUME_USD && !whitelisted40 && !whitelisted25) {
     return PARTNER_TIERS[0]; // Locked until $100 personal swap (or Sprint whitelist)

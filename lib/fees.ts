@@ -85,13 +85,13 @@ export function classify(tx: RawTx): FeeEvent | null {
     const volume = s > 0n ? s + fee : s < 0n ? -s : 0n;
     if (volume <= 0n) continue;
     const rate = Number(fee) / Number(volume);
-    if (rate < 0.00005 || rate > 0.01) continue;
+    if (rate < 0.00002 || rate > 0.01) continue;
     let referrer: string | undefined;
     let refFeeRaw: bigint | undefined;
     const coinOthers = others.get(coin);
     if (coinOthers) {
       for (const [addr, amt] of coinOthers) {
-        if (amt > 0n && amt * 100n >= fee * 20n && amt * 100n <= fee * 110n) {
+        if (amt > 0n && amt * 100n >= fee * 20n && amt * 100n <= fee * 260n) {
           referrer = addr;
           refFeeRaw = amt;
           break;
