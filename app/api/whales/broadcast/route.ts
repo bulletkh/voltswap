@@ -8,6 +8,7 @@ export const maxDuration = 30;
 const STABLES = new Set([
   "USDC",
   "USDT",
+  "SUIUSDT",
   "BUCK",
   "AUSD",
   "FDUSD",
@@ -18,8 +19,16 @@ const STABLES = new Set([
   "SBUSDT",
   "USDSUI",
   "DAI",
+  "USD1",
+  "USDE",
 ]);
-const BTC_TOKENS = new Set(["HBTC", "LBTC", "WBTC", "XBTC", "SBTC", "BTC", "TBTC", "CBBTC"]);
+const BTC_TOKENS = new Set(["HBTC", "LBTC", "WBTC", "XBTC", "SBTC", "BTC", "TBTC", "CBBTC", "SOLVBTC", "FBTC"]);
+const SAME_KIND_FAMILIES = [
+  STABLES,
+  BTC_TOKENS,
+  new Set(["SUI", "HASUI", "AFSUI", "VSUI", "SSUI", "KSUI", "MSUI", "SPRINGSUI", "STUI", "GSUI"]),
+  new Set(["ETH", "WETH", "STETH", "WSTETH", "CBETH", "RETH", "WEETH", "EZETH"]),
+];
 
 const sentDigests = new Map<string, number>();
 const SENT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -28,6 +37,13 @@ const GROUP_WINDOW_MS = 10 * 60 * 1000;
 const norm = (s: string) => s.trim().toUpperCase();
 const isStable = (s: string) => STABLES.has(norm(s));
 const isBtc = (s: string) => BTC_TOKENS.has(norm(s));
+const sameKind = (a: string, b: string) => {
+  const na = norm(a);
+  const nb = norm(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  return SAME_KIND_FAMILIES.some((fam) => fam.has(na) && fam.has(nb));
+};
 const fmtUsd = (v: number) => "$" + Math.round(v).toLocaleString("en-US");
 const shortAddr = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 
@@ -123,7 +139,6 @@ async function handle(req: Request) {
 
   const sp = new URL(req.url).searchParams;
   const minUsd = Math.max(1_000, Number(sp.get("minUsd") ?? process.env.WHALE_TG_MIN_USD ?? "10000") || 10_000);
-  const stableMinUsd = Math.max(minUsd, Number(sp.get("stableMinUsd") ?? process.env.WHALE_TG_STABLE_MIN_USD ?? "25000") || 25_000);
   const maxPerRun = Math.max(1, Math.min(5, Number(sp.get("max") ?? process.env.WHALE_TG_MAX_PER_RUN ?? "2") || 2));
   const windowSec = Math.max(60, Math.min(3_600, Number(sp.get("windowSec") ?? "360") || 360));
   const dryRun = sp.get("dryRun") === "1";
@@ -136,7 +151,7 @@ async function handle(req: Request) {
   const data = await getWhales(true);
   const unseen = data.items.filter((w) => now - w.t <= windowSec * 1000 && !sentDigests.has(w.digest));
   const qualified = groupSwaps(unseen)
-    .filter((g) => g.usd >= (isStable(g.inSym) && isStable(g.outSym) ? stableMinUsd : minUsd))
+    .filter((g) => !sameKind(g.inSym, g.outSym) && g.usd >= minUsd)
     .sort((a, b) => b.usd - a.usd)
     .slice(0, maxPerRun);
 

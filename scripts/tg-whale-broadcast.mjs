@@ -37,6 +37,7 @@ const GROUP_WINDOW_MS = 10 * 60 * 1000;
 const STABLES = new Set([
   "USDC",
   "USDT",
+  "SUIUSDT",
   "BUCK",
   "AUSD",
   "FDUSD",
@@ -47,13 +48,29 @@ const STABLES = new Set([
   "SBUSDT",
   "USDSUI",
   "DAI",
+  "USD1",
+  "USDE",
 ]);
 
-const BTC_TOKENS = new Set(["HBTC", "LBTC", "WBTC", "XBTC", "SBTC", "BTC", "TBTC", "CBBTC"]);
+const BTC_TOKENS = new Set(["HBTC", "LBTC", "WBTC", "XBTC", "SBTC", "BTC", "TBTC", "CBBTC", "SOLVBTC", "FBTC"]);
+
+const SAME_KIND_FAMILIES = [
+  STABLES,
+  BTC_TOKENS,
+  new Set(["SUI", "HASUI", "AFSUI", "VSUI", "SSUI", "KSUI", "MSUI", "SPRINGSUI", "STUI", "GSUI"]),
+  new Set(["ETH", "WETH", "STETH", "WSTETH", "CBETH", "RETH", "WEETH", "EZETH"]),
+];
 
 const normSym = (s) => String(s ?? "").trim().toUpperCase();
 const isStable = (s) => STABLES.has(normSym(s));
 const isBtc = (s) => BTC_TOKENS.has(normSym(s));
+const sameKind = (a, b) => {
+  const na = normSym(a);
+  const nb = normSym(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  return SAME_KIND_FAMILIES.some((fam) => fam.has(na) && fam.has(nb));
+};
 
 const esc = (s) =>
   String(s ?? "")
@@ -232,9 +249,9 @@ async function main() {
   });
 
   const grouped = groupRecentSwaps(freshUnseen).filter((g) => {
-    const bothStable = isStable(g.inSym) && isStable(g.outSym);
-    const floor = bothStable ? STABLE_MIN_USD : MIN_USD;
-    return g.usd >= floor;
+    // Skip same-family rebalancing/arb swaps (stable<->stable, SUI<->haSUI/vSUI/afSUI, wBTC<->hBTC, ETH<->WETH)
+    if (sameKind(g.inSym, g.outSym)) return false;
+    return g.usd >= MIN_USD;
   });
 
   // Prioritize largest swaps first, cap per run to avoid spamming
