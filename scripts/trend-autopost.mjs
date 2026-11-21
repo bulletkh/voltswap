@@ -211,15 +211,133 @@ function extractJsonObject(raw) {
   return JSON.parse(candidate.slice(first, last + 1));
 }
 
+function buildDeterministicFallback(signals, recentHistory) {
+  const recentKeys = new Set(
+    (recentHistory.posts || [])
+      .filter((p) => Date.now() - (p.ts || 0) < 48 * 60 * 60 * 1000)
+      .map((p) => p.topic_key),
+  );
+  const w = signals.whales || { swapCount1h: 0, totalUsd1h: 0, dexVolume: [], topNet: [], topSwaps: [] };
+  const topDex = w.dexVolume?.[0];
+  const topNet = w.topNet?.[0];
+  const topPair = signals.dexScreenerSui?.[0];
+  const topNews = signals.newsHeadlines?.find((n) => n.title && n.title.length > 20);
+  const topLlama = [...(signals.defiLlamaSui || [])].sort((a, b) => (b.change24hPct ?? -999) - (a.change24hPct ?? -999))[0];
+
+  // Candidate 1: Breaking Sui news + live Whale Radar context
+  if (topNews && !recentKeys.has("news-" + topNews.title.toLowerCase().slice(0, 24).replace(/[^a-z0-9]+/g, "-"))) {
+    const cleanTitle = topNews.title.replace(/\s+-\s+[^-]+$/, "").trim();
+    const key = "news-" + cleanTitle.toLowerCase().slice(0, 24).replace(/[^a-z0-9]+/g, "-");
+    const shortHeadline = cleanTitle.length > 64 ? cleanTitle.slice(0, 61).trimEnd() + "..." : cleanTitle;
+    const xText = trimXText(
+      `Trending on @SuiNetwork right now:\n${shortHeadline}\n\nLive Whale Radar: ${w.swapCount1h} large swaps (${fmtUsd(w.totalUsd1h)}) in the last hour${topDex ? `, led by ${topDex.dex}` : ""}.\n\nTrack live & swap (0.10% -> 0.00% fee):\nhttps://voltswap.org/whales\n#Sui #DeFi`,
+      274,
+    );
+    const tgHtml = [
+      `⚡ <b>Trending on Sui Right Now</b>`,
+      ``,
+      `<b>${cleanTitle.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</b>`,
+      ``,
+      `🐋 Live Whale Radar (1h): <code>${w.swapCount1h} swaps</code> · <code>${fmtUsd(w.totalUsd1h)}</code>${topDex ? ` (led by <b>${topDex.dex}</b>)` : ""}`,
+      topPair ? `📊 Spot Pulse: <code>${topPair.pair}</code> 24h vol <code>${fmtUsd(topPair.vol24hUsd)}</code> (${topPair.change24hPct ?? 0}%)` : "",
+      ``,
+      `<i>Track live flows &amp; split-route across all 5 Sui DEX pools at voltswap.org/whales</i>`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    return {
+      topic_key: key,
+      x_text: xText,
+      tg_html: tgHtml,
+      card: {
+        badge: "TRENDING ON SUI",
+        headline: shortHeadline,
+        subline: "Live Sui ecosystem momentum paired with real-time on-chain Whale Radar liquidity.",
+        cta: "voltswap.org/whales",
+        stats: [
+          { label: "WHALE RADAR (1H)", value: fmtUsd(w.totalUsd1h), note: `${w.swapCount1h} large swaps live`, tone: "gold" },
+          {
+            label: topPair ? `${topPair.pair} 24H VOL` : "TOP DEX FLOW",
+            value: topPair ? fmtUsd(topPair.vol24hUsd) : topDex ? fmtUsd(topDex.usd) : "$3M+",
+            note: topPair?.change24hPct != null ? `24h move: ${topPair.change24hPct}%` : topDex ? `${topDex.dex} leading` : "Sui spot volume",
+            tone: (topPair?.change24hPct ?? 0) >= 0 ? "up" : "down",
+          },
+          { label: "VOLTSWAP FEE", value: "0.10% -> 0.00%", note: "6 ranks + 50% atomic PTB", tone: "neutral" },
+        ],
+      },
+    };
+  }
+
+  // Candidate 2: Live Whale Radar + TVL Pulse
+  const key = `whale-pulse-${new Date().toISOString().slice(0, 13)}`;
+  const netStr = topNet ? `${topNet.sym} ${topNet.bias === "net_buy" ? "net buy" : "net sell"} ${fmtUsd(Math.abs(topNet.netUsd))}` : `${w.swapCount1h} whale swaps live`;
+  const xText = trimXText(
+    `Sui Whale Pulse (last 1h) ⚡\n\n• ${w.swapCount1h} large swaps worth ${fmtUsd(w.totalUsd1h)}\n• Flow focus: ${netStr}${topDex ? `\n• Top venue: ${topDex.dex} (${fmtUsd(topDex.usd)})` : ""}\n\nWatch live free & split-route:\nhttps://voltswap.org/whales\n#Sui #DeFi`,
+    274,
+  );
+  const tgHtml = [
+    `🐋 <b>Sui Whale Pulse (Last 1h)</b>`,
+    ``,
+    `• Large swaps tracked: <code>${w.swapCount1h}</code> (<b>${fmtUsd(w.totalUsd1h)}</b>)`,
+    `• Top flow bias: <code>${netStr}</code>`,
+    topDex ? `• Leading DEX: <b>${topDex.dex}</b> (<code>${fmtUsd(topDex.usd)}</code>)` : "",
+    topLlama ? `• DeFiLlama mover: <b>${topLlama.name}</b> (<code>${fmtUsd(topLlama.suiTvlUsd)}</code> TVL)` : "",
+    ``,
+    `<i>Real-time non-custodial routing across all 5 Sui DEXes · 0.10% down to 0.00% fee</i>`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    topic_key: key,
+    x_text: xText,
+    tg_html: tgHtml,
+    card: {
+      badge: "SUI WHALE PULSE",
+      headline: `${fmtUsd(w.totalUsd1h)} in Large Sui Swaps Last Hour`,
+      subline: `Real-time flow across Cetus, DeepBook, Bluefin, Momentum & Turbos: ${netStr}.`,
+      cta: "voltswap.org/whales",
+      stats: [
+        { label: "1H WHALE VOLUME", value: fmtUsd(w.totalUsd1h), note: `${w.swapCount1h} swaps tracked live`, tone: "gold" },
+        {
+          label: topDex ? `TOP VENUE: ${topDex.dex}` : "FLOW BIAS",
+          value: topDex ? fmtUsd(topDex.usd) : netStr.slice(0, 18),
+          note: topNet ? `${topNet.sym} ${topNet.bias === "net_buy" ? "buying" : "selling"}` : "5 Sui DEXes live",
+          tone: topNet?.bias === "net_sell" ? "down" : "up",
+        },
+        {
+          label: topLlama ? `${topLlama.name} TVL` : "VOLTSWAP RANKS",
+          value: topLlama ? fmtUsd(topLlama.suiTvlUsd) : "0.10% -> 0.00%",
+          note: topLlama?.change24hPct != null ? `24h TVL: ${topLlama.change24hPct}%` : "6 glowing on-chain tiers",
+          tone: "neutral",
+        },
+      ],
+    },
+  };
+}
+
+async function callModelWithTimeout(ai, params, timeoutMs = 25_000) {
+  let timer;
+  try {
+    return await Promise.race([
+      ai.interactions.create(params),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timeout after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function generatePostWithGemini(signals, recentHistory) {
   const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
   if (!apiKey) {
-    console.log("[voltswap-trend] GEMINI_API_KEY is not set; skipping gracefully.");
-    return null;
+    console.log("[voltswap-trend] GEMINI_API_KEY is not set; using live deterministic data brief.");
+    return buildDeterministicFallback(signals, recentHistory);
   }
 
   const { GoogleGenAI } = await import("@google/genai");
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 22_000 } });
 
   const recentTopics = (recentHistory.posts || [])
     .filter((p) => Date.now() - (p.ts || 0) < 72 * 60 * 60 * 1000)
@@ -231,7 +349,7 @@ async function generatePostWithGemini(signals, recentHistory) {
 Write ONE sharp, data-backed post about the SINGLE hottest Sui ecosystem trend RIGHT NOW.
 
 STRICT RULES:
-1. NEVER invent or hallucinate numbers. Cite ONLY real numbers from the LIVE SIGNALS JSON or verified Google Search results from today.
+1. NEVER invent or hallucinate numbers. Cite ONLY real numbers from the LIVE SIGNALS JSON.
 2. NEVER repeat a topic covered in the last 72h list below.
 3. ZERO AI slop or cringe marketing buzzwords (ban: "exciting", "revolutionizing", "game-changer", "dive into", "in the rapidly evolving", "delve", "unlock the power", "seamless"). Write like a real sharp crypto trader/analyst on X.
 4. Tie the live Sui trend naturally (1 short line) to the most relevant Voltswap link (voltswap.org, voltswap.org/whales, or voltswap.org/partner). Never mention Darkglide.
@@ -275,33 +393,37 @@ Return ONLY valid JSON matching:
     .filter(Boolean)
     .join("\n");
 
-  const useSearch = process.env.GEMINI_ENABLE_SEARCH !== "0";
-  let interaction;
-  try {
-    interaction = await ai.interactions.create({
-      model: GEMINI_MODEL,
-      system_instruction: systemInstruction,
-      input: prompt,
-      tools: useSearch ? [{ type: "google_search" }] : undefined,
-      store: false,
-    });
-  } catch (err) {
-    if (!useSearch) throw err;
-    console.warn("[voltswap-trend] google_search call failed, retrying with direct live signals only:", err instanceof Error ? err.message : "err");
-    interaction = await ai.interactions.create({
-      model: GEMINI_MODEL,
-      system_instruction: systemInstruction,
-      input: prompt,
-      store: false,
-    });
+  const useSearch = process.env.GEMINI_ENABLE_SEARCH === "1";
+  const modelChain = [...new Set(["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", GEMINI_MODEL, "gemma-4-31b-it", "gemma-4-26b-a4b-it"].filter(Boolean))];
+
+  for (const model of modelChain) {
+    try {
+      const isGemma = model.startsWith("gemma-");
+      const interaction = await callModelWithTimeout(
+        ai,
+        {
+          model,
+          system_instruction: isGemma ? undefined : systemInstruction,
+          input: isGemma ? `${systemInstruction}\n\n${prompt}` : prompt,
+          tools: !isGemma && useSearch ? [{ type: "google_search" }] : undefined,
+          store: false,
+        },
+        25_000,
+      );
+      const parsed = extractJsonObject(interaction.output_text);
+      if (parsed?.x_text && parsed?.card?.headline) {
+        console.log(`[voltswap-trend] generated via model=${model}`);
+        parsed.x_text = trimXText(parsed.x_text, 274);
+        return parsed;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "err";
+      console.warn(`[voltswap-trend] model=${model} skipped: ${msg.slice(0, 180)}`);
+    }
   }
 
-  const parsed = extractJsonObject(interaction.output_text);
-  if (!parsed?.x_text || !parsed?.card?.headline) {
-    throw new Error("Incomplete JSON returned by Gemini");
-  }
-  parsed.x_text = trimXText(parsed.x_text, 274);
-  return parsed;
+  console.warn("[voltswap-trend] All Gemini/Gemma models hit rate limits; falling back to live deterministic data brief.");
+  return buildDeterministicFallback(signals, recentHistory);
 }
 
 function renderCardPng(cardData, outPngPath) {
@@ -557,8 +679,24 @@ async function main() {
 
   let xId = null;
   let tgId = null;
-  if (PUBLISH_X) xId = await publishToX(post.x_text, cardPng);
-  if (PUBLISH_TG) tgId = await publishToTelegram(post.tg_html, cardPng);
+  let xErr = null;
+  let tgErr = null;
+  if (PUBLISH_X) {
+    try {
+      xId = await publishToX(post.x_text, cardPng);
+    } catch (e) {
+      xErr = e instanceof Error ? e.message : "unknown";
+      console.error("[voltswap-trend] X publish error:", xErr);
+    }
+  }
+  if (PUBLISH_TG) {
+    try {
+      tgId = await publishToTelegram(post.tg_html, cardPng);
+    } catch (e) {
+      tgErr = e instanceof Error ? e.message : "unknown";
+      console.error("[voltswap-trend] Telegram publish error:", tgErr);
+    }
+  }
 
   if (xId || tgId) {
     history.posts.push({
@@ -572,6 +710,8 @@ async function main() {
     if (process.env.GITHUB_OUTPUT) {
       fs.appendFileSync(process.env.GITHUB_OUTPUT, "changed=true\n");
     }
+  } else if (xErr || tgErr) {
+    throw new Error(`Publish failed (x=${xErr ?? "skipped"}, tg=${tgErr ?? "skipped"})`);
   } else {
     console.log("[voltswap-trend] Neither X nor Telegram published (check secrets).");
   }
