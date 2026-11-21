@@ -629,6 +629,60 @@ async function publishToTelegram(captionHtml, pngPath) {
   return j.result?.message_id ?? null;
 }
 
+async function sendOwnerXAssist(post, pngPath) {
+  const token = (process.env.WHALE_TG_BOT_TOKEN ?? "").trim();
+  const ownerId = (process.env.OWNER_TG_CHAT_ID ?? "141393418").trim();
+  if (!token || !ownerId) return false;
+
+  const escHtml = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const intentUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(post.x_text)}`;
+  const caption = [
+    `🐦 <b>Ready for X (@voltswap)</b> · <code>${escHtml(post.topic_key || "sui-trend")}</code>`,
+    ``,
+    `<code>${escHtml(post.x_text)}</code>`,
+    ``,
+    `<i>1 tap opens X pre-filled -> attach this image &amp; hit Post (0$ mode).</i>`,
+  ].join("\n");
+
+  const replyMarkup = {
+    inline_keyboard: [[{ text: "🐦 Open X with Text Pre-Filled", url: intentUrl }]],
+  };
+
+  try {
+    let r;
+    if (pngPath && fs.existsSync(pngPath)) {
+      const fd = new FormData();
+      fd.append("chat_id", ownerId);
+      fd.append("photo", new Blob([fs.readFileSync(pngPath)], { type: "image/png" }), "voltswap_x_post.png");
+      fd.append("caption", caption.slice(0, 1020));
+      fd.append("parse_mode", "HTML");
+      fd.append("reply_markup", JSON.stringify(replyMarkup));
+      r = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: "POST",
+        body: fd,
+        signal: AbortSignal.timeout(15_000),
+      });
+    } else {
+      r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: ownerId, text: caption, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: replyMarkup }),
+        signal: AbortSignal.timeout(15_000),
+      });
+    }
+    const j = await r.json().catch(() => ({ ok: false }));
+    if (!r.ok || !j.ok) {
+      console.warn(`[voltswap-trend] Owner X-assist DM skipped (${r.status}): ${j.description ?? "unknown"} (open @Voltswap_sui_bot and press /start once to enable DMs)`);
+      return false;
+    }
+    console.log(`[voltswap-trend] Sent 1-tap X-assist DM to owner (${ownerId}): msg_id=${j.result?.message_id}`);
+    return true;
+  } catch (e) {
+    console.warn("[voltswap-trend] Owner X-assist DM error:", e instanceof Error ? e.message : "unknown");
+    return false;
+  }
+}
+
 async function main() {
   const signals = await collectLiveSignals();
   console.log(
@@ -708,6 +762,10 @@ async function main() {
       tgErr = e instanceof Error ? e.message : "unknown";
       console.error("[voltswap-trend] Telegram publish error:", tgErr);
     }
+  }
+
+  if (PUBLISH_X && !xId) {
+    await sendOwnerXAssist(post, cardPng);
   }
 
   if (xId || tgId) {
