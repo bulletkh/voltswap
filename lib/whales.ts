@@ -294,7 +294,7 @@ async function refresh() {
   state.whales = new Map(sorted.map((w) => [w.digest, w]));
 }
 
-export async function getWhales(): Promise<{ updated: number; floor: number; error: string | null; stats: typeof state.stats; items: Whale[] }> {
+export async function getWhales(waitFresh = false): Promise<{ updated: number; floor: number; error: string | null; stats: typeof state.stats; items: Whale[] }> {
   if (!state.inflight && Date.now() - state.lastRun >= MIN_INTERVAL_MS) {
     state.lastRun = Date.now();
     state.inflight = refresh()
@@ -308,7 +308,7 @@ export async function getWhales(): Promise<{ updated: number; floor: number; err
         state.inflight = null;
       });
   }
-  if (state.inflight && !state.warmAll) await state.inflight;
+  if (state.inflight && (!state.warmAll || waitFresh)) await state.inflight;
   return {
     updated: state.lastRun,
     floor: FLOOR_USD,
