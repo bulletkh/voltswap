@@ -1,0 +1,82 @@
+name: Voltswap Live Trend Autopost
+
+on:
+  schedule:
+    - cron: "30 10,16 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run without publishing to X or Telegram (true/false)"
+        required: false
+        default: "false"
+      topic_hint:
+        description: "Optional priority trend/topic focus"
+        required: false
+        default: ""
+      publish_x:
+        description: "Publish to X (@voltswap) (true/false)"
+        required: false
+        default: "true"
+      publish_tg:
+        description: "Publish to Telegram (@voltswap_org) (true/false)"
+        required: false
+        default: "true"
+
+concurrency:
+  group: voltswap-trend-autopost
+  cancel-in-progress: false
+
+jobs:
+  autopost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Python & Pillow for data card graphics
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime tools (@google/genai + pillow)
+        run: |
+          npm install --no-save @google/genai
+          pip install --quiet pillow
+
+      - name: Restore 72h posted trend history cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .trend-history.json
+          key: voltswap-trend-history-${{ github.run_id }}
+          restore-keys: |
+            voltswap-trend-history-
+
+      - name: Collect live Sui trends, generate card & publish
+        id: run
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          WHALE_TG_BOT_TOKEN: ${{ secrets.WHALE_TG_BOT_TOKEN }}
+          WHALE_TG_CHANNEL_ID: ${{ secrets.WHALE_TG_CHANNEL_ID }}
+          DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '0' }}
+          TOPIC_HINT: ${{ inputs.topic_hint || '' }}
+          PUBLISH_X: ${{ inputs.publish_x == 'false' && '0' || '1' }}
+          PUBLISH_TG: ${{ inputs.publish_tg == 'false' && '0' || '1' }}
+        run: node scripts/trend-autopost.mjs
+
+      - name: Save updated trend history cache
+        if: steps.run.outputs.changed == 'true' && hashFiles('.trend-history.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .trend-history.json
+          key: voltswap-trend-history-${{ github.run_id }}
