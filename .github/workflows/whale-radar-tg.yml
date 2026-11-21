@@ -1,0 +1,58 @@
+name: Whale Radar Telegram Alerts
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      min_usd:
+        description: "Minimum USD threshold for directional swaps (default 10000)"
+        required: false
+        default: "10000"
+      dry_run:
+        description: "Dry run without posting to Telegram (true/false)"
+        required: false
+        default: "false"
+
+concurrency:
+  group: whale-radar-tg-broadcast
+  cancel-in-progress: false
+
+jobs:
+  broadcast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Restore sent whale digests cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .whale-tg-state.json
+          key: whale-tg-state-${{ github.run_id }}
+          restore-keys: |
+            whale-tg-state-
+
+      - name: Scan Sui Whale Radar & post new alerts
+        id: scan
+        env:
+          WHALE_TG_BOT_TOKEN: ${{ secrets.WHALE_TG_BOT_TOKEN }}
+          WHALE_TG_CHANNEL_ID: ${{ secrets.WHALE_TG_CHANNEL_ID }}
+          WHALE_TG_MIN_USD: ${{ inputs.min_usd || vars.WHALE_TG_MIN_USD || '10000' }}
+          WHALE_TG_STABLE_MIN_USD: ${{ vars.WHALE_TG_STABLE_MIN_USD || '25000' }}
+          WHALE_TG_MAX_PER_RUN: "2"
+          WHALE_TG_DRY_RUN: ${{ inputs.dry_run == 'true' && '1' || '0' }}
+        run: node scripts/tg-whale-broadcast.mjs
+
+      - name: Save updated sent whale digests cache
+        if: steps.scan.outputs.changed == 'true' && hashFiles('.whale-tg-state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .whale-tg-state.json
+          key: whale-tg-state-${{ github.run_id }}
