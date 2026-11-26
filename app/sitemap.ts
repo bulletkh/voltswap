@@ -5,7 +5,7 @@ import type { MetadataRoute } from "next";
 const BASE = "https://voltswap.org";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const paths = ["", "/market", "/portfolio", "/whales", "/partner", "/terms", "/risks"];
+  const paths = ["", "/market", "/portfolio", "/merge", "/whales", "/partner", "/terms", "/risks"];
   const all = [
     ...paths,
     "/guides",
